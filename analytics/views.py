@@ -4,7 +4,6 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
 from django.db.models import Count
-from django.http import HttpResponseBadRequest
 from web import models
 from analytics.forms import ManualSentimentForm
 from recommendations.models import Recommendation
