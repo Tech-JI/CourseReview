@@ -32,7 +32,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     "web",
-    "spider.apps.SpiderConfig",
+    "spider",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
