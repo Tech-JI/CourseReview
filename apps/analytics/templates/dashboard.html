@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Analytics | Layup List{% endblock %}
+{% block content %}
+{% load admin_urls %}
+<div class="row">
+    <div class="col-md-12">
+        <h1> Analytics </h1>
+        <p> {{ activated_accounts }} users are activated. </p>
+        <p><a href="{% url 'crawled_datas' %}">View Crawled Data</a></p>
+        <p> <a href="{% url 'sentiment_labeler' %}">Sentiment Labeler</a>
+        <table class="table">
+            <thead>
+                <th>Range</th>
+                <th><a href="/admin/auth/user/?is_active__exact=1">Users</a></th>
+                <th>Good Votes</th>
+                <th>Layup Votes</th>
+                <th><a href="/admin/web/review/">Reviews</a></th>
+            </thead>
+            <tbody>
+                {% for c1, c2, c3, c4, c5 in overall_table %}
+                <tr>
+                    <th>{{ c1}}</th>
+                    <td>{{ c2 }}</td>
+                    <td>{{ c3 }}</td>
+                    <td>{{ c4 }}</td>
+                    <td>{{ c5 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <h3>Recommendations</h3>
+        <p><a href="/eligible_for_recommendations/">View users eligible for recommendations.</a></p>
+        <ul>
+            {% for rec_type, updated in recommendations_last_updated %}
+            <li>{{ rec_type }} last updated {{ updated }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <h3>Vote Breakdown</h3>
+        <table class="table">
+            <thead>
+                <th>Range</th>
+                <th>Good +</th>
+                <th>Good -</th>
+                <th>Layup +</th>
+                <th>Layup -</th>
+                <th>Total Unvotes</th>
+            </thead>
+            <tbody>
+                {% for c1, c2, c3, c4, c5, c6 in vote_table %}
+                <tr>
+                    <th>{{ c1}}</th>
+                    <td>{{ c2 }}</td>
+                    <td>{{ c3 }}</td>
+                    <td>{{ c4 }}</td>
+                    <td>{{ c5 }}</td>
+                    <td>{{ c6 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <h3>Class Breakdown</h3>
+        <table class="table">
+            <thead>
+                <th>Class Year</th>
+                {% for year, count in class_breakdown %}
+                    <th><a href="/admin/auth/user/?q=.{{ year }}&is_active__exact=1">{{ year }}</a></th>
+                {% endfor %}
+            </thead>
+            <tbody>
+                <tr>
+                    <th># Users</th>
+                    {% for year, count in class_breakdown %}
+                        <td>{{ count }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
