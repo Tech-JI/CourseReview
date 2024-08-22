@@ -36,7 +36,11 @@ class Student(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    unauth_session_ids = ArrayField(base_field=models.CharField(max_length=32, unique=True), default=list())
+    unauth_session_ids = ArrayField(
+        base_field=models.CharField(max_length=32, unique=True), 
+        default=list,
+        blank=True
+    )
 
     def send_confirmation_link(self, request):
         full_link = request.build_absolute_uri(
