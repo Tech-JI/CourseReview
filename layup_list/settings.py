@@ -1,11 +1,20 @@
 import os
 import dj_database_url
-import sys
+from pathlib import Path
+from dotenv import load_dotenv
+
+dotenv_path = Path('.env')
+if dotenv_path.exists():
+    load_dotenv(dotenv_path=dotenv_path)
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = "django-insecure-__9p!i2^udts*l==hl)+6=!fi872f3ec(n%(^f-!6i$o5+7#ar"
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv("DEBUG", False) == "True"
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SECRET_KEY = os.environ['SECRET_KEY']
-DEBUG = os.environ['DEBUG'] == "True"
 ALLOWED_HOSTS = ['ll-prod.herokuapp.com', '.layuplist.com'] if not DEBUG else ['0.0.0.0', 'localhost']
 AUTO_IMPORT_CRAWLED_DATA = os.environ.get('AUTO_IMPORT_CRAWLED_DATA') == "True"
 
@@ -17,11 +26,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'debug_toolbar',
     'pipeline',
     'crispy_forms',
     'hijack',
-    'compat',
     'hijack_admin',
     'django_celery_beat',
     'django_celery_results',
@@ -32,7 +39,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE_CLASSES = [
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -190,3 +196,5 @@ LOGGING = {
         "level": "WARNING",
     },
 }
+DEBUG = True
+
