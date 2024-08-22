@@ -1,0 +1,20 @@
+{{ users.all.count }} users ({{ users.new.count }} new).
+
+{{ users.unique_recent_logins.count }} unique users logged in this past week.
+
+{{ votes.all_quality_upvotes.count }} quality upvotes ({{ votes.new_quality_upvotes.count }} new).
+
+{{ votes.all_quality_downvotes.count }} quality downvotes ({{ votes.new_quality_downvotes.count }} new).
+
+{{ votes.all_difficulty_upvotes.count }} difficulty upvotes ({{ votes.new_difficulty_upvotes.count }} new).
+
+{{ votes.all_difficulty_downvotes.count }} difficulty downvotes ({{ votes.new_difficulty_downvotes.count }} new).
+
+{{ reviews.all.count }} reviews ({{ reviews.new.count }} new).
+
+{% for review in reviews.new %}
+{{ review.term }} {{ review.course }} {{ review.professor }} {{ review.user }}
+
+{{ review.comments }}
+
+{% endfor %}
