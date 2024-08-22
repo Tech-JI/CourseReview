@@ -1,0 +1,54 @@
+html, body {
+    height: 100%;
+}
+
+.logo {
+    width: 25px;
+    height: 25px;
+}
+
+.container-and-footer {
+    min-height: 100%;
+    position: relative;
+}
+
+.container {
+   padding-bottom: 140px;
+}
+
+.footer {
+    height: 100px;
+    background-color: #F6F6F6;
+    font-size: 0.9em;
+    position:absolute;
+    bottom:0;
+    width:100%;
+}
+
+.footer-inner {
+    max-width: 550px;
+    margin: 0 auto;
+    position: relative;
+    top: 40%;
+    transform: translateY(-50%);
+}
+
+.support-link {
+    font-size: 1em;
+}
+
+.score {
+    margin: 0;
+}
+
+.unselected {
+    color: #A7A7A7;
+}
+
+.selected {
+    color: #000;
+}
+
+.vote-arrow {
+    cursor: pointer;
+}
