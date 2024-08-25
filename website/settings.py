@@ -33,19 +33,23 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    "apps.web",
-    "apps.spider",
-    "apps.recommendations",
-    "apps.analytics",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'django.contrib.humanize',
-    'pipeline',
-    # 'hijack',  # hijack-admin (relies on compact) deprecated and merged into hijack
+    "django.contrib.humanize",
+    "debug_toolbar",
+    "pipeline",
+    "crispy_forms",
+    # "hijack",  # hijack-admin (relies on compact) deprecated and merged into hijack
+    "django_celery_beat",
+    "django_celery_results",
+    "apps.analytics",
+    "apps.recommendations",
+    "apps.spider",
+    "apps.web",
 ]
 
 MIDDLEWARE = [
@@ -56,6 +60,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = "website.urls"
@@ -139,7 +144,7 @@ STATICFILES_FINDERS = (
 )
 ROOT_ASSETS_DIR = os.path.join(BASE_DIR, 'root_assets')
 PIPELINE = {
-    'COMPILERS': ('react.utils.pipeline.JSXCompiler', ),
+    # 'COMPILERS': ('react.utils.pipeline.JSXCompiler', ),
     'JAVASCRIPT': {
         'app': {
             'source_filenames': (
