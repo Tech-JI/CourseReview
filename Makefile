@@ -3,6 +3,7 @@ run:
 clean:
 	python3 manage.py clearsession
 collect:
+	npm run build
 	python3 manage.py collectstatic
 migrate:
 	python3 manage.py migrate
