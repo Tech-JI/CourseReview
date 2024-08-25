@@ -17,7 +17,7 @@ class SignupForm(forms.Form):
         'password_mismatch': "The two password fields didn't match.",
     }
 
-    email = forms.EmailField(label="Dartmouth Undergraduate Email")
+    email = forms.EmailField(label="SJTU Undergraduate Email")
     password1 = forms.CharField(
         label="Password",
         widget=forms.PasswordInput)
@@ -47,9 +47,9 @@ class SignupForm(forms.Form):
         email = self.cleaned_data.get("email").lower()
         username = email.split("@")[0]
 
-        if not Student.objects.is_valid_dartmouth_student_email(email):
+        if not Student.objects.is_valid_sjtu_student_email(email):
             raise ValidationError(
-                "Only Dartmouth student emails are permitted for registration"
+                "Only SJTU student emails are permitted for registration"
                 " at this time.")
 
         if len(username) > 30:
