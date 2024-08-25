@@ -50,7 +50,7 @@ LIMITS = {
 
 def get_session_id(request):
     if 'user_id' not in request.session:
-        if not request.user.is_authenticated():
+        if not request.user.is_authenticated:
             request.session['user_id'] = uuid.uuid4().hex
         else:
             request.session['user_id'] = request.user.username
@@ -163,7 +163,7 @@ def current_term(request, sort):
             "Best Classes", "-quality_score", "-difficulty_score")
         vote_category = Vote.CATEGORIES.QUALITY
     else:
-        if not request.user.is_authenticated():
+        if not request.user.is_authenticated:
             return HttpResponseRedirect(
                 reverse("signup") + "?restriction=see layups")
 
@@ -187,7 +187,7 @@ def current_term(request, sort):
     except EmptyPage:
         courses = paginator.page(paginator.num_pages)
 
-    if courses.number > 1 and not request.user.is_authenticated():
+    if courses.number > 1 and not request.user.is_authenticated:
         return HttpResponseRedirect(
             reverse("signup") + "?restriction=see more")
 
@@ -212,7 +212,7 @@ def current_term(request, sort):
 def course_detail(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
-        prior_course_id = get_prior_course_id(request, course_id)
+        # prior_course_id = get_prior_course_id(request, course_id)
         # if prior_course_id is not None:
         #     result = pub_sub_publisher.publish(topic_paths['course-views'], b'', courseID=course_id, priorCourseID=prior_course_id, userID=get_session_id(request), timestamp=datetime.datetime.utcnow().isoformat(), source='ll', dataVersion='1')
         # else:
@@ -225,7 +225,7 @@ def course_detail(request, course_id):
         return HttpResponseNotFound('<h1>Page not found</h1>')
 
     form = None
-    if (request.user.is_authenticated() and
+    if (request.user.is_authenticated and
             Review.objects.user_can_write_review(request.user.id, course_id)):
         if request.method == 'POST':
             form = ReviewForm(request.POST)
@@ -247,7 +247,7 @@ def course_detail(request, course_id):
     except EmptyPage:
         reviews = paginator.page(paginator.num_pages)
 
-    if request.user.is_authenticated():
+    if request.user.is_authenticated:
         difficulty_vote, quality_vote = Vote.objects.for_course_and_user(
             course, request.user)
     else:
@@ -336,7 +336,7 @@ def course_search(request):
 
 @require_safe
 def course_review_search(request, course_id):
-    if not request.user.is_authenticated():
+    if not request.user.is_authenticated:
         return HttpResponseRedirect(
             reverse("signup") + "?restriction=see reviews")
 
@@ -345,7 +345,7 @@ def course_review_search(request, course_id):
     reviews = course.search_reviews(query)
     review_count = reviews.count()
 
-    if not request.user.is_authenticated():
+    if not request.user.is_authenticated:
         reviews = reviews[:LIMITS["unauthenticated_review_search"]]
 
     return render(request, 'course_review_search.html', {
@@ -404,7 +404,7 @@ def course_professors(request, course_id):
 
 @require_POST
 def vote(request, course_id):
-    if not request.user.is_authenticated():
+    if not request.user.is_authenticated:
         return HttpResponseForbidden()
 
     try:
