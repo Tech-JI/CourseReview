@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "debug_toolbar",
     "pipeline",
     "crispy_forms",
+    "crispy_bootstrap4",
     # "hijack",  # hijack-admin (relies on compact) deprecated and merged into hijack
     "django_celery_beat",
     "django_celery_results",
@@ -80,6 +81,8 @@ TEMPLATES = [
         },
     },
 ]
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 WSGI_APPLICATION = "website.wsgi.application"
 
