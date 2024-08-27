@@ -1,8 +1,8 @@
 import re
 from urllib.parse import urljoin
 
-from web.models import Course
-from spider.utils import (
+from apps.web.models import Course
+from apps.spider.utils import (
     parse_number_and_subnumber,
     retrieve_soup,
 )
