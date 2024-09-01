@@ -16,7 +16,7 @@ def int_or_none(string):
 
 
 def pretty_json(data):
-    return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
+    return json.dumps(data, sort_keys=True, indent=4, separators=(",", ": "))
 
 
 def parse_number_and_subnumber(numbers_text):
@@ -29,8 +29,9 @@ def parse_number_and_subnumber(numbers_text):
 
 
 def retrieve_soup(url, data=None, preprocess=lambda x: x):
+    print(url)
     if data is not None:
-        data = data.encode('utf-8')
+        data = data.encode("utf-8")
     with urllib_request.urlopen(url, data=data) as response:
-        return BeautifulSoup(preprocess(response.read().decode('utf-8')),
+        return BeautifulSoup(preprocess(response.read().decode("utf-8")),
                              "html.parser")
