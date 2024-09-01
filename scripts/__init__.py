@@ -4,18 +4,15 @@ from apps.spider.models import CrawledData
 from apps.spider.tasks import crawl_orc
 
 
-def crawl_and_import_data(include_orc=True):
+def crawl_and_import_data():
     old_task_always_eager = app.conf.task_always_eager
     app.conf.task_always_eager = True
 
     # ORC crawling takes a long time, especially when run synchronously.
     # If the ORC is not crawled, the course selection will only be limited,
     # but this should not interfere with development
-    if include_orc:
-        print("Crawling ORC. This will take a while.")
-        crawl_orc()
-    else:
-        print("Skipping ORC crawling. Should be enough for development.")
+    print("Crawling ORC. This will take a while.")
+    crawl_orc()
 
     # print("Crawling timetable")
     # crawl_timetable()
@@ -23,9 +20,8 @@ def crawl_and_import_data(include_orc=True):
     # print("Crawling medians")
     # crawl_medians()
 
-    if include_orc:
-        print("Importing ORC")
-        _import_crawled_datas(CrawledData.ORC_DEPARTMENT_COURSES)
+    print("Importing ORC")
+    _import_crawled_datas(CrawledData.ORC_DEPARTMENT_COURSES)
 
     # print("Importing timetable")
     # _import_crawled_datas(CrawledData.COURSE_TIMETABLE)
