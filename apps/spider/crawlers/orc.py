@@ -91,22 +91,20 @@ def _is_department_url(candidate_url):
 #             and potential_department_name.isupper()
 #             and not _is_course_url(candidate_url))
 
-
-def crawl_courses_from_program_page_url(url):
-    # soup = retrieve_soup(url)
-    # course_urls = [
-    #     urljoin(BASE_URL, a["href"]) for a in soup.find_all("a", href=True)
-    # ]
-    # course_urls = sorted(set(url for url in linked_urls
-    #                          if _is_course_url(url)))
-    return filter(
-        None,
-        [
-            _crawl_course_data(url)
-            # for course_url in course_urls
-        ],
-    )
-
+# def crawl_courses_from_program_page_url(url):
+#     # soup = retrieve_soup(url)
+#     # course_urls = [
+#     #     urljoin(BASE_URL, a["href"]) for a in soup.find_all("a", href=True)
+#     # ]
+#     # course_urls = sorted(set(url for url in linked_urls
+#     #                          if _is_course_url(url)))
+#     return filter(
+#         None,
+#         [
+#             _crawl_course_data(url)
+#             # for course_url in course_urls
+#         ],
+#     )
 
 # def _is_course_url(candidate_url):
 #     potential_course_data = candidate_url.split("/")[-1].split("-")
@@ -140,7 +138,8 @@ def _crawl_course_data(course_url):
         children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
 
         course_code = split_course_heading[0]
-        # print(course_code)
+        department = re.findall(r'^([A-Z]{2,4})\d+', course_code)[0]
+        number = re.findall(r'^[A-Z]{2,4}(\d{3})', course_code)[0]
         course_title = split_course_heading[1]
 
         course_credits = 0
@@ -169,6 +168,8 @@ def _crawl_course_data(course_url):
         result = {
             "course_code": course_code,
             "course_title": course_title,
+            "department": department,
+            "number": number,
             "course_credits": course_credits,
             "pre_requisites": pre_requisites,
             "description": description,
@@ -180,6 +181,8 @@ def _crawl_course_data(course_url):
         # return {
         #     "course_code": "QWER1234J",
         #     "course_title": "Test Course",
+        #     "department": "QWER",
+        #     "number": 1234,
         #     "course_credits": 4,
         #     "pre_requisites": None,
         #     "description": "This is a test course",
@@ -188,23 +191,26 @@ def _crawl_course_data(course_url):
         # }
 
 
-def get_education_level_code(url):
-    if url.startswith(UNDERGRAD_URL) or url == SUPPLEMENT_URL:
-        return "ug"
-    else:
-        # assert url.startswith(GRADUATE_URL)
-        return "gr"
+# def get_education_level_code(url):
+#     if url.startswith(UNDERGRAD_URL) or url == SUPPLEMENT_URL:
+#         return "ug"
+#     else:
+#         # assert url.startswith(GRADUATE_URL)
+#         return "gr"
 
 
 def import_department(department_data):
     for course_data in department_data:
         Course.objects.update_or_create(
-            department=course_data["department"],
-            number=course_data["number"],
-            subnumber=course_data["subnumber"],
+            course_code=course_data["course_code"],
             defaults={
+                "course_title": course_data["course_title"],
+                "department": course_data["department"],
+                "number": course_data["number"],
+                "course_credits": course_data["course_credits"],
+                "pre_requisites": course_data["pre_requisites"],
                 "description": course_data["description"],
-                "title": course_data["title"],
+                "course_topics": course_data["course_topics"],
                 "url": course_data["url"],
                 "source": Course.SOURCES.ORC,
             },

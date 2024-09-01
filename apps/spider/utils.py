@@ -19,13 +19,13 @@ def pretty_json(data):
     return json.dumps(data, sort_keys=True, indent=4, separators=(",", ": "))
 
 
-def parse_number_and_subnumber(numbers_text):
-    numbers = numbers_text.split(".")
-    if len(numbers) == 2:
-        return (int(n) for n in numbers)
-    else:
-        assert len(numbers) == 1
-        return int(numbers[0]), None
+# def parse_number_and_subnumber(numbers_text):
+#     numbers = numbers_text.split(".")
+#     if len(numbers) == 2:
+#         return (int(n) for n in numbers)
+#     else:
+#         assert len(numbers) == 1
+#         return int(numbers[0]), None
 
 
 def retrieve_soup(url, data=None, preprocess=lambda x: x):

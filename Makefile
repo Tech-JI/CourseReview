@@ -5,6 +5,8 @@ clean:
 collect:
 	npm run build
 	python3 manage.py collectstatic
+makemigrations:
+	python3 manage.py makemigrations
 migrate:
 	python3 manage.py migrate
 shell:
