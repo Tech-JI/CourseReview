@@ -3,7 +3,7 @@ from apps.spider.models import CrawledData
 from apps.spider.tasks import crawl_medians, crawl_orc, crawl_timetable
 
 
-def crawl_and_import_data(include_orc=False):
+def crawl_and_import_data(include_orc=True):
     old_task_always_eager = app.conf.task_always_eager
     app.conf.task_always_eager = True
 
@@ -16,21 +16,21 @@ def crawl_and_import_data(include_orc=False):
     else:
         print("Skipping ORC crawling. Should be enough for development.")
 
-    print("Crawling timetable")
-    crawl_timetable()
+    # print("Crawling timetable")
+    # crawl_timetable()
 
-    print("Crawling medians")
-    crawl_medians()
+    # print("Crawling medians")
+    # crawl_medians()
 
     if include_orc:
         print("Importing ORC")
         _import_crawled_datas(CrawledData.ORC_DEPARTMENT_COURSES)
 
-    print("Importing timetable")
-    _import_crawled_datas(CrawledData.COURSE_TIMETABLE)
+    # print("Importing timetable")
+    # _import_crawled_datas(CrawledData.COURSE_TIMETABLE)
 
-    print("Importing medians")
-    _import_crawled_datas(CrawledData.MEDIANS)
+    # print("Importing medians")
+    # _import_crawled_datas(CrawledData.MEDIANS)
 
     app.conf.task_always_eager = old_task_always_eager
 
