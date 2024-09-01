@@ -122,6 +122,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Spider
+
+AUTO_IMPORT_CRAWLED_DATA = "True"
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 

@@ -12,7 +12,7 @@ ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 # ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
 # ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id=27"
+    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id=277"
 )
 # GRADUATE_URL = urljoin(ORC_BASE_URL, ORC_GRADUATE_SUFFIX)
 UNDERGRAD_URL = ORC_BASE_URL
@@ -176,7 +176,7 @@ def _crawl_course_data(course_url):
             "course_topics": course_topics,
             "url": course_url,
         }
-        print("result: ", result)
+        # print("result: ", result)
         return result
         # return {
         #     "course_code": "QWER1234J",

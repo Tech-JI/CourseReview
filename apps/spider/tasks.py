@@ -7,8 +7,8 @@ from apps.spider.crawlers import orc
 from apps.spider.models import CrawledData
 
 from lib import task_utils
-from lib.constants import CURRENT_TERM
-from lib.terms import get_next_term
+# from lib.constants import CURRENT_TERM
+# from lib.terms import get_next_term
 
 
 @shared_task
@@ -53,7 +53,7 @@ def import_pending_crawled_data(crawled_data_pk):
 @task_utils.email_if_fails
 def crawl_orc():
     print("Starting crawl_orc")
-    crawl_program_url.delay(orc.SUPPLEMENT_URL, "supplement")
+    # crawl_program_url.delay(orc.SUPPLEMENT_URL, "supplement")
     program_urls = orc.crawl_program_urls()
     print(f"Found {len(program_urls)} program URLs")
     # assert len(program_urls) > 50
