@@ -1,3 +1,3 @@
-LayupList.Web.Landing = function() {
-    $(".search-input").focus();
+LayupList.Web.Landing = function () {
+  $(".search-input").focus();
 };
