@@ -12,7 +12,7 @@ Environment: Linux, python3.12
    ```bash
    cat <<EOF > .env
    DATABASE_URL=postgres://admin:test@localhost:5432/coursereview
-   REDIS_URL=redis://localhost:6379/0
+   REDIS_URL=redis://[YOUR_USERNAME]@localhost:6379
    SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
    DEBUG=True
    CURRENT_TERM=2024
@@ -45,6 +45,4 @@ Environment: Linux, python3.12
        ```
    11. Restart postgres service: `sudo systemctl restart postgresql`
    12. Auto setup database connection and static file routes in Django: `make migrate`
-10. Run redis `redis-serve`
-11. Run `celery -A website worker -l info` to see log of celery
-12. `make run` and visit http://127.0.0.1:8000
+10. `make run` and visit http://127.0.0.1:8000
