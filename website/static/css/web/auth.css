@@ -1,6 +1,7 @@
+
 hr {
   border: 0;
-  border-top: 1px solid #434857;
+  border-top: 1px solid #434857
 }
 
 /*.form-control {
@@ -9,49 +10,49 @@ hr {
 */
 #large {
   font-size: 36px;
-  text-align: center;
+  text-align: center
 }
 
 #medium-large {
   font-size: 24px;
-  text-align: center;
+  text-align: center
 }
 
 #medium {
   font-size: 20px;
-  text-align: center;
+  text-align: center
 }
 
 #small {
   font-size: 18px;
-  text-align: justify;
+  text-align: justify
 }
 
 #small-center {
   font-size: 18px;
-  text-align: center;
+  text-align: center
 }
 
 #very-small-center {
   font-size: 14px;
-  text-align: center;
+  text-align: center
 }
 
 .btn-font-landing {
-  font-size: 30px;
+  font-size: 30px
 }
 
 #signup-modal {
   padding-left: 25px;
-  padding-right: 25px;
+  padding-right: 25px
 }
 
 #signupError {
   font-size: 14px;
   color: red;
-  text-align: center;
+  text-align: center
 }
 
 #bigcaps {
-  font-size: 50px;
+  font-size: 50px
 }
