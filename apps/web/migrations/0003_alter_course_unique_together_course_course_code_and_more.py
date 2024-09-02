@@ -4,68 +4,69 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('web', '0002_alter_student_unauth_session_ids'),
+        ("web", "0002_alter_student_unauth_session_ids"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='course',
+            name="course",
             unique_together=set(),
         ),
         migrations.AddField(
-            model_name='course',
-            name='course_code',
-            field=models.CharField(default='', max_length=10, unique=True),
+            model_name="course",
+            name="course_code",
+            field=models.CharField(default="", max_length=10, unique=True),
         ),
         migrations.AddField(
-            model_name='course',
-            name='course_credits',
+            model_name="course",
+            name="course_credits",
             field=models.IntegerField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='course',
-            name='course_title',
-            field=models.CharField(default='', max_length=100),
+            model_name="course",
+            name="course_title",
+            field=models.CharField(default="", max_length=100),
         ),
         migrations.AddField(
-            model_name='course',
-            name='course_topics',
+            model_name="course",
+            name="course_topics",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='course',
-            name='pre_requisites',
-            field=models.TextField(blank=True, default=''),
+            model_name="course",
+            name="pre_requisites",
+            field=models.TextField(blank=True, default=""),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='description',
-            field=models.TextField(blank=True, default=''),
+            model_name="course",
+            name="description",
+            field=models.TextField(blank=True, default=""),
         ),
         migrations.AddConstraint(
-            model_name='course',
-            constraint=models.UniqueConstraint(fields=('course_code',), name='unique_course_code'),
+            model_name="course",
+            constraint=models.UniqueConstraint(
+                fields=("course_code",), name="unique_course_code"
+            ),
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='department',
+            model_name="course",
+            name="department",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='number',
+            model_name="course",
+            name="number",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='source',
+            model_name="course",
+            name="source",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='subnumber',
+            model_name="course",
+            name="subnumber",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='title',
+            model_name="course",
+            name="title",
         ),
     ]

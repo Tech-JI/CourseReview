@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 
 
 class ReviewManager(models.Manager):
-
     def user_can_write_review(self, user, course):
         return not self.filter(user=user, course=course).exists()
 
@@ -30,10 +29,14 @@ class Review(models.Model):
     comments = models.TextField(blank=False)
 
     sentiment_labeler = models.CharField(
-        max_length=64, choices=SENTIMENT_LABELERS, default=None,
-        db_index=True, null=True, blank=True)
-    difficulty_sentiment = models.FloatField(
-        default=None, null=True, blank=True)
+        max_length=64,
+        choices=SENTIMENT_LABELERS,
+        default=None,
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    difficulty_sentiment = models.FloatField(default=None, null=True, blank=True)
     quality_sentiment = models.FloatField(default=None, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,4 +44,5 @@ class Review(models.Model):
 
     def __unicode__(self):
         return "{} {} {}: {}".format(
-            self.course.short_name(), self.professor, self.term, self.comments)
+            self.course.short_name(), self.professor, self.term, self.comments
+        )

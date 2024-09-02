@@ -10,7 +10,7 @@ ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 # ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
 # ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id=277"
+    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 # GRADUATE_URL = urljoin(ORC_BASE_URL, ORC_GRADUATE_SUFFIX)
 UNDERGRAD_URL = ORC_BASE_URL

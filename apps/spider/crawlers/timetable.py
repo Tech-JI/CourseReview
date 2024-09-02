@@ -16,8 +16,7 @@ from apps.spider.utils import (
 from lib.terms import split_term
 from lib.constants import CURRENT_TERM
 
-TIMETABLE_URL = (
-    "http://oracle-www.dartmouth.edu/dart/groucho/timetable.display_courses")
+TIMETABLE_URL = "http://oracle-www.dartmouth.edu/dart/groucho/timetable.display_courses"
 
 DATA_TO_SEND = (
     "distribradio=alldistribs&depts=no_value&periods=no_value&"
@@ -25,10 +24,12 @@ DATA_TO_SEND = (
     "term=&levl=&fys=n&wrt=n&pe=n&review=n&crnl=no_value&classyear=2008&"
     "searchtype=Subject+Area%28s%29&termradio=selectterms&terms=no_value&"
     "deliveryradio=selectdelivery&subjectradio=selectsubjects&hoursradio=allhours&sortorder=dept"
-    "&terms={term}")
+    "&terms={term}"
+)
 
 COURSE_TITLE_REGEX = re.compile(
-    r"(.*?)(?:\s\(((?:Remote|On Campus|Individualized)[^\)]*)\))?(\(.*\))?$")
+    r"(.*?)(?:\s\(((?:Remote|On Campus|Individualized)[^\)]*)\))?(\(.*\))?$"
+)
 
 
 def crawl_timetable(term):
@@ -67,68 +68,55 @@ def crawl_timetable(term):
         tds = [next(td_generator) for _ in range(num_columns)]
 
         number, subnumber = parse_number_and_subnumber(tds[3].get_text())
-        crosslisted_courses = _parse_crosslisted_courses(
-            tds[7].get_text(strip=True))
+        crosslisted_courses = _parse_crosslisted_courses(tds[7].get_text(strip=True))
 
         title_match = COURSE_TITLE_REGEX.match(
-            tds[5].get_text(strip=True).encode('ascii',
-                                               'ignore').decode('ascii'))
+            tds[5].get_text(strip=True).encode("ascii", "ignore").decode("ascii")
+        )
 
         title = title_match.group(1)
         if title_match.group(3):
             title += " " + title_match.group(3)
 
-        course_data.append({
-            "term":
-            _convert_timetable_term_to_term(tds[0].get_text(strip=True)),
-            # "crn": int(tds[1].get_text(strip=True)),
-            "program":
-            tds[2].get_text(strip=True),
-            "number":
-            number,
-            "subnumber":
-            subnumber,
-            "section":
-            int(tds[4].get_text(strip=True)),
-            "title":
-            title,
-            "delivery_mode":
-            title_match.group(2),
-            "crosslisted":
-            crosslisted_courses,
-            "period":
-            tds[8].get_text(strip=True),
-            "room":
-            tds[10].get_text(strip=True),
-            "building":
-            tds[11].get_text(strip=True),
-            "instructor":
-            _parse_instructors(tds[12].get_text(strip=True)),
-            "world_culture":
-            tds[13].get_text(strip=True),
-            "distribs":
-            _parse_distribs(tds[14].get_text(strip=True)),
-            "limit":
-            int_or_none(tds[15].get_text(strip=True)),
-            # "enrollment": int_or_none(tds[16].get_text(strip=True)),
-            "status":
-            tds[17].get_text(strip=True),
-        })
+        course_data.append(
+            {
+                "term": _convert_timetable_term_to_term(tds[0].get_text(strip=True)),
+                # "crn": int(tds[1].get_text(strip=True)),
+                "program": tds[2].get_text(strip=True),
+                "number": number,
+                "subnumber": subnumber,
+                "section": int(tds[4].get_text(strip=True)),
+                "title": title,
+                "delivery_mode": title_match.group(2),
+                "crosslisted": crosslisted_courses,
+                "period": tds[8].get_text(strip=True),
+                "room": tds[10].get_text(strip=True),
+                "building": tds[11].get_text(strip=True),
+                "instructor": _parse_instructors(tds[12].get_text(strip=True)),
+                "world_culture": tds[13].get_text(strip=True),
+                "distribs": _parse_distribs(tds[14].get_text(strip=True)),
+                "limit": int_or_none(tds[15].get_text(strip=True)),
+                # "enrollment": int_or_none(tds[16].get_text(strip=True)),
+                "status": tds[17].get_text(strip=True),
+            }
+        )
     return course_data
 
 
 def _parse_crosslisted_courses(xlist_text):
     crosslisted_courses = []
-    for course_text in (xlist_text.split(",") if xlist_text else []):
+    for course_text in xlist_text.split(",") if xlist_text else []:
         program, numbers, section = course_text.split()
         number, subnumber = parse_number_and_subnumber(numbers)
         section = int(section)
-        crosslisted_courses.append({
-            "program": program,
-            "number": number,
-            "subnumber": subnumber,
-            "section": section,
-        })
+        crosslisted_courses.append(
+            {
+                "program": program,
+                "number": number,
+                "subnumber": subnumber,
+                "section": section,
+            }
+        )
     return crosslisted_courses
 
 
@@ -137,13 +125,9 @@ def _convert_timetable_term_to_term(timetable_term):
     assert timetable_term[:2] == "20"
     month = int(timetable_term[-2:])
     year = timetable_term[2:4]
-    return "{year}{season}".format(year=year,
-                                   season={
-                                       1: "W",
-                                       3: "S",
-                                       6: "X",
-                                       9: "F"
-                                   }[month])
+    return "{year}{season}".format(
+        year=year, season={1: "W", 3: "S", 6: "X", 9: "F"}[month]
+    )
 
 
 def _parse_distribs(distribs_text):
@@ -158,12 +142,7 @@ def _get_timetable_term_code(term):
     year, term = split_term(term)
     return "20{year}0{term_number}".format(
         year=year,
-        term_number={
-            "w": 1,
-            "s": 3,
-            "x": 6,
-            "f": 9
-        }[term.lower()],
+        term_number={"w": 1, "s": 3, "x": 6, "f": 9}[term.lower()],
     )
 
 
@@ -244,5 +223,6 @@ def _update_distribs(course_data, course):
 def _update_instructors(course_data, offering):
     for instructor_name in course_data["instructor"]:
         instructor, _ = Instructor.objects.get_or_create(
-            name=instructor_name, )
+            name=instructor_name,
+        )
         offering.instructors.add(instructor)

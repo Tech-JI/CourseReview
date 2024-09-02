@@ -5,7 +5,6 @@ from apps.web.models import Course
 
 
 class VoteManager(models.Manager):
-
     @transaction.atomic
     def vote(self, value, course_id, category, user):
         is_unvote = False
@@ -14,11 +13,7 @@ class VoteManager(models.Manager):
             return None, is_unvote
 
         course = Course.objects.get(id=course_id)
-        vote, created = self.get_or_create(
-            course=course,
-            category=category,
-            user=user
-        )
+        vote, created = self.get_or_create(course=course, category=category, user=user)
 
         # if previously voted, reverse the old value of the vote
         if not created:
@@ -53,9 +48,9 @@ class VoteManager(models.Manager):
 
     def group_courses_with_votes(self, courses, category, user):
         votes = self.filter(
-            course_id__in=courses.values_list('id', flat=True),
+            course_id__in=courses.values_list("id", flat=True),
             category=category,
-            user=user
+            user=user,
         )
 
         votes_dict = {vote.course_id: vote for vote in votes}
@@ -76,8 +71,7 @@ class VoteManager(models.Manager):
         return difficulty_vote, quality_vote
 
     def num_quality_upvotes_for_user(self, user):
-        return self.filter(
-            user=user, category=Vote.CATEGORIES.QUALITY, value=1).count()
+        return self.filter(user=user, category=Vote.CATEGORIES.QUALITY, value=1).count()
 
 
 class Vote(models.Model):
@@ -95,7 +89,8 @@ class Vote(models.Model):
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     category = models.CharField(
-        max_length=16, choices=CATEGORIES.CHOICES, db_index=True)
+        max_length=16, choices=CATEGORIES.CHOICES, db_index=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -108,7 +103,7 @@ class Vote(models.Model):
             self.category.capitalize(),
             self.vote_type(),
             self.course.short_name(),
-            self.user.username
+            self.user.username,
         )
 
     def vote_type(self):

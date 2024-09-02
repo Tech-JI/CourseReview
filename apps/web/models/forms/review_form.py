@@ -8,30 +8,26 @@ REVIEW_MINIMUM_LENGTH = 100
 
 
 class ReviewForm(forms.ModelForm):
-
     def clean_term(self):
-        term = self.cleaned_data['term'].upper()
+        term = self.cleaned_data["term"].upper()
         if is_valid_term(term):
             return term
         else:
             raise ValidationError(
-                "Please use a valid term, e.g. {}".format(
-                    constants.CURRENT_TERM)
+                "Please use a valid term, e.g. {}".format(constants.CURRENT_TERM)
             )
 
     def clean_professor(self):
-        professor = self.cleaned_data['professor']
-        names = professor.split(' ')
+        professor = self.cleaned_data["professor"]
+        names = professor.split(" ")
 
         if len(names) < 2:
-            raise ValidationError(
-                "Please use a valid professor name, e.g. John Smith"
-            )
+            raise ValidationError("Please use a valid professor name, e.g. John Smith")
 
         return " ".join([n.capitalize() for n in names])
 
     def clean_comments(self):
-        review = self.cleaned_data['comments']
+        review = self.cleaned_data["comments"]
 
         if len(review) < REVIEW_MINIMUM_LENGTH:
             raise ValidationError(
@@ -44,21 +40,19 @@ class ReviewForm(forms.ModelForm):
 
     class Meta:
         model = Review
-        fields = ['term', 'professor', 'comments']
+        fields = ["term", "professor", "comments"]
 
         widgets = {
-            'term': forms.TextInput(
-                attrs={'placeholder': 'e.g. {}'.format(constants.CURRENT_TERM)}
+            "term": forms.TextInput(
+                attrs={"placeholder": "e.g. {}".format(constants.CURRENT_TERM)}
             ),
-            'professor': forms.TextInput(
-                attrs={'placeholder': 'Full name please, e.g. John Smith'}
+            "professor": forms.TextInput(
+                attrs={"placeholder": "Full name please, e.g. John Smith"}
             ),
         }
 
-        labels = {
-            'comments': 'Review'
-        }
+        labels = {"comments": "Review"}
 
         help_texts = {
-            'professor': 'Please choose from the suggestions if you can.',
+            "professor": "Please choose from the suggestions if you can.",
         }

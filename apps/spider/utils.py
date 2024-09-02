@@ -33,5 +33,4 @@ def retrieve_soup(url, data=None, preprocess=lambda x: x):
     if data is not None:
         data = data.encode("utf-8")
     with urllib_request.urlopen(url, data=data) as response:
-        return BeautifulSoup(preprocess(response.read().decode("utf-8")),
-                             "html.parser")
+        return BeautifulSoup(preprocess(response.read().decode("utf-8")), "html.parser")

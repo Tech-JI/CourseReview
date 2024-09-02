@@ -24,85 +24,84 @@ from apps.recommendations import views as rviews
 from apps.spider import views as spider_views
 
 urlpatterns = [
-
     # administrative
-    re_path(r'^admin/', admin.site.urls),
-#     re_path(r'^hijack/', include('hijack.urls')),
-
+    re_path(r"^admin/", admin.site.urls),
+    #     re_path(r'^hijack/', include('hijack.urls')),
     # analytics
-    re_path(r'^analytics/$', aviews.home, name='analytics_home'),
-    re_path(r'^eligible_for_recommendations/$',
-            aviews.eligible_for_recommendations,
-            name='eligible_for_recommendations'),
-    re_path(r'^sentiment_labeler/$',
-            aviews.sentiment_labeler,
-            name='sentiment_labeler'),
-
+    re_path(r"^analytics/$", aviews.home, name="analytics_home"),
+    re_path(
+        r"^eligible_for_recommendations/$",
+        aviews.eligible_for_recommendations,
+        name="eligible_for_recommendations",
+    ),
+    re_path(
+        r"^sentiment_labeler/$", aviews.sentiment_labeler, name="sentiment_labeler"
+    ),
     # spider
-    re_path(r'^spider/data/$',
-            spider_views.crawled_data_list,
-            name="crawled_datas"),
-    re_path(r'^spider/data/(?P<crawled_data_pk>[0-9]+)$',
-            spider_views.crawled_data_detail,
-            name="crawled_data"),
-
+    re_path(r"^spider/data/$", spider_views.crawled_data_list, name="crawled_datas"),
+    re_path(
+        r"^spider/data/(?P<crawled_data_pk>[0-9]+)$",
+        spider_views.crawled_data_detail,
+        name="crawled_data",
+    ),
     # primary views
-    re_path(r'^$', views.landing, name="landing"),
-    re_path(r'^(?P<sort>best|layups)/?',
-            views.current_term,
-            name="current_term"),
-    re_path(r'^search/?', views.course_search, name="course_search"),
-    re_path(r'^course/(?P<course_id>[0-9]+)$',
-            views.course_detail,
-            name="course_detail"),
-    re_path(r'^course/(?P<course_id>[0-9]+)/review_search/?',
-            views.course_review_search,
-            name="course_review_search"),
-    re_path(r'^departments/?', views.departments, name="departments"),
-
+    re_path(r"^$", views.landing, name="landing"),
+    re_path(r"^(?P<sort>best|layups)/?", views.current_term, name="current_term"),
+    re_path(r"^search/?", views.course_search, name="course_search"),
+    re_path(
+        r"^course/(?P<course_id>[0-9]+)$", views.course_detail, name="course_detail"
+    ),
+    re_path(
+        r"^course/(?P<course_id>[0-9]+)/review_search/?",
+        views.course_review_search,
+        name="course_review_search",
+    ),
+    re_path(r"^departments/?", views.departments, name="departments"),
     # recommendations
-    re_path(r'^recommendations/?',
-            rviews.recommendations,
-            name='recommendations'),
-
+    re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # api
-    re_path(r'^api/course/(?P<course_id>[0-9].*)/medians',
-            views.medians,
-            name="medians"),
-    re_path(r'^api/course/(?P<course_id>[0-9].*)/professors?/?',
-            views.course_professors,
-            name="course_professors"),
-    re_path(r'^api/course/(?P<course_id>[0-9].*)/vote',
-            views.vote,
-            name="vote"),
-
+    re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
+        views.course_professors,
+        name="course_professors",
+    ),
+    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
     # authentication
-    re_path(r'^accounts/signup$', views.signup, name="signup"),
-    re_path(r'^accounts/login/$', views.auth_login, name="auth_login"),
-    re_path(r'^accounts/logout$', views.auth_logout, name="auth_logout"),
-    re_path(r'^accounts/confirmation$',
-            views.confirmation,
-            name="confirmation"),
-
+    re_path(r"^accounts/signup$", views.signup, name="signup"),
+    re_path(r"^accounts/login/$", views.auth_login, name="auth_login"),
+    re_path(r"^accounts/logout$", views.auth_logout, name="auth_logout"),
+    re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
-    re_path(r'^accounts/password/reset/$',
-            authviews.PasswordResetView.as_view(
-                template_name='password_reset_form.html',
-                html_email_template_name='password_reset_email.html',
-                email_template_name='password_reset_email.html'),
-            {'post_reset_redirect': '/accounts/password/reset/done/'},
-            name="password_reset"),
     re_path(
-        r'^accounts/password/reset/done/$',
+        r"^accounts/password/reset/$",
+        authviews.PasswordResetView.as_view(
+            template_name="password_reset_form.html",
+            html_email_template_name="password_reset_email.html",
+            email_template_name="password_reset_email.html",
+        ),
+        {"post_reset_redirect": "/accounts/password/reset/done/"},
+        name="password_reset",
+    ),
+    re_path(
+        r"^accounts/password/reset/done/$",
         authviews.PasswordResetDoneView.as_view(
-            template_name='password_reset_done.html')),
+            template_name="password_reset_done.html"
+        ),
+    ),
     re_path(
-        r'^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)-(?P<token>.+)/$',
+        r"^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)-(?P<token>.+)/$",
         authviews.PasswordResetConfirmView.as_view(
-            template_name='password_reset_confirm.html'),
-        name="password_reset_confirm"),
+            template_name="password_reset_confirm.html"
+        ),
+        name="password_reset_confirm",
+    ),
     re_path(
-        r'^accounts/password/done/$',
+        r"^accounts/password/done/$",
         authviews.PasswordResetCompleteView.as_view(
-            template_name='password_reset_complete.html')),
+            template_name="password_reset_complete.html"
+        ),
+    ),
 ]

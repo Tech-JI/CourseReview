@@ -4,30 +4,39 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('spider', '0001_initial'),
+        ("spider", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='crawleddata',
-            name='current_data',
+            model_name="crawleddata",
+            name="current_data",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='crawleddata',
-            name='data_type',
-            field=models.CharField(choices=[('medians', 'Medians'), ('orc_department_courses', 'ORC Department Courses'), ('course_timetable', 'Course Timetable')], default='', max_length=32),
+            model_name="crawleddata",
+            name="data_type",
+            field=models.CharField(
+                choices=[
+                    ("medians", "Medians"),
+                    ("orc_department_courses", "ORC Department Courses"),
+                    ("course_timetable", "Course Timetable"),
+                ],
+                default="",
+                max_length=32,
+            ),
         ),
         migrations.AlterField(
-            model_name='crawleddata',
-            name='pending_data',
+            model_name="crawleddata",
+            name="pending_data",
             field=models.JSONField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='crawleddata',
-            name='resource',
-            field=models.CharField(db_index=True, default='', max_length=128, unique=True),
+            model_name="crawleddata",
+            name="resource",
+            field=models.CharField(
+                db_index=True, default="", max_length=128, unique=True
+            ),
         ),
     ]
