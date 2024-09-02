@@ -1,18 +1,15 @@
-from celery import shared_task
-from itertools import chain
-import numpy as np
 import re
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from itertools import chain
 from time import time
 
+import numpy as np
+from apps.recommendations.models import Recommendation
+from apps.web.models import Course
+from celery import shared_task
 from django.db import transaction
 from django.db.models import Q
-
-from web.models import Course
-from recommendations.models import Recommendation
-
 from lib import task_utils
-
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 
 MIN_COURSE_DESCRIPTION_LENGTH = 80
 RECOMMENDATIONS_PER_CLASS = 8
@@ -30,8 +27,7 @@ def generate_course_description_similarity_recommendations():
     reverse_course_ids = {}
     course_descriptions = []
     i = 0
-    for course in Course.objects.exclude(
-            description=None).exclude(description=""):
+    for course in Course.objects.exclude(description=None).exclude(description=""):
         if len(course.description) < MIN_COURSE_DESCRIPTION_LENGTH:
             # these are typically uninteresting classes e.g. thesis
             continue
@@ -74,15 +70,15 @@ def generate_course_description_similarity_recommendations():
 
     # zero out columns corresponding to thesis, research, independent, and grad
     course_ids_to_zero = Course.objects.filter(
-        Q(title__icontains="thesis") |
-        Q(title__icontains="research") |
-        Q(title__icontains="independent") |
-        Q(title__icontains="seminar") |
-        Q(title__icontains="first-year") |
-        Q(title__icontains="foreign study") |
-        Q(title__icontains="senior") |
-        Q(title__icontains="honors") |
-        Q(number__gt=99)
+        Q(title__icontains="thesis")
+        | Q(title__icontains="research")
+        | Q(title__icontains="independent")
+        | Q(title__icontains="seminar")
+        | Q(title__icontains="first-year")
+        | Q(title__icontains="foreign study")
+        | Q(title__icontains="senior")
+        | Q(title__icontains="honors")
+        | Q(number__gt=99)
     ).values_list("id", flat=True)
     for zero_id in course_ids_to_zero:
         if zero_id in reverse_course_ids:
@@ -96,9 +92,12 @@ def generate_course_description_similarity_recommendations():
             continue
         course_id = course_ids[i]
         course = Course.objects.get(id=course_id)
-        for xlist_course in list(chain(
+        for xlist_course in list(
+            chain(
                 course.crosslisted_courses.all(),
-                Course.objects.filter(title=course.title))):
+                Course.objects.filter(title=course.title),
+            )
+        ):
             if xlist_course == course:
                 continue
             if xlist_course.id in reverse_course_ids:
@@ -116,32 +115,37 @@ def generate_course_description_similarity_recommendations():
         zero_ids = [i]
 
         # zero out crosslisted classes
-        zero_ids += list(current_class.crosslisted_courses.values_list(
-            "id", flat=True))
+        zero_ids += list(current_class.crosslisted_courses.values_list("id", flat=True))
 
         # zero out classes with the same title
-        zero_ids += list(Course.objects.filter(
-            title=current_class.title).values_list("id", flat=True))
+        zero_ids += list(
+            Course.objects.filter(title=current_class.title).values_list(
+                "id", flat=True
+            )
+        )
 
         for zero_id in zero_ids:
             if zero_id in reverse_course_ids:
                 psarray[i, reverse_course_ids[zero_id]] = 0
 
-        for other_i in np.argpartition(
-                psarray[i, :],
-                -RECOMMENDATIONS_PER_CLASS)[-RECOMMENDATIONS_PER_CLASS:]:
+        for other_i in np.argpartition(psarray[i, :], -RECOMMENDATIONS_PER_CLASS)[
+            -RECOMMENDATIONS_PER_CLASS:
+        ]:
             course_id = course_ids[other_i]
 
-            recommendations_to_create.append(Recommendation(
-                course=current_class,
-                recommendation_id=course_id,
-                creator=Recommendation.DOCUMENT_SIMILARITY,
-                weight=psarray[i, other_i]
-            ))
+            recommendations_to_create.append(
+                Recommendation(
+                    course=current_class,
+                    recommendation_id=course_id,
+                    creator=Recommendation.DOCUMENT_SIMILARITY,
+                    weight=psarray[i, other_i],
+                )
+            )
 
     with transaction.atomic():
         Recommendation.objects.filter(
-            creator=Recommendation.DOCUMENT_SIMILARITY).delete()
+            creator=Recommendation.DOCUMENT_SIMILARITY
+        ).delete()
         Recommendation.objects.bulk_create(recommendations_to_create)
 
     print(f"finished in {time() - t0}")
@@ -149,8 +153,8 @@ def generate_course_description_similarity_recommendations():
 
 def _clean_text_to_raw_words(text):
     if text:
-        return " ".join([
-            w for w in re.sub("[^a-zA-Z ]", "", text).lower().split()
-            if len(w) > 3])
+        return " ".join(
+            [w for w in re.sub("[^a-zA-Z ]", "", text).lower().split() if len(w) > 3]
+        )
     else:
         return ""

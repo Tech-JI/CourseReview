@@ -10,8 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,10 +24,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG') == "True"
+DEBUG = os.getenv("DEBUG") == "True"
 
 ALLOWED_HOSTS = []
 
@@ -82,7 +83,7 @@ TEMPLATES = [
     },
 ]
 
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 WSGI_APPLICATION = "website.wsgi.application"
 
@@ -90,13 +91,13 @@ WSGI_APPLICATION = "website.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'coursereview',
-        'USER': 'admin',
-        'PASSWORD': 'test',
-        'HOST': '0.0.0.0',
-        'PORT': '5432',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "coursereview",
+        "USER": "admin",
+        "PASSWORD": "test",
+        "HOST": "0.0.0.0",
+        "PORT": "5432",
     }
 }
 
@@ -105,22 +106,23 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME":
-        "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        "NAME":
-        "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        "NAME":
-        "django.contrib.auth.password_validation.CommonPasswordValidator",
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        "NAME":
-        "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+CELERY_BROKER_URL = os.environ["REDIS_URL"]
+print("REDIS_URL:", os.environ.get("REDIS_URL"))
+CELERY_RESULT_BACKEND = "django-db"
+# CELERY_TIMEZONE = "US/Pacific"
 
 # Spider
 
@@ -140,51 +142,50 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_ROOT = 'staticfiles'
+
+STATIC_ROOT = "staticfiles"
 STATIC_URL = "/static/"
-STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'), )
-STATICFILES_STORAGE = 'pipeline.storage.ManifestStaticFilesStorage'
+STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
+STATICFILES_STORAGE = "pipeline.storage.ManifestStaticFilesStorage"
 STATICFILES_FINDERS = (
-    'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'pipeline.finders.PipelineFinder',
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "pipeline.finders.PipelineFinder",
 )
-ROOT_ASSETS_DIR = os.path.join(BASE_DIR, 'root_assets')
+ROOT_ASSETS_DIR = os.path.join(BASE_DIR, "root_assets")
 PIPELINE = {
     # 'COMPILERS': ('react.utils.pipeline.JSXCompiler', ),
-    'JAVASCRIPT': {
-        'app': {
-            'source_filenames': (
-                'js/plugins.js',
-                'js/vendor/jquery.highlight-5.js',
-                'js/web/base.jsx',
-                'js/web/common.jsx',
-                'js/web/landing.jsx',
-                'js/web/current_term.jsx',
-                'js/web/course_detail.jsx',
-                'js/web/course_review_search.jsx',
+    "JAVASCRIPT": {
+        "app": {
+            "source_filenames": (
+                "js/plugins.js",
+                "js/vendor/jquery.highlight-5.js",
+                "js/web/base.jsx",
+                "js/web/common.jsx",
+                "js/web/landing.jsx",
+                "js/web/current_term.jsx",
+                "js/web/course_detail.jsx",
+                "js/web/course_review_search.jsx",
             ),
-            'output_filename':
-            'js/app.js',
+            "output_filename": "js/app.js",
         }
     },
-    'STYLESHEETS': {
-        'app': {
-            'source_filenames': (
-                'css/web/base.css',
-                'css/web/current_term.css',
-                'css/web/course_detail.css',
-                'css/web/course_review_search.css',
-                'css/web/landing.css',
-                'css/web/auth.css',
+    "STYLESHEETS": {
+        "app": {
+            "source_filenames": (
+                "css/web/base.css",
+                "css/web/current_term.css",
+                "css/web/course_detail.css",
+                "css/web/course_review_search.css",
+                "css/web/landing.css",
+                "css/web/auth.css",
             ),
-            'output_filename':
-            'css/app.css',
-            'extra_context': {
-                'media': 'screen,projection',
+            "output_filename": "css/app.css",
+            "extra_context": {
+                "media": "screen,projection",
             },
         }
-    }
+    },
 }
 
 # Default primary key field type

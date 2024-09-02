@@ -1,12 +1,10 @@
-from celery import shared_task
-
-from django.db import transaction
-
 # from apps.spider.crawlers import medians, orc, timetable
 from apps.spider.crawlers import orc
 from apps.spider.models import CrawledData
-
+from celery import shared_task
+from django.db import transaction
 from lib import task_utils
+
 # from lib.constants import CURRENT_TERM
 # from lib.terms import get_next_term
 
@@ -15,8 +13,7 @@ from lib import task_utils
 @task_utils.email_if_fails
 @transaction.atomic
 def import_pending_crawled_data(crawled_data_pk):
-    crawled_data = CrawledData.objects.select_for_update().get(
-        pk=crawled_data_pk)
+    crawled_data = CrawledData.objects.select_for_update().get(pk=crawled_data_pk)
     # if crawled_data.data_type == CrawledData.MEDIANS:
     #     medians.import_medians(crawled_data.pending_data)
     # elif
@@ -75,7 +72,8 @@ def crawl_program_url(url, program_code=None):
     resource_name = "orc_department_courses"
     new_data = [orc._crawl_course_data(url)]
     return CrawledData.objects.handle_new_crawled_data(
-        new_data, resource_name, CrawledData.ORC_DEPARTMENT_COURSES)
+        new_data, resource_name, CrawledData.ORC_DEPARTMENT_COURSES
+    )
 
 
 # @shared_task

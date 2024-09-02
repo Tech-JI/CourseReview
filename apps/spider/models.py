@@ -1,11 +1,9 @@
 import difflib
 
+from apps.spider import utils
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import models
-
-from apps.spider import utils
-
 from lib import constants
 
 
@@ -40,8 +38,7 @@ class CrawledDataManager(models.Manager):
 
     def sorted(self):
         qs = self.order_by("-updated_at").all()
-        return ([d for d in qs if d.has_change()] +
-                [d for d in qs if not d.has_change()])
+        return [d for d in qs if d.has_change()] + [d for d in qs if not d.has_change()]
 
 
 class CrawledData(models.Model):
@@ -55,13 +52,8 @@ class CrawledData(models.Model):
     )
     objects = CrawledDataManager()
 
-    resource = models.CharField(max_length=128,
-                                db_index=True,
-                                unique=True,
-                                default="")
-    data_type = models.CharField(max_length=32,
-                                 choices=DATA_TYPE_CHOICES,
-                                 default="")
+    resource = models.CharField(max_length=128, db_index=True, unique=True, default="")
+    data_type = models.CharField(max_length=32, choices=DATA_TYPE_CHOICES, default="")
     current_data = models.JSONField(null=True, blank=True)
     pending_data = models.JSONField(null=True, blank=True)
 
@@ -86,7 +78,8 @@ class CrawledData(models.Model):
                 difflib.unified_diff(
                     utils.pretty_json(self.current_data).splitlines(),
                     utils.pretty_json(self.pending_data).splitlines(),
-                ))
+                )
+            )
 
     @property
     def pretty_current_data(self):
@@ -108,4 +101,5 @@ class CrawledData(models.Model):
 
     def approve_change(self):
         from apps.spider.tasks import import_pending_crawled_data
+
         import_pending_crawled_data.delay(self.pk)

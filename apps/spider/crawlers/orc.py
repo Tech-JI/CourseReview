@@ -1,10 +1,8 @@
 import re
 from urllib.parse import urljoin
 
+from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course
-from apps.spider.utils import (
-    # parse_number_and_subnumber,
-    retrieve_soup, )
 
 # BASE_URL = "http://dartmouth.smartcatalogiq.com/"
 BASE_URL = "https://www.ji.sjtu.edu.cn/"
@@ -21,26 +19,22 @@ INSTRUCTOR_TERM_REGEX = re.compile("^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
 SUPPLEMENT_URL = "http://dartmouth.smartcatalogiq.com/en/2016s/Supplement/Courses"
 
 COURSE_HEADING_CORRECTIONS = {
-    "COLT": {
-        "7 First Year Seminars": "COLT 7 First Year Seminars"
-    },
-    "GRK": {
-        "GRK 1.02-3.02 Intensive Greek": "GRK 1.02 Intensive Greek"
-    },
+    "COLT": {"7 First Year Seminars": "COLT 7 First Year Seminars"},
+    "GRK": {"GRK 1.02-3.02 Intensive Greek": "GRK 1.02 Intensive Greek"},
     "INTS": {
         "INTS INTS 17.04 Migration Stories": "INTS 17.04 Migration Stories",
     },
     "MALS": {
-        "MALS MALS 368 Seeing and Feeling in Early Modern Europe":
-        ("MALS 368 Seeing and Feeling in Early Modern Europe"),
+        "MALS MALS 368 Seeing and Feeling in Early Modern Europe": (
+            "MALS 368 Seeing and Feeling in Early Modern Europe"
+        ),
     },
-    "PSYC": {
-        "$name": None
-    },
+    "PSYC": {"$name": None},
     "QBS": {
         "Quantitative Biomedical Sciences 132-2 Molecular Markers in Human "
-        "Health Studies Lab":
-        ("QBS 132.02 Molecular Markers in Human Health Studies Lab"),
+        "Health Studies Lab": (
+            "QBS 132.02 Molecular Markers in Human Health Studies Lab"
+        ),
     },
 }
 
@@ -57,11 +51,10 @@ def crawl_program_urls():
 
 def _get_department_urls_from_url(url):
     soup = retrieve_soup(url)
-    linked_urls = [
-        urljoin(BASE_URL, a["href"]) for a in soup.find_all("a", href=True)
-    ]
-    return set(linked_url for linked_url in linked_urls
-               if _is_department_url(linked_url))
+    linked_urls = [urljoin(BASE_URL, a["href"]) for a in soup.find_all("a", href=True)]
+    return set(
+        linked_url for linked_url in linked_urls if _is_department_url(linked_url)
+    )
 
 
 def _is_department_url(candidate_url):
@@ -138,8 +131,8 @@ def _crawl_course_data(course_url):
         children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
 
         course_code = split_course_heading[0]
-        department = re.findall(r'^([A-Z]{2,4})\d+', course_code)[0]
-        number = re.findall(r'^[A-Z]{2,4}(\d{3})', course_code)[0]
+        department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
+        number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
         course_title = split_course_heading[1]
 
         course_credits = 0
@@ -148,22 +141,25 @@ def _crawl_course_data(course_url):
         course_topics = []
 
         for i, child in enumerate(children):
-            text = child.get_text(
-                strip=True) if hasattr(child, 'get_text') else ""
+            text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
             if "Credits" in text:
-                course_credits = int(re.findall(r'\d+', text)[0])
+                course_credits = int(re.findall(r"\d+", text)[0])
             elif "Pre-requisites" in text:
                 pre_requisites = extract_prerequisites(text)
             elif "Description" in text:
-                description = children[i + 2].get_text(
-                    strip=True) if i + 2 < len(children) else ""
+                description = (
+                    children[i + 2].get_text(strip=True)
+                    if i + 2 < len(children)
+                    else ""
+                )
                 if description == "\n" or "Course Topics" in description:
                     description = ""
             elif "Course Topics" in text:
-                course_topics = [
-                    li.get_text(strip=True)
-                    for li in children[i + 2].find_all("li")
-                ] if i + 2 < len(children) else []
+                course_topics = (
+                    [li.get_text(strip=True) for li in children[i + 2].find_all("li")]
+                    if i + 2 < len(children)
+                    else []
+                )
 
         result = {
             "course_code": course_code,
@@ -212,7 +208,8 @@ def import_department(department_data):
                 "description": course_data["description"],
                 "course_topics": course_data["course_topics"],
                 "url": course_data["url"],
-                "source": Course.SOURCES.ORC,
+                # FIXME: invalid field source in course
+                # "source": Course.SOURCES.ORC,
             },
         )
 
@@ -220,12 +217,12 @@ def import_department(department_data):
 def extract_prerequisites(pre_requisites):
     result = pre_requisites
 
-    result = result.replace('Pre-requisites:', '').strip()
+    result = result.replace("Pre-requisites:", "").strip()
 
-    result = result.replace('Obtained Credit', 'Obtained_Credit').strip()
-    result = result.replace('Credits Submitted', 'Credits_Submitted').strip()
+    result = result.replace("Obtained Credit", "Obtained_Credit").strip()
+    result = result.replace("Credits Submitted", "Credits_Submitted").strip()
 
-    result = result.replace('&&', ' && ').strip()
-    result = result.replace('||', ' || ').strip()
+    result = result.replace("&&", " && ").strip()
+    result = result.replace("||", " || ").strip()
 
     return result
