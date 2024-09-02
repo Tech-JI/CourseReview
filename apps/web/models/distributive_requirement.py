@@ -11,8 +11,7 @@ class DistributiveRequirement(models.Model):
     )
 
     name = models.CharField(max_length=16, unique=True)
-    distributive_type = models.CharField(
-        max_length=16, choices=DISTRIBUTE_TYPE_CHOICES)
+    distributive_type = models.CharField(max_length=16, choices=DISTRIBUTE_TYPE_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

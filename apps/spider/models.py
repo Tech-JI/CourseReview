@@ -8,7 +8,6 @@ from lib import constants
 
 
 class CrawledDataManager(models.Manager):
-
     def handle_new_crawled_data(self, new_data, resource_name, data_type):
         print(f"Handling new crawled data: {new_data}")
         print(f"Resource name: {resource_name}")

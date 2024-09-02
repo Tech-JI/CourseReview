@@ -4,20 +4,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('web', '0004_course_department'),
+        ("web", "0004_course_department"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='number',
+            model_name="course",
+            name="number",
             field=models.IntegerField(blank=True, db_index=True, null=True),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='course_code',
-            field=models.CharField(db_index=True, default='', max_length=10, unique=True),
+            model_name="course",
+            name="course_code",
+            field=models.CharField(
+                db_index=True, default="", max_length=10, unique=True
+            ),
         ),
     ]
