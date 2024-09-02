@@ -81,3 +81,5 @@ course-activity-service-account.json
 Layup-List.code-workspace
 .vscode/
 db.sqlite3
+*.db
+*.rdb
