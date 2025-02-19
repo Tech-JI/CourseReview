@@ -1,98 +1,50 @@
-# <img src="layup_list/static/img/logo-sm.png" alt="logo" width=30> Contributing to Layup List
+# Development
 
-Our <a href="https://github.com/layuplist/layup-list/issues">issues</a> page has some ideas for buxfixes and feature improvements (though you aren't limited to this list).
+Environment: Linux, python3.12
 
-To contribute code, make a pull request. Github has a great <a href="https://guides.github.com/activities/contributing-to-open-source/">guide</a> for how you can go about doing this.
-
-Feel free to email <a href="mailto:support@layuplist.com">support@layuplist.com</a> if you need any help.
-
-Local Setup (macOS or OS X)
------------------
-#### Installation
-* Use Python 2.7.16
-* Install [Homebrew](http://brew.sh/), [node.js](https://nodejs.org/en/), and Postgres (we recommend [Postgres.app](http://postgresapp.com/) with their [CLI Tools](http://postgresapp.com/documentation/cli-tools.html)).
-* Install the [Heroku CLI](https://cli.heroku.com). You don't need a Heroku account, they just offer good tools for configuration.
-* Install Redis using `brew install redis`.
-* We use yuglify to compress the static files. Install using `sudo npm install -g yuglify`.
-* Install forego using `brew install forego`. This is used to run the server.
-* Run `easy_install pip` if you do not have pip.
-* Run `pip install virtualenv` if you do not have virtualenv.
-* Run `virtualenv venv` to create a Python virtual environment.
-* Run `createdb layuplist`.
-* [Clone](https://help.github.com/articles/cloning-a-repository/) the main repository. `git clone https://github.com/layuplist/layup-list.git`.
-* Create a `.env` file in the root directory of the repository (fill out the items in brackets):
-
-  ```bash
-  DATABASE_URL=postgres://[YOUR_USERNAME]@localhost:5432/layuplist
-  REDIS_URL=redis://[YOUR_USERNAME]@localhost:6379
-  SECRET_KEY=[SOME_LONG_RANDOM_STRING]
-  DEBUG=True
-  CURRENT_TERM=20X
-  OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
-  ```
-
-* Run `source ./scripts/dev/environment.sh` to set up the heroku development environment.
-* Run `source ./scripts/dev/virtualize.sh` to activate the virtual environment.
-* Install Python dependencies using `pip install -r requirements.txt`.
-* Initialize the database with `python manage.py migrate`.
-
-Developing
-----------
-
-**Note:** Every time you start up a new Terminal window or tab, you need to run both of the below commands. You already ran them above, but if you close your terminal and want to work on this project again later, you must run them again.
-
-```bash
-source ./scripts/dev/environment.sh
-source ./scripts/dev/virtualize.sh
-```
-
-You will also need to have Postgres and Redis running. Do this by opening `Postgres.app` or running `redis-server`.
-
-After you have completed all the steps in **Local Setup**, you can start the development server by running:
-
-```bash
-python manage.py collectstatic        # create static files
-forego start                          # run the server
-```
-
-You may need to run the second command multiple times while developing, mostly if you are working with the front-end. I run this whenever I start the server:
-```bash
-echo 'yes' | python manage.py collectstatic; forego start;
-```
-
-After running `forego start` you can navigate to your browser and visit `http://localhost:5000` to see your local version of Layup List.
-
-Populating Initial Data
------------------------
-Open the Django shell using `python manage.py shell` and run 
-```python
-from scripts import crawl_and_import_data
-crawl_and_import_data()
-```
-
-This will crawl the timetable and medians for data to use during development. By default, this does not crawl the ORC, as that takes a long time. If you would like to crawl the ORC, you can run `crawl_and_import_data(include_orc=True)` instead.
-
-Setting Up An Account
----------------------
-After successfully running the server, you can create an user account by signing up through the website. You won't receive a confirmation email, so you have the activate the account through the Django shell. Open the Django shell using `python manage.py shell` and run the following code:
-```python
-from django.contrib.auth.models import User
-u = User.objects.last()  # last created user
-u.is_active = True
-u.save()
-```
-If you'd like to have access to the admin panel at `/admin`, also run these before `u.save()`:
-```python
-u.is_staff = True
-u.is_admin = True
-```
-
-Linting code and Running Tests
-------------------------------
-We offer two scripts, `./scripts/dev/lint.sh` and `./scripts/dev/test.sh` that you should run occasionally during development. You may need to `pip install pep8`.
-
-Stack
------
-Languages: Python, Javascript (JSX enabled), HTML, CSS
-
-Frameworks and Services: Django, Postgres, Heroku, SendGrid, jQuery, Bootstrap, d3.js, Node.js
+1. `git clone git@github.com:TechJI-2023/CourseReview.git`
+2. `cd CourseReview`
+3. `git checkout py3`
+4. `python3 -m venv .venv`
+5. `python3 -m pip install -r requirements.txt`
+6. Make directory for builds of static files: `mkdir staticfiles`
+7. Create .env file for storing secrets:
+   ```bash
+   cat <<EOF > .env
+   DATABASE_URL=postgres://admin:test@localhost:5432/coursereview
+   REDIS_URL=redis://localhost:6379/0
+   SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
+   DEBUG=True
+   CURRENT_TERM=2024
+   OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
+   EOF
+   ```
+8. Build static files: `echo 'yes' | make collect`
+9. Configure database
+   1. Install Postgres: `sudo pacman -S postgresql`
+   2. Create user postgres: `sudo -iu postgres`
+   3. Initialize database: `initdb -D /var/lib/postgres/data`
+   4. Start postgresql service: `sudo systemctl start postgresql`. Run `sudo systemctl enable postgresql` to auto-start postgresql service.
+   5. Switch to user postgres: `sudo -iu postgres`
+   6. `psql`
+   7. Initialize coursereview database, user and privileges
+      ```sql
+      CREATE DATABASE coursereview;
+      CREATE USER admin WITH PASSWORD 'test';
+      GRANT ALL PRIVILEGES ON DATABASE coursereview TO admin;
+      ALTER DATABASE coursereview OWNER TO admin;
+      ```
+   8. Exit psql and switch back to normal user: `\q`, `exit`
+   9. Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim /var/lib/postgres/data/postgresql.conf`,
+      ```conf
+      listen_addresses = '0.0.0.0'
+      ```
+   10. Grant permission to connect to postgres from any ip (DO NOT do this in production): `sudo vim /var/lib/postgres/data/pg_hba.conf` and add a line:
+       ```conf
+       host    all             all             0.0.0.0/0            md5
+       ```
+   11. Restart postgres service: `sudo systemctl restart postgresql`
+   12. Auto setup database connection and static file routes in Django: `make migrate`
+10. Run redis `redis-serve`
+11. Run `celery -A website worker -l info` to see log of celery
+12. `make run` and visit http://127.0.0.1:8000

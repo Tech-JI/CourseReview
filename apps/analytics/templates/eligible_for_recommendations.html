@@ -14,14 +14,12 @@
             <thead>
                 <th>Good Upvotes</th>
                 <th>Email</th>
-                <th>Hijack</th>
             </thead>
             <tbody>
                 {% for user, user_id, vote_count in users_and_votes %}
                 <tr>
                     <td>{{ vote_count }}</td>
                     <td>{{ user }}</td>
-                    <td><a href="/hijack/{{ user_id }}">Hijack {{ user }}</a></td>
                 </tr>
                 {% endfor %}
             </tbody>

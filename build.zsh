@@ -1,1 +1,0 @@
-echo 'yes' | python manage.py collectstatic

@@ -20,9 +20,10 @@ def email_if_fails(fn):
                 except AttributeError:
                     fnName = fn.__name__
                 send_error_email(
-                    fnName, args, kwargs, socket.gethostname(),
-                    traceback.format_exc())
+                    fnName, args, kwargs, socket.gethostname(), traceback.format_exc()
+                )
             raise
+
     return decorated
 
 
@@ -36,9 +37,10 @@ def send_error_email(fnName, args, kwargs, host, formatted_exc):
             kwargs=kwargs,
             host=host,
             error=formatted_exc,
-        ))
-    short_exc = formatted_exc.rsplit('\n')[-1]
-    subject = '[celery-error] {host} {fnName} {short_exc}'.format(
+        )
+    )
+    short_exc = formatted_exc.rsplit("\n")[-1]
+    subject = "[celery-error] {host} {fnName} {short_exc}".format(
         host=host,
         fnName=fnName,
         short_exc=short_exc,
