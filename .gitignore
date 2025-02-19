@@ -84,3 +84,4 @@ Layup-List.code-workspace
 db.sqlite3
 *.db
 *.rdb
+.aider*
