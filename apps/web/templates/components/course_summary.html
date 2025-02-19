@@ -1,4 +1,4 @@
-<h3><a href="{% url 'course_detail' course.id %}">{{ course }}</a></h3>
+<h3><a href="{% url 'course_detail' course.id %}">{{ course.short_name }}</a></h3>
 <h5>
     {{ course.review_set.count }} reviews
     {% if course.distribs_string %} | {{ course.distribs_string }} {% endif %}

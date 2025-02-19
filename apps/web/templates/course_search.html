@@ -38,7 +38,7 @@
         <tbody>
             {% for course in courses %}
             <tr onclick="window.document.location='{% url 'course_detail' course.id %}';" role="button">
-                <td> <a>{{ course }}</a> </td>
+                <td> <a>{{ course.short_name }}</a> </td>
                 <td> {% if course.prefetched_is_offered %} Offered {{term}} {% endif %} </td>
                 <td> {{ course.distribs_string }} </td>
                 <td> {{ course.review_set.count }} </td>
