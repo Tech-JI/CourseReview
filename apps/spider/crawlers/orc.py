@@ -14,7 +14,7 @@ COURSE_DETAIL_URL_PREFIX = (
 )
 # GRADUATE_URL = urljoin(ORC_BASE_URL, ORC_GRADUATE_SUFFIX)
 UNDERGRAD_URL = ORC_BASE_URL
-INSTRUCTOR_TERM_REGEX = re.compile("^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
+INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
 
 SUPPLEMENT_URL = "http://dartmouth.smartcatalogiq.com/en/2016s/Supplement/Courses"
 
