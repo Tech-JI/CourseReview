@@ -13,7 +13,7 @@ from .course_offering import CourseOffering
 
 class CourseManager(models.Manager):
     course_search_regex = re.compile(
-        "^(?P<department_or_query>\D*)(?P<number>\d*)" "(?P<other>.*)"
+        r"^(?P<department_or_query>\D*)(?P<number>\d*)" "(?P<other>.*)"
     )
     DEPARTMENT_LENGTHS = [3, 4]
 

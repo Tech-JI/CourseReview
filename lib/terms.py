@@ -1,7 +1,7 @@
 import re
 from lib import constants
 
-term_regex = re.compile("^(?P<year>[0-9]{2})(?P<term>[WSXFwsxf])$")
+term_regex = re.compile(r"^(?P<year>[0-9]{2})(?P<term>[WSXFwsxf])$")
 
 
 def numeric_value_of_term(term):
