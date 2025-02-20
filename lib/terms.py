@@ -19,7 +19,7 @@ def is_valid_term(term):
     if not term[:2].isdigit():
         return False
     last_char = term[2].upper()
-    if last_char not in ['X', 'S', 'F']:
+    if last_char not in ["X", "S", "F"]:
         return False
     current_term = constants.CURRENT_TERM
     current_value = numeric_value_of_term(current_term)
