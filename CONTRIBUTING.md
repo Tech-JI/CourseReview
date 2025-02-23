@@ -25,10 +25,11 @@ Environment:
 8. Create .env file for storing secrets. The contents should be like:
 
    ```ini
-   POSTGRESQL_USER=admin
-   POSTGRESQL_PASSWORD=test
-   POSTGRESQL_HOST=127.0.0.1
-   POSTGRESQL_PORT=5432
+   # PostgreSQL
+   DB_USER=admin
+   DB_PASSWORD=test
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
    REDIS_URL=redis://localhost:6379/0
    SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
    DEBUG=True
