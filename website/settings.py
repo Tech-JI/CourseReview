@@ -93,11 +93,11 @@ WSGI_APPLICATION = "website.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "coursereview",
-        "USER": "admin",
-        "PASSWORD": "test",
-        "HOST": "0.0.0.0",
-        "PORT": "5432",
+        "NAME": os.getenv("DB_NAME", "coursereview"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -120,7 +120,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 CELERY_BROKER_URL = os.environ["REDIS_URL"]
-print("REDIS_URL:", os.environ.get("REDIS_URL"))
 CELERY_RESULT_BACKEND = "django-db"
 # CELERY_TIMEZONE = "US/Pacific"
 
