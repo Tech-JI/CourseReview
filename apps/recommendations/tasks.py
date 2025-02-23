@@ -154,7 +154,7 @@ def generate_course_description_similarity_recommendations():
 def _clean_text_to_raw_words(text):
     if text:
         return " ".join(
-            [w for w in re.sub("[^a-zA-Z ]", "", text).lower().split() if len(w) > 3]
+            [w for w in re.sub(r"[^a-zA-Z ]", "", text).lower().split() if len(w) > 3]
         )
     else:
         return ""
