@@ -15,7 +15,7 @@ class CourseManager(models.Manager):
     course_search_regex = re.compile(
         r"^(?P<department_or_query>\D*)(?P<number>\d*)" "(?P<other>.*)"
     )
-    DEPARTMENT_LENGTHS = [3, 4]
+    DEPARTMENT_LENGTHS = [2, 4]
 
     def for_term(self, term, dist=None):
         query = self.filter(id__in=CourseOffering.objects.course_ids_for_term(term))
