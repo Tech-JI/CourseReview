@@ -50,7 +50,7 @@ def crawl_timetable(term):
     soup = retrieve_soup(
         TIMETABLE_URL,
         data=request_data,
-        preprocess=lambda x: re.sub("</tr>", "", x),
+        preprocess=lambda x: re.sub(r"</tr>", "", x),
     )
 
     data_table = soup.find(class_="data-table")
