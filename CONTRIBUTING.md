@@ -23,12 +23,15 @@ Environment:
 7. Make directory for builds of static files: `mkdir staticfiles`
 
 8. Create .env file for storing secrets. The contents should be like:
+
    ```ini
-   DATABASE_URL=postgres://admin:test@localhost:5432/coursereview # Use strong password in production
-   REDIS_URL=redis://[YOUR_USERNAME]@localhost:6379
+   POSTGRESQL_USER=admin
+   POSTGRESQL_PASSWORD=test
+   POSTGRESQL_HOST=127.0.0.1
+   POSTGRESQL_PORT=5432
+   REDIS_URL=redis://localhost:6379/0
    SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
    DEBUG=True
-   CURRENT_TERM=2024
    OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
    ```
 
@@ -49,6 +52,7 @@ Environment:
     6. `psql`
 
     7. Initialize coursereview database, user and privileges
+
        ```sql
        CREATE DATABASE coursereview;
        CREATE USER admin WITH PASSWORD 'test'; -- This is the same password of admin in .env file above.
@@ -59,11 +63,13 @@ Environment:
     8. Exit psql and switch back to normal user: `\q`, `exit`
 
     9. Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim /var/lib/postgres/data/postgresql.conf`,
+
        ```ini
        listen_addresses = '0.0.0.0'
        ```
 
     10. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /var/lib/postgres/data/pg_hba.conf` and add a line:
+
         ```ini
         host    all             all             0.0.0.0/0            md5
         ```

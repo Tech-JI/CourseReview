@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 
@@ -20,6 +21,6 @@ CURRENT_TERM = get_current_term()
 # CURRENT_TERM = os.environ["CURRENT_TERM"]  # e.g. 16S
 SUPPORT_EMAIL = "support@layuplist.com"
 REC_UPVOTE_REQ = 2
-OFFERINGS_THRESHOLD_FOR_TERM_UPDATE = 1
-# OFFERINGS_THRESHOLD_FOR_TERM_UPDATE = int(
-#     os.environ["OFFERINGS_THRESHOLD_FOR_TERM_UPDATE"])
+OFFERINGS_THRESHOLD_FOR_TERM_UPDATE = int(
+    os.environ["OFFERINGS_THRESHOLD_FOR_TERM_UPDATE"]
+)
