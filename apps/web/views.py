@@ -355,7 +355,7 @@ def departments(request):
 @require_safe
 def course_search(request):
     query = request.GET.get("q", "").strip()
-    if len(query) < 3:
+    if len(query) < 2:
         return render(request, "course_search.html", {"query": query, "courses": []})
     courses = Course.objects.search(query).prefetch_related(
         "review_set", "courseoffering_set", "distribs"

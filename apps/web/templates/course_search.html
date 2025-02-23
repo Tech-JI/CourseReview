@@ -20,9 +20,9 @@
 <div class="row">
     <div class="col-md-12">
 {% if not query %}
-    <h3>Empty query string. Please enter a search query. Example: COSC 001</h3>
-{% elif query|length < 3 %}
-    <h3>Query must be at least 3 characters long.</h3>
+    <h3>Empty query string. Please enter a search query. Example: ENGR 101</h3>
+{% elif query|length < 2 %}
+    <h3>Query must be at least 2 characters long.</h3>
 {% elif not courses %}
     <h3>Could not find any results. Please double-check your search query, and make sure the department and course number are correct.</h3>
 {% else %}
