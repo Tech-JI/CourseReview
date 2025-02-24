@@ -15,16 +15,25 @@ Including another URLconf
     3. Add a URL to urlpatterns:  path('blog/', include(blog_urls))
 """
 
-from django.urls import include, re_path
-from django.contrib import admin
 import django.contrib.auth.views as authviews
-
+from django.urls import include, re_path, path
+from rest_framework.routers import DefaultRouter
+from apps.web.api import CourseViewSet, ReviewViewSet, VoteViewSet
+from django.contrib import admin
 from apps.web import views
 from apps.analytics import views as aviews
 from apps.recommendations import views as rviews
 from apps.spider import views as spider_views
 
+
+router = DefaultRouter()
+router.register(r"courses", CourseViewSet)
+router.register(r"reviews", ReviewViewSet)
+router.register(r"votes", VoteViewSet)
+
 urlpatterns = [
+    # API
+    path("api/", include(router.urls)),
     # administrative
     re_path(r"^admin/", admin.site.urls),
     #     re_path(r'^hijack/', include('hijack.urls')),
@@ -61,15 +70,15 @@ urlpatterns = [
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # api
-    re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
-    ),
-    re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
-        views.course_professors,
-        name="course_professors",
-    ),
-    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
+    # re_path(
+    #     r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
+    # ),
+    # re_path(
+    #     r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
+    #     views.course_professors,
+    #     name="course_professors",
+    # ),
+    # re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
     re_path(r"^accounts/login/$", views.auth_login, name="auth_login"),

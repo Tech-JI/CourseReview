@@ -1,5 +1,6 @@
 import datetime
 import dateutil.parser
+import uuid
 from django.shortcuts import render, redirect
 from django.conf import settings
 from django.views.decorators.http import require_safe, require_POST
@@ -33,8 +34,6 @@ from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
 from lib.departments import get_department_name
 from lib import constants
-
-import uuid
 
 # from google.cloud import pubsub_v1
 
