@@ -40,7 +40,9 @@ Environment:
 
 10. Configure database
 
-    1. Install Postgres: `sudo apt install postgresql`
+    1. Install Postgres: 
+      - `sudo apt update`
+      - `sudo apt install postgresql`
 
     2. Create user postgres: `sudo -iu postgres`
 
@@ -61,15 +63,21 @@ Environment:
        ALTER DATABASE coursereview OWNER TO admin;
        ```
 
+      get the path of config file: 
+      ```
+      SHOW config_file;
+      ```
+      copy the path, Shift+Ctrl+C (default)
+
     8. Exit psql and switch back to normal user: `\q`, `exit`
 
-    9. Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim /var/lib/postgres/data/postgresql.conf`,
+    9.  Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim {Path to your config file}`, example: `sudo vim /etc/postgresql/14/main/postgresql.conf`. Find the line `listen_addresses`, modify it to: 
 
        ```ini
        listen_addresses = '0.0.0.0'
        ```
 
-    10. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /var/lib/postgres/data/pg_hba.conf` and add a line:
+    10. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /etc/postgresql/14/main/pg_hba.conf` (maybe differ from your path, just change the command according to the copied path) and add a line:
 
         ```ini
         host    all             all             0.0.0.0/0            md5
