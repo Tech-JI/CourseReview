@@ -1,0 +1,293 @@
+<template>
+  <div v-if="loading" class="loading">Loading...</div>
+  <div v-else-if="error" class="error">Error: {{ error }}</div>
+  <div v-else class="course-detail">
+    <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
+    <h4 v-if="course.courseoffering_set.length > 0">
+      Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period }})
+    </h4>
+    <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
+    <p v-if="course.description">{{ course.description }}</p>
+
+    <p v-if="course.xlist && course.xlist.length > 0">
+      Crosslisted with
+      <span v-for="x in course.xlist" :key="x.id">
+        <a :href="`/course/${x.id}`">{{ x.short_name }}</a>
+      </span>
+    </p>
+
+    <div class="row">
+      <div class="col-md-2 col-md-offset-2 text-center score-box">
+        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+          selected: course.quality_vote && course.quality_vote.is_upvote,
+          unselected:
+            !course.quality_vote || !course.quality_vote.is_upvote,
+        }" @click="vote(1, false)"></span>
+        <h2 class="score">{{ course.quality_score }}</h2>
+        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+          selected: course.quality_vote && course.quality_vote.is_downvote,
+          unselected:
+            !course.quality_vote || !course.quality_vote.is_downvote,
+        }" @click="vote(-1, false)"></span>
+        <p>said it was good</p>
+      </div>
+      <div class="col-md-2 col-md-offset-4 text-center score-box">
+        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+          selected:
+            course.difficulty_vote && course.difficulty_vote.is_upvote,
+          unselected:
+            !course.difficulty_vote || !course.difficulty_vote.is_upvote,
+        }" @click="vote(1, true)"></span>
+        <h2 class="score">{{ course.difficulty_score }}</h2>
+        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+          selected:
+            course.difficulty_vote && course.difficulty_vote.is_downvote,
+          unselected:
+            !course.difficulty_vote || !course.difficulty_vote.is_downvote,
+        }" @click="vote(-1, true)"></span>
+        <p>called it a layup</p>
+      </div>
+    </div>
+
+    <div v-if="course.professors_and_review_count">
+      <h3>Professors</h3>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Reviews</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in course.professors_and_review_count" :key="item[0]">
+            <td>{{ item[0] }}</td>
+            <td>{{ item[1] }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="course.review_set && course.review_set.length > 0">
+      <h3>Reviews ({{ course.review_set.length }})</h3>
+      <table class="table table-striped">
+        <tbody>
+          <tr v-for="review in course.review_set" :key="review.id">
+            <td>
+              <b v-if="review.term">{{ review.term }}
+                <b v-if="review.professor"> with {{ review.professor }}</b>:
+              </b>
+              {{ review.comments }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="course.can_write_review">
+      <h3>Write a Review for {{ course.course_code }}</h3>
+      <form @submit.prevent="submitReview">
+        <div>
+          <label for="term">Term:</label>
+          <input type="text" id="term" v-model="newReview.term" required :placeholder="currentTerm">
+        </div>
+        <div>
+          <label for="professor">Professor:</label>
+          <input type="text" id="professor" v-model="newReview.professor" required
+            placeholder="Full name, e.g., John Smith">
+        </div>
+        <div>
+          <label for="comments">Review:</label>
+          <textarea id="comments" v-model="newReview.comments" required></textarea>
+        </div>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+    <div v-else>
+      <p v-if="isAuthenticated">
+        Thanks for writing a review of this course!
+      </p>
+      <p v-else>
+        <a href="/accounts/login/">Login</a> to write a review.
+      </p>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from "vue";
+import { useRoute } from "vue-router";
+
+const route = useRoute();
+const courseId = ref(null);
+const course = ref(null);
+const loading = ref(true);
+const error = ref(null);
+const currentTerm = "25S";
+const isAuthenticated = ref(false);
+const newReview = ref({
+  term: '',
+  professor: '',
+  comments: ''
+});
+
+onMounted(async () => {
+  courseId.value = document.getElementById('app').dataset.courseId;
+  await fetchCourse();
+
+  checkAuthentication(); // Check if user is authenticated
+});
+
+const fetchCourse = async () => {
+  loading.value = true;
+  error.value = null;
+  try {
+    const response = await fetch(`/api/course/${courseId.value}/`); // Use .value
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    course.value = await response.json();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    loading.value = false;
+  }
+};
+
+const checkAuthentication = async () => {
+  // Replace with your actual authentication check
+  // This is just a placeholder.  You'll likely need a Django endpoint
+  // to check the user's session.
+  try {
+    const response = await fetch('/api/user/status/'); // Example endpoint - you'll need to create this
+    if (response.ok) {
+      const data = await response.json();
+      isAuthenticated.value = data.isAuthenticated;
+    } else {
+      isAuthenticated.value = false;
+    }
+  } catch (e) {
+    console.error("Error checking authentication:", e);
+    isAuthenticated.value = false;
+  }
+};
+
+const vote = async (value, forLayup) => {
+  if (!isAuthenticated.value) {
+    if (confirm("Please sign up to vote!")) {
+      window.location = "/accounts/signup";
+    }
+    return;
+  }
+  try {
+    const postData = { value, forLayup };
+    const response = await fetch(`/api/course/${courseId}/vote`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"), // Get CSRF token
+      },
+      body: JSON.stringify(postData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    // Update the score and vote status locally
+    if (forLayup) {
+      course.value.difficulty_score = data.new_score;
+      if (data.was_unvote) {
+        course.value.difficulty_vote = null;
+      } else {
+        course.value.difficulty_vote = { value: value, is_upvote: value > 0, is_downvote: value < 0 };
+      }
+    } else {
+      course.value.quality_score = data.new_score;
+      if (data.was_unvote) {
+        course.value.quality_vote = null;
+      } else {
+        course.value.quality_vote = { value: value, is_upvote: value > 0, is_downvote: value < 0 };
+      }
+    }
+
+  } catch (e) {
+    console.error("Error voting:", e);
+  }
+};
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === name + "=") {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const submitReview = async () => {
+  if (!isAuthenticated.value) {
+    alert('You must be logged in to submit a review.');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/course/${courseId}/`, { // Use the API endpoint
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(newReview.value)
+    });
+    if (!response.ok) {
+      const errorData = await response.json(); // Get detailed error
+      throw new Error(`HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`);
+    }
+    course.value = await response.json(); // Update course data (including new review)
+    newReview.value = { term: '', professor: '', comments: '' }; // Clear form
+    alert('Review submitted successfully!');
+
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    alert(`Error submitting review: ${error.message}`); // Show detailed error
+
+  }
+};
+</script>
+
+<style scoped>
+/* Add scoped styles here */
+.loading,
+.error {
+  text-align: center;
+  margin: 2em;
+}
+
+.course-detail {
+  /* Your existing styles for course details */
+}
+
+.vote-arrow {
+  cursor: pointer;
+}
+
+.score-box {
+  /* Your existing styles */
+  text-align: center;
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+.selected {
+  color: green;
+}
+
+.unselected {
+  color: gray;
+}
+</style>

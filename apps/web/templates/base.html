@@ -50,7 +50,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"
         integrity="sha512-vc58qvvBdrDR4etbxMdlTt4GBQk1qjvyORR2nrsPsFPyrs+/u5c3+1Ct6upOgdZoIl7eq6k3a1UPDSNAQi/32A=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    {% stylesheet 'app' %}
+
+    <link rel="stylesheet" href="{% static 'assets/index.css' %}">
 </head>
 
 <body>
@@ -66,15 +67,7 @@
         {% include "footer.html" %}
     </div>
 
-    {% javascript 'app' %}
-
-    <script>
-        $(document).ready(function () {
-            LayupList.Web.Base();
-            LayupList.Web.Common();
-            {{ page_javascript }}
-        });
-    </script>
+    <script type="module" src="{% static 'assets/index.js' %}"></script>
 </body>
 
 </html>

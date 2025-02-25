@@ -1,5 +1,6 @@
 import datetime
 import dateutil.parser
+import uuid
 from django.shortcuts import render, redirect
 from django.conf import settings
 from django.views.decorators.http import require_safe, require_POST
@@ -18,7 +19,11 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import Count
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from apps.recommendations.models import Recommendation
+from apps.web.serializers import CourseSerializer
 from apps.web.models import (
     Course,
     CourseMedian,
@@ -34,8 +39,6 @@ from lib.terms import numeric_value_of_term
 from lib.departments import get_department_name
 from lib import constants
 
-import uuid
-
 # from google.cloud import pubsub_v1
 
 # pub_sub_publisher = pubsub_v1.PublisherClient()
@@ -49,6 +52,21 @@ LIMITS = {
     "unauthenticated_review_search": 3,
 }
 
+
+# def get_user(request):
+#     if request.user.is_authenticated:
+#         return Response(
+#             {"user": {"id": request.user.id, "username": request.user.username}}
+#         )
+#     else:
+#         return Response({"user": None})
+
+@api_view(['GET'])
+def user_status(request):
+    if request.user.is_authenticated:
+        return Response({'isAuthenticated': True, 'username': request.user.username})
+    else:
+        return Response({'isAuthenticated': False})
 
 def get_session_id(request):
     if "user_id" not in request.session:
@@ -233,98 +251,40 @@ def current_term(request, sort):
     )
 
 
-def course_detail(request, course_id):
+@api_view(["GET", "POST"])
+@permission_classes([AllowAny])
+def course_detail_api(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
-        # prior_course_id = get_prior_course_id(request, course_id)
-        # if prior_course_id is not None:
-        #     result = pub_sub_publisher.publish(topic_paths['course-views'], b'', courseID=course_id, priorCourseID=prior_course_id, userID=get_session_id(request), timestamp=datetime.datetime.utcnow().isoformat(), source='ll', dataVersion='1')
-        # else:
-        #     result = pub_sub_publisher.publish(topic_paths['course-views'], b'', courseID=course_id, userID=get_session_id(request), timestamp=datetime.datetime.utcnow().isoformat(), source='ll', dataVersion='1')
-        # try:
-        #     result.result()
-        # except:
-        #     print('Error publishing view activity for ', course_id)
     except Course.DoesNotExist:
-        return HttpResponseNotFound("<h1>Page not found</h1>")
+        return Response(status=404)
 
-    form = None
-    if request.user.is_authenticated and Review.objects.user_can_write_review(
-        request.user.id, course_id
-    ):
-        if request.method == "POST":
-            form = ReviewForm(request.POST)
-            if form.is_valid():
-                review = form.save(commit=False)
-                review.course = course
-                review.user = request.user
-                review.save()
-                form = None  # don't show form again after successful submit
-        else:
-            form = ReviewForm()
+    if request.method == "GET":
+        serializer = CourseSerializer(course, context={"request": request})
+        return Response(serializer.data)
+    elif request.method == "POST":
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required"}, status=403)
 
-    paginator = Paginator(course.review_set.all().order_by("-term"), LIMITS["reviews"])
-    try:
-        reviews = paginator.page(request.GET.get("page"))
-    except PageNotAnInteger:
-        reviews = paginator.page(1)
-    except EmptyPage:
-        reviews = paginator.page(paginator.num_pages)
+        if not Review.objects.user_can_write_review(request.user.id, course_id):
+            return Response({"detail": "User cannot write review"}, status=403)
 
-    if request.user.is_authenticated:
-        difficulty_vote, quality_vote = Vote.objects.for_course_and_user(
-            course, request.user
-        )
-    else:
-        difficulty_vote, quality_vote = None, None
+        form = ReviewForm(request.data)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.course = course
+            review.user = request.user
+            review.save()
+            serializer = CourseSerializer(
+                course, context={"request": request}
+            )  # re-serialize with new data
+            return Response(serializer.data, status=201)
+        return Response(form.errors, status=400)
 
-    similarity_recommendations = (
-        course.recommendations.filter(
-            creator=Recommendation.DOCUMENT_SIMILARITY,
-        )
-        .order_by("-weight")
-        .prefetch_related("recommendation")
-    )
 
-    # Get instructor names based on review
-    professors_and_review_count = list(
-        course.review_set.values("professor")
-        .annotate(Count("professor"))
-        .order_by("-professor__count")
-        .values_list("professor", "professor__count")
-    )
-
-    # Get instructor names based on instrutors parsed from course offerings
-    professors_and_review_count += [
-        (instructor_name, 0)
-        for instructor_name in Instructor.objects.filter(
-            courseoffering__course=course,
-        )
-        .exclude(
-            name__in=[professor for professor, _ in professors_and_review_count],
-        )
-        .values_list("name", flat=True)
-        .distinct()
-    ]
-
-    return render(
-        request,
-        "course_detail.html",
-        {
-            "term": constants.CURRENT_TERM,
-            "course": course,
-            "last_offered": course.last_offered(),
-            "recommendations": similarity_recommendations,
-            "professors_and_review_count": professors_and_review_count,
-            "difficulty_vote": difficulty_vote,
-            "quality_vote": quality_vote,
-            "reviews": reviews,
-            "distribs": course.distribs_string(),
-            "xlist": course.crosslisted_courses.all(),
-            "review_form": form,
-            "page_javascript": "LayupList.Web.CourseDetail({})".format(course_id),
-        },
-    )
+@require_safe
+def course_detail(request, course_id):  # Keep for initial rendering
+    return render(request, "course_detail.html", {"course_id": course_id})
 
 
 @require_safe
