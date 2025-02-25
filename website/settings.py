@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     # "hijack",  # hijack-admin (relies on compact) deprecated and merged into hijack
     "django_celery_beat",
     "django_celery_results",
+    "rest_framework",
+    "corsheaders",
     "apps.analytics",
     "apps.recommendations",
     "apps.spider",
@@ -55,6 +57,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -86,6 +89,19 @@ TEMPLATES = [
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 WSGI_APPLICATION = "website.wsgi.application"
+
+
+# Rest Framework
+
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        os.getenv("FRONTEND_URL"),
+        "http://127.0.0.1:8080",
+        "http://localhost:8080",
+    ]
+
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
@@ -121,7 +137,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 CELERY_BROKER_URL = os.environ["REDIS_URL"]
 CELERY_RESULT_BACKEND = "django-db"
-# CELERY_TIMEZONE = "US/Pacific"
+CELERY_TIMEZONE = "Asia/Shanghai"
 
 # Spider
 

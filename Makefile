@@ -3,8 +3,10 @@ run:
 clean:
 	python3 manage.py clearsession
 collect:
-	npm run build
-	python3 manage.py collectstatic
+	cd frontend && pnpm run build
+	cp -f frontend/dist/assets/index.js website/static/assets/index.js
+	cp -f frontend/dist/assets/index.css website/static/assets/index.css
+	echo 'yes' | python3 manage.py collectstatic
 makemigrations:
 	python3 manage.py makemigrations
 migrate:

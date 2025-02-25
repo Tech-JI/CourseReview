@@ -29,6 +29,8 @@ urlpatterns = [
     re_path(r"^admin/", admin.site.urls),
     #     re_path(r'^hijack/', include('hijack.urls')),
     # analytics
+    # re_path(r"^api/user/$", views.get_user, name="get_user"),
+    re_path(r"^api/user/status/?", views.user_status, name="user_status"),
     re_path(r"^analytics/$", aviews.home, name="analytics_home"),
     re_path(
         r"^eligible_for_recommendations/$",
@@ -51,6 +53,11 @@ urlpatterns = [
     re_path(r"^search/?", views.course_search, name="course_search"),
     re_path(
         r"^course/(?P<course_id>[0-9]+)$", views.course_detail, name="course_detail"
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9]+)/$",
+        views.course_detail_api,
+        name="course_detail_api",
     ),
     re_path(
         r"^course/(?P<course_id>[0-9]+)/review_search/?",
