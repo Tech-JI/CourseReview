@@ -1,19 +1,16 @@
-beautifulsoup4==4.12.3
-celery==5.4.0
-crispy-bootstrap4==2024.1
-dj-database-url==2.2.0
-Django==5.0.8
-django-celery-beat==2.7.0
-django-celery-results==2.5.1
-django-crispy-forms==2.3
-django-debug-toolbar==4.4.6
-# django-hijack==3.6.0  # Removed
-django-pipeline==3.1.0
-psycopg2-binary==2.9.10
-# PyExecJS==1.5.0  # Change to babel+npm
-# PyReact==0.6.0   # Change to babel+npm
-python-dateutil==2.9.0
-python-dotenv==1.0.1
-pytz==2024.1
-redis==5.2.1
-requests==2.32.3
+beautifulsoup4>=4.13.3
+celery>=5.4.0
+crispy-bootstrap4>=2024.10
+dj-database-url>=2.3.0
+Django>=5.1.6
+django-celery-beat>=2.7.0
+django-celery-results>=2.5.1
+django-crispy-forms>=2.3
+django-debug-toolbar>=5.0.1
+django-pipeline>=4.0.0
+psycopg2-binary>=2.9.10
+python-dateutil>=2.9.0
+python-dotenv>=1.0.1
+pytz>=2025.1
+redis>=5.2.1
+requests>=2.32.3
