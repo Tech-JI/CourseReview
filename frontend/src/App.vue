@@ -6,45 +6,62 @@
     <h4 v-if="course.courseoffering_set.length > 0">
       Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period }})
     </h4>
-    <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
+    <h4 v-else-if="course.last_offered">
+      Last offered {{ course.last_offered }}
+    </h4>
     <p v-if="course.description">{{ course.description }}</p>
 
     <p v-if="course.xlist && course.xlist.length > 0">
       Crosslisted with
       <span v-for="x in course.xlist" :key="x.id">
-        <a :href="`/course/${x.id}`">{{ x.short_name }}</a>
+        <router-link :to="`/course/${x.id}`">{{ x.short_name }}</router-link>
       </span>
     </p>
 
     <div class="row">
       <div class="col-md-2 col-md-offset-2 text-center score-box">
-        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
-          selected: course.quality_vote && course.quality_vote.is_upvote,
-          unselected:
-            !course.quality_vote || !course.quality_vote.is_upvote,
-        }" @click="vote(1, false)"></span>
+        <span
+          class="vote-arrow glyphicon glyphicon-chevron-up"
+          :class="{
+            selected: course.quality_vote && course.quality_vote.is_upvote,
+            unselected: !course.quality_vote || !course.quality_vote.is_upvote,
+          }"
+          @click="vote(1, false)"
+        ></span>
         <h2 class="score">{{ course.quality_score }}</h2>
-        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
-          selected: course.quality_vote && course.quality_vote.is_downvote,
-          unselected:
-            !course.quality_vote || !course.quality_vote.is_downvote,
-        }" @click="vote(-1, false)"></span>
+        <span
+          class="vote-arrow glyphicon glyphicon-chevron-down"
+          :class="{
+            selected: course.quality_vote && course.quality_vote.is_downvote,
+            unselected:
+              !course.quality_vote || !course.quality_vote.is_downvote,
+          }"
+          @click="vote(-1, false)"
+        ></span>
         <p>said it was good</p>
       </div>
       <div class="col-md-2 col-md-offset-4 text-center score-box">
-        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
-          selected:
-            course.difficulty_vote && course.difficulty_vote.is_upvote,
-          unselected:
-            !course.difficulty_vote || !course.difficulty_vote.is_upvote,
-        }" @click="vote(1, true)"></span>
+        <span
+          class="vote-arrow glyphicon glyphicon-chevron-up"
+          :class="{
+            selected:
+              course.difficulty_vote && course.difficulty_vote.is_upvote,
+            unselected:
+              !course.difficulty_vote || !course.difficulty_vote.is_upvote,
+          }"
+          @click="vote(1, true)"
+        ></span>
         <h2 class="score">{{ course.difficulty_score }}</h2>
-        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
-          selected:
-            course.difficulty_vote && course.difficulty_vote.is_downvote,
-          unselected:
-            !course.difficulty_vote || !course.difficulty_vote.is_downvote,
-        }" @click="vote(-1, true)"></span>
+        <span
+          class="vote-arrow glyphicon glyphicon-chevron-down"
+          :class="{
+            selected:
+              course.difficulty_vote && course.difficulty_vote.is_downvote,
+            unselected:
+              !course.difficulty_vote || !course.difficulty_vote.is_downvote,
+          }"
+          @click="vote(-1, true)"
+        ></span>
         <p>called it a layup</p>
       </div>
     </div>
@@ -73,8 +90,10 @@
         <tbody>
           <tr v-for="review in course.review_set" :key="review.id">
             <td>
-              <b v-if="review.term">{{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b>:
+              <b v-if="review.term"
+                >{{ review.term }}
+                <b v-if="review.professor"> with {{ review.professor }}</b
+                >:
               </b>
               {{ review.comments }}
             </td>
@@ -87,60 +106,75 @@
       <form @submit.prevent="submitReview">
         <div>
           <label for="term">Term:</label>
-          <input type="text" id="term" v-model="newReview.term" required :placeholder="currentTerm">
+          <input
+            type="text"
+            id="term"
+            v-model="newReview.term"
+            required
+            :placeholder="currentTerm"
+          />
         </div>
         <div>
           <label for="professor">Professor:</label>
-          <input type="text" id="professor" v-model="newReview.professor" required
-            placeholder="Full name, e.g., John Smith">
+          <input
+            type="text"
+            id="professor"
+            v-model="newReview.professor"
+            required
+            placeholder="Full name, e.g., John Smith"
+          />
         </div>
         <div>
           <label for="comments">Review:</label>
-          <textarea id="comments" v-model="newReview.comments" required></textarea>
+          <textarea
+            id="comments"
+            v-model="newReview.comments"
+            required
+          ></textarea>
         </div>
         <button type="submit">Submit</button>
       </form>
     </div>
     <div v-else>
-      <p v-if="isAuthenticated">
-        Thanks for writing a review of this course!
-      </p>
-      <p v-else>
-        <a href="/accounts/login/">Login</a> to write a review.
-      </p>
+      <p v-if="isAuthenticated">Thanks for writing a review of this course!</p>
+      <p v-else><a href="/accounts/login/">Login</a> to write a review.</p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
-const courseId = ref(null);
+const router = useRouter();
 const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const currentTerm = "25S";
 const isAuthenticated = ref(false);
 const newReview = ref({
-  term: '',
-  professor: '',
-  comments: ''
+  term: "",
+  professor: "",
+  comments: "",
+});
+
+// Use a computed property for courseId
+const courseId = computed(() => {
+  return route.params.course_id;
 });
 
 onMounted(async () => {
-  courseId.value = document.getElementById('app').dataset.courseId;
   await fetchCourse();
-
-  checkAuthentication(); // Check if user is authenticated
+  checkAuthentication();
 });
 
 const fetchCourse = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await fetch(`/api/course/${courseId.value}/`); // Use .value
+    // Use the computed courseId
+    const response = await fetch(`/api/course/${courseId.value}/`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -153,11 +187,8 @@ const fetchCourse = async () => {
 };
 
 const checkAuthentication = async () => {
-  // Replace with your actual authentication check
-  // This is just a placeholder.  You'll likely need a Django endpoint
-  // to check the user's session.
   try {
-    const response = await fetch('/api/user/status/'); // Example endpoint - you'll need to create this
+    const response = await fetch("/api/user/status/");
     if (response.ok) {
       const data = await response.json();
       isAuthenticated.value = data.isAuthenticated;
@@ -179,11 +210,12 @@ const vote = async (value, forLayup) => {
   }
   try {
     const postData = { value, forLayup };
-    const response = await fetch(`/api/course/${courseId}/vote`, {
+    // Use the computed courseId
+    const response = await fetch(`/api/course/${courseId.value}/vote`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"), // Get CSRF token
+        "X-CSRFToken": getCookie("csrftoken"),
       },
       body: JSON.stringify(postData),
     });
@@ -193,23 +225,29 @@ const vote = async (value, forLayup) => {
     }
 
     const data = await response.json();
-    // Update the score and vote status locally
     if (forLayup) {
       course.value.difficulty_score = data.new_score;
       if (data.was_unvote) {
         course.value.difficulty_vote = null;
       } else {
-        course.value.difficulty_vote = { value: value, is_upvote: value > 0, is_downvote: value < 0 };
+        course.value.difficulty_vote = {
+          value: value,
+          is_upvote: value > 0,
+          is_downvote: value < 0,
+        };
       }
     } else {
       course.value.quality_score = data.new_score;
       if (data.was_unvote) {
         course.value.quality_vote = null;
       } else {
-        course.value.quality_vote = { value: value, is_upvote: value > 0, is_downvote: value < 0 };
+        course.value.quality_vote = {
+          value: value,
+          is_upvote: value > 0,
+          is_downvote: value < 0,
+        };
       }
     }
-
   } catch (e) {
     console.error("Error voting:", e);
   }
@@ -231,30 +269,33 @@ function getCookie(name) {
 }
 const submitReview = async () => {
   if (!isAuthenticated.value) {
-    alert('You must be logged in to submit a review.');
+    alert("You must be logged in to submit a review.");
     return;
   }
   try {
-    const response = await fetch(`/api/course/${courseId}/`, { // Use the API endpoint
-      method: 'POST',
+    // Use the computed courseId
+    const response = await fetch(`/api/course/${courseId.value}/`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken')
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
       },
-      body: JSON.stringify(newReview.value)
+      body: JSON.stringify(newReview.value),
     });
     if (!response.ok) {
-      const errorData = await response.json(); // Get detailed error
-      throw new Error(`HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`);
+      const errorData = await response.json();
+      throw new Error(
+        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(
+          errorData
+        )}`
+      );
     }
-    course.value = await response.json(); // Update course data (including new review)
-    newReview.value = { term: '', professor: '', comments: '' }; // Clear form
-    alert('Review submitted successfully!');
-
+    course.value = await response.json();
+    newReview.value = { term: "", professor: "", comments: "" };
+    alert("Review submitted successfully!");
   } catch (error) {
-    console.error('Error submitting review:', error);
-    alert(`Error submitting review: ${error.message}`); // Show detailed error
-
+    console.error("Error submitting review:", error);
+    alert(`Error submitting review: ${error.message}`);
   }
 };
 </script>
