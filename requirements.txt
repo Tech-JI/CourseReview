@@ -14,3 +14,5 @@ python-dotenv>=1.0.1
 pytz>=2025.1
 redis>=5.2.1
 requests>=2.32.3
+bpython>=0.25
+ptpython>=3.0.29
