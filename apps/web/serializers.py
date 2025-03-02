@@ -37,7 +37,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class CourseSerializer(serializers.ModelSerializer):
-    review_set = ReviewSerializer(many=True, read_only=True)
+    review_set = serializers.SerializerMethodField()
     courseoffering_set = CourseOfferingSerializer(many=True, read_only=True)
     distribs = DistributiveRequirementSerializer(many=True, read_only=True)
     xlist = serializers.SerializerMethodField()
@@ -46,6 +46,7 @@ class CourseSerializer(serializers.ModelSerializer):
     difficulty_vote = serializers.SerializerMethodField()
     quality_vote = serializers.SerializerMethodField()
     can_write_review = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -59,6 +60,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "distribs",
             "xlist",
             "review_set",
+            "review_count",
             "courseoffering_set",
             "difficulty_score",
             "quality_score",
@@ -68,6 +70,15 @@ class CourseSerializer(serializers.ModelSerializer):
             "quality_vote",
             "can_write_review",
         )
+
+    def get_review_set(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return ReviewSerializer(obj.review_set.all(), many=True).data
+        return []
+
+    def get_review_count(self, obj):
+        return obj.review_set.count()
 
     def get_xlist(self, obj):
         return [

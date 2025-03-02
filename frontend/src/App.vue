@@ -84,8 +84,12 @@
       </table>
     </div>
 
-    <div v-if="course.review_set && course.review_set.length > 0">
-      <h3>Reviews ({{ course.review_set.length }})</h3>
+    <div
+      v-if="
+        isAuthenticated && course.review_set && course.review_set.length > 0
+      "
+    >
+      <h3>Reviews ({{ course.review_count }})</h3>
       <table class="table table-striped">
         <tbody>
           <tr v-for="review in course.review_set" :key="review.id">
@@ -100,6 +104,13 @@
           </tr>
         </tbody>
       </table>
+    </div>
+    <div v-else-if="course.review_count > 0" class="auth-message">
+      <p>
+        <a href="/accounts/signup/">Signup</a> or
+        <a href="/accounts/login/">Login</a> to view all of the
+        {{ course.review_count }} reviews for this class.
+      </p>
     </div>
     <div v-if="course.can_write_review">
       <h3>Write a Review for {{ course.course_code }}</h3>
@@ -144,10 +155,9 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 
 const route = useRoute();
-const router = useRouter();
 const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
@@ -161,7 +171,14 @@ const newReview = ref({
 
 // Use a computed property for courseId
 const courseId = computed(() => {
-  return route.params.course_id;
+  // console.log("route.params: ", route.params.course_id);
+  // console.log("route.query: ", route.query);
+  // console.log("route.path: ", route.path);
+  // let urlParams = new URLSearchParams(window.location.search);
+  // console.log("URLSearchParams: ", urlParams.get("course_id"));
+  return (
+    route.params.course_id || document.getElementById("app")?.dataset.courseId
+  );
 });
 
 onMounted(async () => {
@@ -330,5 +347,14 @@ const submitReview = async () => {
 
 .unselected {
   color: gray;
+}
+
+.auth-message {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 5px;
+  text-align: center;
 }
 </style>
