@@ -61,12 +61,14 @@ LIMITS = {
 #     else:
 #         return Response({"user": None})
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 def user_status(request):
     if request.user.is_authenticated:
-        return Response({'isAuthenticated': True, 'username': request.user.username})
+        return Response({"isAuthenticated": True, "username": request.user.username})
     else:
-        return Response({'isAuthenticated': False})
+        return Response({"isAuthenticated": False})
+
 
 def get_session_id(request):
     if "user_id" not in request.session:
