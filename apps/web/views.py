@@ -1,10 +1,14 @@
 import datetime
-import dateutil.parser
 import uuid
-from django.shortcuts import render, redirect
+
+import dateutil.parser
 from django.conf import settings
-from django.views.decorators.http import require_safe, require_POST
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import IntegrityError, transaction
+from django.db.models import Count
 from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
@@ -12,18 +16,15 @@ from django.http import (
     HttpResponseRedirect,
     JsonResponse,
 )
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError, transaction
-from django.db.models import Count
+from django.views.decorators.http import require_POST, require_safe
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+
 from apps.recommendations.models import Recommendation
-from apps.web.serializers import CourseSerializer
 from apps.web.models import (
     Course,
     CourseMedian,
@@ -34,10 +35,11 @@ from apps.web.models import (
     Vote,
 )
 from apps.web.models.forms import ReviewForm, SignupForm
+from apps.web.serializers import CourseSerializer
+from lib import constants
+from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
-from lib.departments import get_department_name
-from lib import constants
 
 # from google.cloud import pubsub_v1
 
@@ -282,11 +284,6 @@ def course_detail_api(request, course_id):
             )  # re-serialize with new data
             return Response(serializer.data, status=201)
         return Response(form.errors, status=400)
-
-
-@require_safe
-def course_detail(request, course_id):  # Keep for initial rendering
-    return render(request, "course_detail.html", {"course_id": course_id})
 
 
 @require_safe

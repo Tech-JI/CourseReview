@@ -15,14 +15,14 @@ Including another URLconf
     3. Add a URL to urlpatterns:  path('blog/', include(blog_urls))
 """
 
-from django.urls import include, re_path
-from django.contrib import admin
 import django.contrib.auth.views as authviews
+from django.contrib import admin
+from django.urls import re_path
 
-from apps.web import views
 from apps.analytics import views as aviews
 from apps.recommendations import views as rviews
 from apps.spider import views as spider_views
+from apps.web import views
 
 urlpatterns = [
     # administrative
@@ -51,9 +51,6 @@ urlpatterns = [
     re_path(r"^$", views.landing, name="landing"),
     re_path(r"^(?P<sort>best|layups)/?", views.current_term, name="current_term"),
     re_path(r"^search/?", views.course_search, name="course_search"),
-    re_path(
-        r"^course/(?P<course_id>[0-9]+)$", views.course_detail, name="course_detail"
-    ),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
         views.course_detail_api,
