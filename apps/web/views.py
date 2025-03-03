@@ -95,7 +95,8 @@ def get_prior_course_id(request, current_course_id):
         ):
             prior_course_id = request.session["prior_course_id"]
     request.session["prior_course_id"] = current_course_id
-    request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
+    request.session["prior_course_timestamp"] = datetime.datetime.now(
+    ).isoformat()
     return prior_course_id
 
 
@@ -136,7 +137,8 @@ def auth_login(request):
                 login(request, user)
                 if "user_id" in request.session:
                     student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
+                    student.unauth_session_ids.append(
+                        request.session["user_id"])
                     student.save()
                 request.session["user_id"] = user.username
 
@@ -189,7 +191,8 @@ def confirmation(request):
         return render(request, "confirmation.html", {"already_confirmed": False})
     else:
         return render(
-            request, "confirmation.html", {"error": "Please provide confirmation code."}
+            request, "confirmation.html", {
+                "error": "Please provide confirmation code."}
         )
 
 
@@ -286,29 +289,22 @@ def course_detail_api(request, course_id):
         return Response(form.errors, status=400)
 
 
-@require_safe
-def departments(request):
-    # department_codes_and_counts = (
-    #     Course.objects.filter(number__lt=100)  # Undergraduate courses
-    #     .exclude(department='RAD').values('department').annotate(
-    #         Count('department')).order_by('department').values_list(
-    #             'department', 'department__count'))
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def departments_api(request):
     department_codes_and_counts = (
         Course.objects.values("department")
         .annotate(Count("department"))
         .order_by("department")
         .values_list("department", "department__count")
     )
-    return render(
-        request,
-        "departments.html",
-        {
-            "departments": [
-                (code, get_department_name(code), count)
-                for code, count in department_codes_and_counts
-            ],
-        },
-    )
+
+    departments_data = [
+        {"code": code, "name": get_department_name(code), "count": count}
+        for code, count in department_codes_and_counts
+    ]
+
+    return Response(departments_data)
 
 
 @require_safe
@@ -323,7 +319,8 @@ def course_search(request):
         return redirect(courses[0])
 
     if len(query) not in Course.objects.DEPARTMENT_LENGTHS:
-        courses = sorted(courses, key=lambda c: c.review_set.count(), reverse=True)
+        courses = sorted(
+            courses, key=lambda c: c.review_set.count(), reverse=True)
 
     return render(
         request,
