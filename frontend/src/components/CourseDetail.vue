@@ -4,7 +4,7 @@
   <div v-else class="course-detail">
     <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
     <h4 v-if="course.courseoffering_set.length > 0">Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period
-    }})</h4>
+      }})</h4>
     <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
@@ -128,7 +128,9 @@ const courseId = computed(() => {
 });
 
 onMounted(async () => {
-  await fetchCourse();
+  if (courseId.value) {
+    await fetchCourse();
+  }
   checkAuthentication();
 });
 

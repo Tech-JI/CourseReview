@@ -11,6 +11,7 @@ from apps.web.models import (
     Review,
     Vote,
 )
+from lib.departments import get_department_name
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):
@@ -35,6 +36,12 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ("id", "user", "term", "professor", "comments", "created_at")
+
+
+class DepartmentSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    name = serializers.CharField()
+    count = serializers.IntegerField()
 
 
 class CourseSerializer(serializers.ModelSerializer):
