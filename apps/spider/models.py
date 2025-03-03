@@ -1,9 +1,10 @@
 import difflib
 
-from apps.spider import utils
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import models
+
+from apps.spider import utils
 from lib import constants
 
 

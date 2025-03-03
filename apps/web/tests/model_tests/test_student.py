@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from django.test import TestCase
+
 from apps.web.models import Review, Student, Vote
 from apps.web.tests import factories
-from datetime import datetime
 from lib import constants
 
 

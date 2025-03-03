@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-from celery import shared_task
 
+from celery import shared_task
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.db.models import Q
-from django.template.loader import get_template
 from django.template import Context
+from django.template.loader import get_template
 
 from apps.web.models import CourseOffering, Review, Vote
 from lib import constants, task_utils, terms

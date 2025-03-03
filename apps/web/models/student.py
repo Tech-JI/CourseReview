@@ -1,11 +1,13 @@
 from __future__ import unicode_literals
-from django.db import models
-from django.contrib.postgres.fields import ArrayField
-from django.contrib.auth.models import User
+
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.core.mail import send_mail
+from django.db import models
 from django.urls import reverse
-from apps.web.models import Review, Vote
+
+from apps.web.models import Vote
 from lib import constants
 
 

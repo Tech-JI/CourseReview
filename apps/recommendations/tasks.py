@@ -3,13 +3,14 @@ from itertools import chain
 from time import time
 
 import numpy as np
-from apps.recommendations.models import Recommendation
-from apps.web.models import Course
 from celery import shared_task
 from django.db import transaction
 from django.db.models import Q
-from lib import task_utils
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+
+from apps.recommendations.models import Recommendation
+from apps.web.models import Course
+from lib import task_utils
 
 MIN_COURSE_DESCRIPTION_LENGTH = 80
 RECOMMENDATIONS_PER_CLASS = 8

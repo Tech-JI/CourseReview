@@ -5,6 +5,7 @@ import re
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
+
 from lib.constants import CURRENT_TERM
 from lib.terms import numeric_value_of_term
 

@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.db.models import Q
+
 from apps.web.models import Course, CourseOffering, Vote
 
 

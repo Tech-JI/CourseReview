@@ -1,6 +1,8 @@
-from django.test import TestCase
-from lib import terms, constants
 import random
+
+from django.test import TestCase
+
+from lib import constants, terms
 
 
 class TermsTestCase(TestCase):
