@@ -1,18 +1,17 @@
 import { createApp } from "vue";
-import App from "./App.vue";
-import { createRouter, createWebHashHistory } from "vue-router";
+import CourseDetail from "./components/CourseDetail.vue";
+import { createRouter, createWebHistory } from "vue-router";
 import "./style.css";
 
 const routes = [
-  { path: "/course/:course_id", component: App, props: true },
-  // Add other routes as you convert more pages
+  { path: "/course/:course_id", component: CourseDetail, props: true },
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes,
 });
 
-const app = createApp(App);
+const app = createApp(CourseDetail);
 app.use(router);
 app.mount("#app");

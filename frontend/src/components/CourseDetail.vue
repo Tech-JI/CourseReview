@@ -171,14 +171,14 @@ const newReview = ref({
 
 // Use a computed property for courseId
 const courseId = computed(() => {
-  // console.log("route.params: ", route.params.course_id);
-  // console.log("route.query: ", route.query);
-  // console.log("route.path: ", route.path);
-  // let urlParams = new URLSearchParams(window.location.search);
-  // console.log("URLSearchParams: ", urlParams.get("course_id"));
-  return (
-    route.params.course_id || document.getElementById("app")?.dataset.courseId
-  );
+  const pathSegments = window.location.pathname.split("/");
+  const courseIdIndex = pathSegments.indexOf("course") + 1;
+  const courseIdFromPath =
+    courseIdIndex > 0 && courseIdIndex < pathSegments.length
+      ? pathSegments[courseIdIndex]
+      : null;
+
+  return courseIdFromPath;
 });
 
 onMounted(async () => {
