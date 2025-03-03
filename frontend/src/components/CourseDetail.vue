@@ -3,12 +3,9 @@
   <div v-else-if="error" class="error">Error: {{ error }}</div>
   <div v-else class="course-detail">
     <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
-    <h4 v-if="course.courseoffering_set.length > 0">
-      Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period }})
-    </h4>
-    <h4 v-else-if="course.last_offered">
-      Last offered {{ course.last_offered }}
-    </h4>
+    <h4 v-if="course.courseoffering_set.length > 0">Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period
+    }})</h4>
+    <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
     <p v-if="course.xlist && course.xlist.length > 0">
@@ -20,48 +17,27 @@
 
     <div class="row">
       <div class="col-md-2 col-md-offset-2 text-center score-box">
-        <span
-          class="vote-arrow glyphicon glyphicon-chevron-up"
-          :class="{
-            selected: course.quality_vote && course.quality_vote.is_upvote,
-            unselected: !course.quality_vote || !course.quality_vote.is_upvote,
-          }"
-          @click="vote(1, false)"
-        ></span>
+        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+          selected: course.quality_vote && course.quality_vote.is_upvote,
+          unselected: !course.quality_vote || !course.quality_vote.is_upvote,
+        }" @click="vote(1, false)"></span>
         <h2 class="score">{{ course.quality_score }}</h2>
-        <span
-          class="vote-arrow glyphicon glyphicon-chevron-down"
-          :class="{
-            selected: course.quality_vote && course.quality_vote.is_downvote,
-            unselected:
-              !course.quality_vote || !course.quality_vote.is_downvote,
-          }"
-          @click="vote(-1, false)"
-        ></span>
+        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+          selected: course.quality_vote && course.quality_vote.is_downvote,
+          unselected: !course.quality_vote || !course.quality_vote.is_downvote,
+        }" @click="vote(-1, false)"></span>
         <p>said it was good</p>
       </div>
       <div class="col-md-2 col-md-offset-4 text-center score-box">
-        <span
-          class="vote-arrow glyphicon glyphicon-chevron-up"
-          :class="{
-            selected:
-              course.difficulty_vote && course.difficulty_vote.is_upvote,
-            unselected:
-              !course.difficulty_vote || !course.difficulty_vote.is_upvote,
-          }"
-          @click="vote(1, true)"
-        ></span>
+        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+          selected: course.difficulty_vote && course.difficulty_vote.is_upvote,
+          unselected: !course.difficulty_vote || !course.difficulty_vote.is_upvote,
+        }" @click="vote(1, true)"></span>
         <h2 class="score">{{ course.difficulty_score }}</h2>
-        <span
-          class="vote-arrow glyphicon glyphicon-chevron-down"
-          :class="{
-            selected:
-              course.difficulty_vote && course.difficulty_vote.is_downvote,
-            unselected:
-              !course.difficulty_vote || !course.difficulty_vote.is_downvote,
-          }"
-          @click="vote(-1, true)"
-        ></span>
+        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+          selected: course.difficulty_vote && course.difficulty_vote.is_downvote,
+          unselected: !course.difficulty_vote || !course.difficulty_vote.is_downvote,
+        }" @click="vote(-1, true)"></span>
         <p>called it a layup</p>
       </div>
     </div>
@@ -84,20 +60,13 @@
       </table>
     </div>
 
-    <div
-      v-if="
-        isAuthenticated && course.review_set && course.review_set.length > 0
-      "
-    >
+    <div v-if="isAuthenticated && course.review_set && course.review_set.length > 0">
       <h3>Reviews ({{ course.review_count }})</h3>
       <table class="table table-striped">
         <tbody>
           <tr v-for="review in course.review_set" :key="review.id">
             <td>
-              <b v-if="review.term"
-                >{{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b
-                >:
+              <b v-if="review.term">{{ review.term }} <b v-if="review.professor"> with {{ review.professor }}</b>:
               </b>
               {{ review.comments }}
             </td>
@@ -106,42 +75,24 @@
       </table>
     </div>
     <div v-else-if="course.review_count > 0" class="auth-message">
-      <p>
-        <a href="/accounts/signup/">Signup</a> or
-        <a href="/accounts/login/">Login</a> to view all of the
-        {{ course.review_count }} reviews for this class.
-      </p>
+      <p><a href="/accounts/signup/">Signup</a> or <a href="/accounts/login/">Login</a> to view all of the {{
+        course.review_count }} reviews for this class.</p>
     </div>
     <div v-if="course.can_write_review">
       <h3>Write a Review for {{ course.course_code }}</h3>
       <form @submit.prevent="submitReview">
         <div>
           <label for="term">Term:</label>
-          <input
-            type="text"
-            id="term"
-            v-model="newReview.term"
-            required
-            :placeholder="currentTerm"
-          />
+          <input type="text" id="term" v-model="newReview.term" required :placeholder="currentTerm" />
         </div>
         <div>
           <label for="professor">Professor:</label>
-          <input
-            type="text"
-            id="professor"
-            v-model="newReview.professor"
-            required
-            placeholder="Full name, e.g., John Smith"
-          />
+          <input type="text" id="professor" v-model="newReview.professor" required
+            placeholder="Full name, e.g., John Smith" />
         </div>
         <div>
           <label for="comments">Review:</label>
-          <textarea
-            id="comments"
-            v-model="newReview.comments"
-            required
-          ></textarea>
+          <textarea id="comments" v-model="newReview.comments" required></textarea>
         </div>
         <button type="submit">Submit</button>
       </form>
@@ -155,9 +106,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
 
-const route = useRoute();
 const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
@@ -173,10 +122,7 @@ const newReview = ref({
 const courseId = computed(() => {
   const pathSegments = window.location.pathname.split("/");
   const courseIdIndex = pathSegments.indexOf("course") + 1;
-  const courseIdFromPath =
-    courseIdIndex > 0 && courseIdIndex < pathSegments.length
-      ? pathSegments[courseIdIndex]
-      : null;
+  const courseIdFromPath = courseIdIndex > 0 && courseIdIndex < pathSegments.length ? pathSegments[courseIdIndex] : null;
 
   return courseIdFromPath;
 });
@@ -301,11 +247,7 @@ const submitReview = async () => {
     });
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(
-        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(
-          errorData
-        )}`
-      );
+      throw new Error(`HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`);
     }
     course.value = await response.json();
     newReview.value = { term: "", professor: "", comments: "" };

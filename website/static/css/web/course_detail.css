@@ -1,35 +1,35 @@
 .bar {
-    fill: #02592E;
+  fill: #02592e;
 }
 
 .bar:hover {
-    fill: #014328;
+  fill: #014328;
 }
 
 .axis {
-    font: 10px sans-serif;
+  font: 10px sans-serif;
 }
 
 .axis path,
 .axis line {
-    fill: none;
-    stroke: #000;
-    shape-rendering: crispEdges;
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
 }
 
 .x.axis path {
-    display: none;
+  display: none;
 }
 
 .median-chart {
-    height: 250px;
+  height: 250px;
 }
 
 .score-box {
-    border: 1px solid black;
-    border-radius: 5px;
+  border: 1px solid black;
+  border-radius: 5px;
 }
 
 .course-review-search {
-    margin-top: 10px;
+  margin-top: 10px;
 }
