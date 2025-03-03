@@ -1,17 +1,19 @@
-from django.shortcuts import render
-from django.views.decorators.http import require_safe
+import datetime
+from collections import Counter
+from random import randint
+
+import pytz
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
 from django.db.models import Count
-from apps.web import models
+from django.shortcuts import render
+from django.views.decorators.http import require_safe
+
 from apps.analytics.forms import ManualSentimentForm
 from apps.recommendations.models import Recommendation
+from apps.web import models
 from lib import constants
-from collections import Counter
-import datetime
-import pytz
-from random import randint
 
 LIMIT = 15
 

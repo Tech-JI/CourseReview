@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from apps.web.models import Review, Course
+
+from apps.web.models import Course, Review
 from lib import constants
 from lib.terms import is_valid_term
 

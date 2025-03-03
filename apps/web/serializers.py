@@ -2,8 +2,15 @@
 from django.db.models import Count
 from rest_framework import serializers
 
-from apps.web.models import (Course, CourseMedian, CourseOffering,
-                             DistributiveRequirement, Instructor, Review, Vote)
+from apps.web.models import (
+    Course,
+    CourseMedian,
+    CourseOffering,
+    DistributiveRequirement,
+    Instructor,
+    Review,
+    Vote,
+)
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):

@@ -1,6 +1,7 @@
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.views.decorators.http import require_safe
-from django.contrib.auth.decorators import login_required
+
 from apps.recommendations.models import Recommendation
 from lib import constants
 

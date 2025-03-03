@@ -1,11 +1,11 @@
 from urllib.parse import urljoin
 
-from apps.web.models import Course, CourseMedian
 from apps.spider.utils import (
     clean_department_code,
     parse_number_and_subnumber,
     retrieve_soup,
 )
+from apps.web.models import Course, CourseMedian
 
 MEDIAN_PAGE_INDEX_URL = "http://www.dartmouth.edu/reg/transcript/medians/"
 MEDIANS_URL_FMT = "http://www.dartmouth.edu/reg/transcript/medians/{term}.html"

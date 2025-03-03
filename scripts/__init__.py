@@ -1,8 +1,8 @@
-from website.celery import app
 from apps.spider.models import CrawledData
 
 # from apps.spider.tasks import crawl_medians, crawl_orc, crawl_timetable
 from apps.spider.tasks import crawl_orc
+from website.celery import app
 
 
 def crawl_and_import_data():

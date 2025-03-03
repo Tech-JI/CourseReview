@@ -1,8 +1,9 @@
 # from apps.spider.crawlers import medians, orc, timetable
-from apps.spider.crawlers import orc
-from apps.spider.models import CrawledData
 from celery import shared_task
 from django.db import transaction
+
+from apps.spider.crawlers import orc
+from apps.spider.models import CrawledData
 from lib import task_utils
 
 # from lib.constants import CURRENT_TERM

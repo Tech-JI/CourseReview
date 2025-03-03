@@ -1,9 +1,10 @@
 from django import forms
-from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
+
 from apps.web.models import Student
 
 

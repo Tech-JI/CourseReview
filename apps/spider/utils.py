@@ -1,7 +1,8 @@
-from bs4 import BeautifulSoup
 import html
 import json
 import urllib.request as urllib_request
+
+from bs4 import BeautifulSoup
 
 DEPARTMENT_CORRECTIONS = {"M&SS": "QSS", "WGST": "WGSS"}
 

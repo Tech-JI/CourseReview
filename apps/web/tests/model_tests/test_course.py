@@ -1,4 +1,5 @@
 from django.test import TestCase
+
 from apps.web.models import Course, CourseOffering
 from apps.web.tests import factories
 

@@ -1,5 +1,6 @@
 from django.test import TestCase
-from apps.web.models import Vote, Course
+
+from apps.web.models import Course, Vote
 from apps.web.tests import factories
 
 

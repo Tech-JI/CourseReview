@@ -1,4 +1,5 @@
 import re
+
 from lib import constants
 
 term_regex = re.compile(r"^(?P<year>[0-9]{2})(?P<term>[WSXFwsxf])$")
