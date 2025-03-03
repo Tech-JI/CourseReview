@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 from django.contrib.auth.models import User
 from django.db import models, transaction
 
-from apps.web.models import Course
+from .course import Course
 
 
 class VoteManager(models.Manager):
