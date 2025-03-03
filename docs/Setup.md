@@ -40,9 +40,11 @@ Environment:
 
 10. Configure database
 
-    1. Install Postgres: 
-      - `sudo apt update`
-      - `sudo apt install postgresql`
+    1. Install Postgres:
+
+       - `sudo apt update`
+
+       - `sudo apt install postgresql`
 
     2. Create user postgres: `sudo -iu postgres`
 
@@ -54,42 +56,44 @@ Environment:
 
     6. `psql`
 
-    7. Initialize coursereview database, user and privileges
+       1. Initialize coursereview database, user and privileges
 
-       ```sql
-       CREATE DATABASE coursereview;
-       CREATE USER admin WITH PASSWORD 'test'; -- This is the same password of admin in .env file above.
-       GRANT ALL PRIVILEGES ON DATABASE coursereview TO admin;
-       ALTER DATABASE coursereview OWNER TO admin;
-       ```
+          ```sql
+          CREATE DATABASE coursereview;
+          CREATE USER admin WITH PASSWORD 'test'; -- This is the same password of admin in .env file above.
+          GRANT ALL PRIVILEGES ON DATABASE coursereview TO admin;
+          ALTER DATABASE coursereview OWNER TO admin;
+          ```
 
-      get the path of config file: 
-      ```
-      SHOW config_file;
-      ```
-      copy the path, Shift+Ctrl+C (default)
+       2. Get the path of config file:
 
-    8. Exit psql and switch back to normal user: `\q`, `exit`
+          ```sql
+          SHOW config_file;
+          ```
 
-    9.  Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim {Path to your config file}`, example: `sudo vim /etc/postgresql/14/main/postgresql.conf`. Find the line `listen_addresses`, modify it to: 
+       3. Copy the path (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> by default)
+
+       4. Exit `psql` and switch back to normal user: `\q`, `exit`
+
+    7. Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim {Path to your config file}`, example: `sudo vim /etc/postgresql/14/main/postgresql.conf`. Find the line `listen_addresses`, modify it to:
 
        ```ini
        listen_addresses = '0.0.0.0'
        ```
 
-    10. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /etc/postgresql/14/main/pg_hba.conf` (maybe differ from your path, just change the command according to the copied path) and add a line:
+    8. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /etc/postgresql/14/main/pg_hba.conf` (maybe differ from your path, just change the command according to the copied path) and add a line:
 
-        ```ini
-        host    all             all             0.0.0.0/0            md5
-        ```
+       ```ini
+       host    all             all             0.0.0.0/0            md5
+       ```
 
-    11. Restart postgres service: `sudo systemctl restart postgresql`
+    9. Restart postgres service: `sudo systemctl restart postgresql`
 
-    12. Auto setup database connection and static file routes in Django: `make migrate`, `make makemigrations`
+    10. Auto setup database connection and static file routes in Django: `make migrate`, `make makemigrations`
 
 11. Install cache database redis: `sudo apt install redis-server`, `sudo systemctl start redis`. Run `sudo systemctl enable redis` to auto-start redis service on start-up.
 
-12. `make run` and visit http://127.0.0.1:8000
+12. `make run` and visit <http://127.0.0.1:8000/>
 
 13. Add local admin:
 
@@ -98,6 +102,7 @@ Environment:
     2. Enter interactive python shell: `make shell`. (Different from directly running `python` from shell.)
 
     3. Run following python codes in interactive shell:
+
        ```python
        from django.contrib.auth.models import User
        u = User.objects.last()
@@ -114,6 +119,7 @@ Environment:
     2. Enter interactive python shell: `make shell`.
 
     3. Run following python codes in interactive shell:
+
        ```python
        from scripts import crawl_and_import_data
        crawl_and_import_data()
