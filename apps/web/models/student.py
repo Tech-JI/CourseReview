@@ -7,8 +7,9 @@ from django.core.mail import send_mail
 from django.db import models
 from django.urls import reverse
 
-from apps.web.models import Vote
 from lib import constants
+
+from .vote import Vote
 
 
 class StudentManager(models.Manager):
