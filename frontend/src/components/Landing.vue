@@ -85,11 +85,11 @@ const performSearch = () => {
 };
 
 const goToBestClasses = () => {
-  window.location.href = '/best';
+  router.push('/best');
 };
 
 const goToLayups = () => {
-  window.location.href = '/layups';
+  router.push('/layups');
 };
 
 const goToDepartments = () => {

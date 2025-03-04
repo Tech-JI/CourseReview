@@ -5,7 +5,8 @@ import CourseDetail from "./components/CourseDetail.vue";
 import Departments from "./components/Departments.vue";
 import CourseSearch from "./components/CourseSearch.vue";
 import Landing from "./components/Landing.vue";
-import CourseReviewSearch from "./components/CourseReviewSearch.vue"; // Import
+import CourseReviewSearch from "./components/CourseReviewSearch.vue";
+import CoursesList from "./components/CoursesList.vue";
 import "./style.css";
 
 const routes = [
@@ -13,8 +14,8 @@ const routes = [
   { path: "/course/:course_id", component: CourseDetail, props: true },
   { path: "/departments", component: Departments },
   { path: "/search", component: CourseSearch, props: (route) => ({ query: route.query.q }) },
-  { path: '/course/:courseId/review_search', component: CourseReviewSearch, props: true }, // Add route
-
+  { path: '/course/:courseId/review_search', component: CourseReviewSearch, props: true },
+  { path: '/:sort(best|layups)', component: CoursesList, props: true },
 ];
 
 const router = createRouter({

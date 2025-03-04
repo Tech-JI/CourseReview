@@ -76,6 +76,21 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         instructors = obj.get_instructors()
         return [instructor.name for instructor in instructors]
 
+    def get_short_description(self, obj):
+        """Return a shortened version of the course description"""
+        if obj.description:
+            return (
+                obj.description
+                if len(obj.description) <= 300
+                else obj.description[:300] + "..."
+            )
+        return None
+
+    def get_offered_times_string(self, obj):
+        """Return a string of when the course is offered"""
+        periods = set(o.period for o in obj.courseoffering_set.all())
+        return ", ".join(periods) if periods else None
+
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         request = self.context.get("request")
@@ -84,6 +99,10 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             ret.pop("quality_score", None)
             ret.pop("difficulty_score", None)
+
+        # Add summary fields
+        ret["short_description"] = self.get_short_description(instance)
+        ret["offered_times_string"] = self.get_offered_times_string(instance)
 
         return ret
 

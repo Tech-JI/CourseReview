@@ -174,8 +174,9 @@ def confirmation(request):
         )
 
 
-@require_safe
-def current_term(request, sort):
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def current_term_api(request, sort):
     if sort == "best":
         course_type, primary_sort, secondary_sort = (
             "Best Classes",
@@ -185,7 +186,9 @@ def current_term(request, sort):
         vote_category = Vote.CATEGORIES.QUALITY
     else:
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("signup") + "?restriction=see layups")
+            return Response(
+                {"detail": "Authentication required to view layups"}, status=403
+            )
 
         course_type, primary_sort, secondary_sort = (
             "Layups",
@@ -196,6 +199,8 @@ def current_term(request, sort):
 
     dist = request.GET.get("dist")
     dist = dist.upper() if dist else dist
+    page = request.GET.get("page", 1)
+
     term_courses = (
         Course.objects.for_term(constants.CURRENT_TERM, dist)
         .prefetch_related("distribs", "review_set", "courseoffering_set")
@@ -204,35 +209,39 @@ def current_term(request, sort):
 
     paginator = Paginator(term_courses, LIMITS["courses"])
     try:
-        courses = paginator.page(request.GET.get("page"))
-    except PageNotAnInteger:
+        courses = paginator.page(page)
+    except (PageNotAnInteger, EmptyPage):
         courses = paginator.page(1)
-    except EmptyPage:
-        courses = paginator.page(paginator.num_pages)
 
     if courses.number > 1 and not request.user.is_authenticated:
-        return HttpResponseRedirect(reverse("signup") + "?restriction=see more")
-
-    for_layups_js_boolean = str(sort != "best").lower()
+        return Response(
+            {"detail": "Authentication required to view more pages"}, status=403
+        )
 
     courses_and_votes = Vote.objects.authenticated_group_courses_with_votes(
         courses.object_list, vote_category, request.user
     )
 
-    return render(
-        request,
-        "current_term.html",
+    serializer = CourseSearchSerializer(
+        [course for course, _ in courses_and_votes],
+        many=True,
+        context={"request": request},
+    )
+
+    return Response(
         {
             "term": constants.CURRENT_TERM,
             "sort": sort,
             "course_type": course_type,
-            "courses": courses,
-            "courses_and_votes": courses_and_votes,
-            "distribs": DistributiveRequirement.objects.all(),
-            "page_javascript": "LayupList.Web.CurrentTerm({})".format(
-                for_layups_js_boolean
-            ),
-        },
+            "courses": serializer.data,
+            "current_page": courses.number,
+            "total_pages": paginator.num_pages,
+            "distribs": [
+                {"name": d.name, "code": d.name.lower()}
+                for d in DistributiveRequirement.objects.all()
+            ],
+            "selected_distrib": dist.lower() if dist else None,
+        }
     )
 
 
