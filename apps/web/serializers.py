@@ -100,6 +100,7 @@ class CourseSerializer(serializers.ModelSerializer):
     can_write_review = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
+    course_topics = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -123,6 +124,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "quality_vote",
             "can_write_review",
             "instructors",
+            "course_topics",
         )
 
     def get_review_set(self, obj):
@@ -196,3 +198,6 @@ class CourseSerializer(serializers.ModelSerializer):
         """Return a list of instructor names for the course"""
         instructors = obj.get_instructors()
         return [instructor.name for instructor in instructors]
+
+    def get_course_topics(self, obj):
+        return obj.course_topics
