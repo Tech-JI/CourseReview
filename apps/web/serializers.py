@@ -48,6 +48,7 @@ class CourseSearchSerializer(serializers.ModelSerializer):
     distribs = DistributiveRequirementSerializer(many=True, read_only=True)
     review_count = serializers.SerializerMethodField()
     is_offered_in_current_term = serializers.SerializerMethodField()
+    instructors = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -61,6 +62,7 @@ class CourseSearchSerializer(serializers.ModelSerializer):
             "difficulty_score",
             "last_offered",
             "is_offered_in_current_term",
+            "instructors",
         )
 
     def get_review_count(self, obj):
@@ -68,6 +70,11 @@ class CourseSearchSerializer(serializers.ModelSerializer):
 
     def get_is_offered_in_current_term(self, obj):
         return obj.courseoffering_set.filter(term=constants.CURRENT_TERM).exists()
+
+    def get_instructors(self, obj):
+        """Return a list of instructor names for the course"""
+        instructors = obj.get_instructors()
+        return [instructor.name for instructor in instructors]
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -92,6 +99,7 @@ class CourseSerializer(serializers.ModelSerializer):
     quality_vote = serializers.SerializerMethodField()
     can_write_review = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    instructors = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -114,6 +122,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "difficulty_vote",
             "quality_vote",
             "can_write_review",
+            "instructors",
         )
 
     def get_review_set(self, obj):
@@ -182,3 +191,8 @@ class CourseSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return Review.objects.user_can_write_review(request.user.id, obj.id)
         return False
+
+    def get_instructors(self, obj):
+        """Return a list of instructor names for the course"""
+        instructors = obj.get_instructors()
+        return [instructor.name for instructor in instructors]

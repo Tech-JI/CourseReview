@@ -31,6 +31,7 @@
               <tr>
                 <th>Course</th>
                 <th>Offered {{ term }}?</th>
+                <th>Instructors</th>
                 <th>Distribs</th>
                 <th>Reviews</th>
                 <th>Quality</th>
@@ -43,6 +44,13 @@
                 <td>
                   <span v-if="course.is_offered_in_current_term">Offered {{ term }}</span>
                   <span v-else-if="course.last_offered">Last offered {{ course.last_offered }}</span>
+                </td>
+                <td>
+                  <span v-if="course.instructors && course.instructors.length > 0">
+                    {{ course.instructors.slice(0, 2).join(', ') }}
+                    <span v-if="course.instructors.length > 2">...</span>
+                  </span>
+                  <span v-else>-</span>
                 </td>
                 <td>
                   <span v-for="(distrib, index) in course.distribs" :key="index">

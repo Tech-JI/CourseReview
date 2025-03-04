@@ -42,8 +42,17 @@
       </div>
     </div>
 
+    <div v-if="course.instructors && course.instructors.length > 0">
+      <h3>Instructors</h3>
+      <div class="instructor-list">
+        <span v-for="(instructor, index) in course.instructors" :key="index" class="instructor-tag">
+          {{ instructor }}
+        </span>
+      </div>
+    </div>
+
     <div v-if="course.professors_and_review_count">
-      <h3>Professors</h3>
+      <h3>Professors with Reviews</h3>
       <table class="table table-striped">
         <thead>
           <tr>
@@ -300,5 +309,19 @@ const submitReview = async () => {
   margin: 20px 0;
   border-radius: 5px;
   text-align: center;
+}
+
+.instructor-list {
+  margin: 10px 0 20px 0;
+}
+
+.instructor-tag {
+  display: inline-block;
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 5px 10px;
+  margin: 0 5px 5px 0;
+  border-radius: 15px;
+  font-size: 0.9em;
 }
 </style>

@@ -396,6 +396,18 @@ def course_professors(request, course_id):
     )
 
 
+@require_safe
+def course_instructors(request, course_id):
+    try:
+        course = Course.objects.get(pk=course_id)
+        instructors = course.get_instructors()
+        return JsonResponse(
+            {"instructors": [instructor.name for instructor in instructors]}
+        )
+    except Course.DoesNotExist:
+        return JsonResponse({"error": "Course not found"}, status=404)
+
+
 @require_POST
 def vote(request, course_id):
     if not request.user.is_authenticated:

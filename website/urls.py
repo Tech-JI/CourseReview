@@ -53,6 +53,11 @@ urlpatterns = [
         name="course_detail_api",
     ),
     re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/instructors?/?",
+        views.course_instructors,
+        name="course_instructors",
+    ),
+    re_path(
         r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
     ),
     re_path(
