@@ -76,10 +76,15 @@ urlpatterns = [
         views.departments_api,
         name="departments_api",
     ),
-    re_path(
-        r"^course/(?P<course_id>[0-9]+)/review_search/?",
-        views.course_review_search,
-        name="course_review_search",
+    # re_path(
+    #     r"^course/(?P<course_id>[0-9]+)/review_search/?",
+    #     views.course_review_search,
+    #     name="course_review_search",
+    # ),
+    re_path(  # New API endpoint
+        r"^api/course/(?P<course_id>[0-9]+)/review_search/$",
+        views.course_review_search_api,
+        name="course_review_search_api",
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
