@@ -2,29 +2,23 @@ import datetime
 import uuid
 
 import dateutil.parser
-from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db import IntegrityError, transaction
 from django.db.models import Count
 from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
-    HttpResponseNotFound,
     HttpResponseRedirect,
     JsonResponse,
 )
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_safe
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from apps.recommendations.models import Recommendation
 from apps.web.models import (
     Course,
     CourseMedian,
@@ -41,27 +35,12 @@ from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
 
-# from google.cloud import pubsub_v1
-
-# pub_sub_publisher = pubsub_v1.PublisherClient()
-# topic_paths = {
-#     'course-views': pub_sub_publisher.topic_path(os.environ['GCLOUD_PROJECT_ID'], 'course-views')
-# }
 
 LIMITS = {
     "courses": 20,
     "reviews": 5,
     "unauthenticated_review_search": 3,
 }
-
-
-# def get_user(request):
-#     if request.user.is_authenticated:
-#         return Response(
-#             {"user": {"id": request.user.id, "username": request.user.username}}
-#         )
-#     else:
-#         return Response({"user": None})
 
 
 @api_view(["GET"])

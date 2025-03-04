@@ -27,9 +27,6 @@ from apps.web import views
 urlpatterns = [
     # administrative
     re_path(r"^admin/", admin.site.urls),
-    #     re_path(r'^hijack/', include('hijack.urls')),
-    # analytics
-    # re_path(r"^api/user/$", views.get_user, name="get_user"),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
     re_path(r"^analytics/$", aviews.home, name="analytics_home"),
     re_path(
@@ -56,6 +53,15 @@ urlpatterns = [
         name="course_detail_api",
     ),
     re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
+        views.course_professors,
+        name="course_professors",
+    ),
+    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
+    re_path(
         r"^api/search/$",
         views.course_search_api,
         name="course_search_api",
@@ -72,16 +78,6 @@ urlpatterns = [
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
-    # api
-    re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
-    ),
-    re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
-        views.course_professors,
-        name="course_professors",
-    ),
-    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
     re_path(r"^accounts/login/$", views.auth_login, name="auth_login"),
