@@ -8,6 +8,15 @@
     <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
+    <div v-if="course.course_topics && course.course_topics.length > 0">
+      <h3>Course Topics</h3>
+      <ul>
+        <li v-for="(topic, index) in course.course_topics" :key="index">
+          {{ topic }}
+        </li>
+      </ul>
+    </div>
+
     <p v-if="course.xlist && course.xlist.length > 0">
       Crosslisted with
       <span v-for="x in course.xlist" :key="x.id">
@@ -87,6 +96,7 @@
       <p><a href="/accounts/signup/">Signup</a> or <a href="/accounts/login/">Login</a> to view all of the {{
         course.review_count }} reviews for this class.</p>
     </div>
+
     <div v-if="course.can_write_review">
       <h3>Write a Review for {{ course.course_code }}</h3>
       <form @submit.prevent="submitReview">
@@ -106,6 +116,7 @@
         <button type="submit">Submit</button>
       </form>
     </div>
+
     <div v-else>
       <p v-if="isAuthenticated">Thanks for writing a review of this course!</p>
       <p v-else><a href="/accounts/login/">Login</a> to write a review.</p>
