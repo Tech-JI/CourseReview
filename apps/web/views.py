@@ -95,8 +95,7 @@ def get_prior_course_id(request, current_course_id):
         ):
             prior_course_id = request.session["prior_course_id"]
     request.session["prior_course_id"] = current_course_id
-    request.session["prior_course_timestamp"] = datetime.datetime.now(
-    ).isoformat()
+    request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
     return prior_course_id
 
 
@@ -137,8 +136,7 @@ def auth_login(request):
                 login(request, user)
                 if "user_id" in request.session:
                     student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(
-                        request.session["user_id"])
+                    student.unauth_session_ids.append(request.session["user_id"])
                     student.save()
                 request.session["user_id"] = user.username
 
@@ -191,8 +189,7 @@ def confirmation(request):
         return render(request, "confirmation.html", {"already_confirmed": False})
     else:
         return render(
-            request, "confirmation.html", {
-                "error": "Please provide confirmation code."}
+            request, "confirmation.html", {"error": "Please provide confirmation code."}
         )
 
 
@@ -307,30 +304,30 @@ def departments_api(request):
     return Response(departments_data)
 
 
-@require_safe
-def course_search(request):
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def course_search_api(request):
     query = request.GET.get("q", "").strip()
+
     if len(query) < 2:
-        return render(request, "course_search.html", {"query": query, "courses": []})
+        return Response({"query": query, "department": None, "courses": []})
+
     courses = Course.objects.search(query).prefetch_related(
         "review_set", "courseoffering_set", "distribs"
     )
-    if len(courses) == 1:
-        return redirect(courses[0])
 
     if len(query) not in Course.objects.DEPARTMENT_LENGTHS:
-        courses = sorted(
-            courses, key=lambda c: c.review_set.count(), reverse=True)
+        courses = sorted(courses, key=lambda c: c.review_set.count(), reverse=True)
 
-    return render(
-        request,
-        "course_search.html",
+    serializer = CourseSerializer(courses, many=True, context={"request": request})
+
+    return Response(
         {
-            "term": constants.CURRENT_TERM,
             "query": query,
             "department": get_department_name(query),
-            "courses": courses,
-        },
+            "term": constants.CURRENT_TERM,
+            "courses": serializer.data,
+        }
     )
 
 

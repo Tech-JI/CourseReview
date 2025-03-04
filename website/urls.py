@@ -41,8 +41,7 @@ urlpatterns = [
         r"^sentiment_labeler/$", aviews.sentiment_labeler, name="sentiment_labeler"
     ),
     # spider
-    re_path(r"^spider/data/$", spider_views.crawled_data_list,
-            name="crawled_datas"),
+    re_path(r"^spider/data/$", spider_views.crawled_data_list, name="crawled_datas"),
     re_path(
         r"^spider/data/(?P<crawled_data_pk>[0-9]+)$",
         spider_views.crawled_data_detail,
@@ -50,13 +49,16 @@ urlpatterns = [
     ),
     # primary views
     re_path(r"^$", views.landing, name="landing"),
-    re_path(r"^(?P<sort>best|layups)/?",
-            views.current_term, name="current_term"),
-    re_path(r"^search/?", views.course_search, name="course_search"),
+    re_path(r"^(?P<sort>best|layups)/?", views.current_term, name="current_term"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
         views.course_detail_api,
         name="course_detail_api",
+    ),
+    re_path(
+        r"^api/search/$",
+        views.course_search_api,
+        name="course_search_api",
     ),
     re_path(
         r"^api/departments/$",
@@ -69,8 +71,7 @@ urlpatterns = [
         name="course_review_search",
     ),
     # recommendations
-    re_path(r"^recommendations/?", rviews.recommendations,
-            name="recommendations"),
+    re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # api
     re_path(
         r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
@@ -80,14 +81,12 @@ urlpatterns = [
         views.course_professors,
         name="course_professors",
     ),
-    re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
+    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
     re_path(r"^accounts/login/$", views.auth_login, name="auth_login"),
     re_path(r"^accounts/logout$", views.auth_logout, name="auth_logout"),
-    re_path(r"^accounts/confirmation$",
-            views.confirmation, name="confirmation"),
+    re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
     re_path(
         r"^accounts/password/reset/$",
