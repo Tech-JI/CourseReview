@@ -35,7 +35,7 @@ from apps.web.models import (
     Vote,
 )
 from apps.web.models.forms import ReviewForm, SignupForm
-from apps.web.serializers import CourseSerializer
+from apps.web.serializers import CourseSearchSerializer, CourseSerializer
 from lib import constants
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
@@ -312,14 +312,14 @@ def course_search_api(request):
     if len(query) < 2:
         return Response({"query": query, "department": None, "courses": []})
 
-    courses = Course.objects.search(query).prefetch_related(
-        "review_set", "courseoffering_set", "distribs"
-    )
+    courses = Course.objects.search(query).prefetch_related("review_set", "distribs")
 
     if len(query) not in Course.objects.DEPARTMENT_LENGTHS:
         courses = sorted(courses, key=lambda c: c.review_set.count(), reverse=True)
 
-    serializer = CourseSerializer(courses, many=True, context={"request": request})
+    serializer = CourseSearchSerializer(
+        courses, many=True, context={"request": request}
+    )
 
     return Response(
         {
