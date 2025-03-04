@@ -4,7 +4,6 @@ from django.db import transaction
 
 from apps.spider.utils import int_or_none, parse_number_and_subnumber, retrieve_soup
 from apps.web.models import Course, CourseOffering, DistributiveRequirement, Instructor
-from lib.constants import CURRENT_TERM
 from lib.terms import split_term
 
 TIMETABLE_URL = "http://oracle-www.dartmouth.edu/dart/groucho/timetable.display_courses"
