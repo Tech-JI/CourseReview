@@ -41,16 +41,17 @@
               <tr v-for="course in courses" :key="course.id" @click="goToCourse(course.id)" role="button">
                 <td><a>{{ course.course_code }}: {{ course.course_title }}</a></td>
                 <td>
-                  <span v-if="isOfferedInCurrentTerm(course)">Offered {{ term }}</span>
+                  <span v-if="course.is_offered_in_current_term">Offered {{ term }}</span>
+                  <span v-else-if="course.last_offered">Last offered {{ course.last_offered }}</span>
                 </td>
                 <td>
                   <span v-for="(distrib, index) in course.distribs" :key="index">
                     {{ distrib.name }}{{ index < course.distribs.length - 1 ? ', ' : '' }} </span>
                 </td>
                 <td>{{ course.review_count }}</td>
-                <td>{{ course.quality_score }}</td>
-                <td v-if="isAuthenticated">{{ course.difficulty_score }}</td>
-                <td v-else><a href="/accounts/signup/">Signup to reveal</a></td>
+                <td v-if="isAuthenticated && course.quality_score !== undefined">{{ course.quality_score }}</td>
+                <td v-if="isAuthenticated && course.difficulty_score !== undefined">{{ course.difficulty_score }}</td>
+                <td v-else colspan="2"><a href="/accounts/signup/">Signup to reveal</a></td>
               </tr>
             </tbody>
           </table>
@@ -148,10 +149,6 @@ const checkAuthentication = async () => {
 
 const goToCourse = (courseId) => {
   router.push(`/course/${courseId}`);
-};
-
-const isOfferedInCurrentTerm = (course) => {
-  return course.courseoffering_set && course.courseoffering_set.length > 0;
 };
 </script>
 

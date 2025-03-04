@@ -11,7 +11,7 @@ from apps.web.models import (
     Review,
     Vote,
 )
-from lib.departments import get_department_name
+from lib import constants
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):
@@ -42,6 +42,43 @@ class DepartmentSerializer(serializers.Serializer):
     code = serializers.CharField()
     name = serializers.CharField()
     count = serializers.IntegerField()
+
+
+class CourseSearchSerializer(serializers.ModelSerializer):
+    distribs = DistributiveRequirementSerializer(many=True, read_only=True)
+    review_count = serializers.SerializerMethodField()
+    is_offered_in_current_term = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = (
+            "id",
+            "course_code",
+            "course_title",
+            "distribs",
+            "review_count",
+            "quality_score",
+            "difficulty_score",
+            "last_offered",
+            "is_offered_in_current_term",
+        )
+
+    def get_review_count(self, obj):
+        return obj.review_set.count()
+
+    def get_is_offered_in_current_term(self, obj):
+        return obj.courseoffering_set.filter(term=constants.CURRENT_TERM).exists()
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+
+        # Remove scores for unauthenticated users
+        if not request or not request.user.is_authenticated:
+            ret.pop("quality_score", None)
+            ret.pop("difficulty_score", None)
+
+        return ret
 
 
 class CourseSerializer(serializers.ModelSerializer):
