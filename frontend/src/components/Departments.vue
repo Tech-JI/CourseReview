@@ -49,10 +49,11 @@ const fetchDepartments = async () => {
   }
 };
 
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
 const goToDepartment = (code) => {
-  window.location.href = `/search?q=${code}`;
-  // If you want to use Vue Router instead:
-  // router.push({ path: '/search', query: { q: code } });
+  router.push({ path: '/search', query: { q: code } });
 };
 </script>
 
