@@ -181,3 +181,28 @@ class Course(models.Model):
 
     def should_ask_viewers_to_contribute(self):
         return self.department in {"COSC", "ENGS"}
+
+    def get_instructors(self, term=CURRENT_TERM):
+        """
+        Get all instructors for this course in the specified term.
+        If term is None, returns instructors across all terms.
+        """
+        instructors = []
+        offerings = self.courseoffering_set.all()
+
+        if term:
+            offerings = offerings.filter(term=term)
+
+        for offering in offerings:
+            for instructor in offering.instructors.all():
+                instructors.append(instructor)
+
+        # Remove duplicates while preserving order
+        unique_instructors = []
+        seen = set()
+        for instructor in instructors:
+            if instructor.id not in seen:
+                seen.add(instructor.id)
+                unique_instructors.append(instructor)
+
+        return unique_instructors
