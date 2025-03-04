@@ -35,7 +35,6 @@ from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
 
-
 LIMITS = {
     "courses": 20,
     "reviews": 5,

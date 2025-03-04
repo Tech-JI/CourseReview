@@ -74,11 +74,11 @@ def _crawl_course_data(course_url):
 
         for i, child in enumerate(children):
             text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
-            if "Credits" in text:
+            if "Credits:" in text:
                 course_credits = int(re.findall(r"\d+", text)[0])
-            elif "Pre-requisites" in text:
+            elif "Pre-requisites:" in text:
                 pre_requisites = extract_prerequisites(text)
-            elif "Description" in text:
+            elif "Description:" in text:
                 description = (
                     children[i + 2].get_text(strip=True)
                     if i + 2 < len(children)
@@ -86,7 +86,7 @@ def _crawl_course_data(course_url):
                 )
                 if description == "\n" or "Course Topics" in description:
                     description = ""
-            elif "Course Topics" in text:
+            elif "Course Topics:" in text:
                 course_topics = (
                     [li.get_text(strip=True) for li in children[i + 2].find_all("li")]
                     if i + 2 < len(children)
