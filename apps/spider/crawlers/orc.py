@@ -2,7 +2,8 @@ import re
 from urllib.parse import urljoin
 
 from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
-from apps.web.models import Course
+from apps.web.models import Course, CourseOffering, Instructor
+from lib.constants import CURRENT_TERM
 
 BASE_URL = "https://www.ji.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
@@ -71,6 +72,7 @@ def _crawl_course_data(course_url):
         pre_requisites = ""
         description = ""
         course_topics = []
+        instructors = []
 
         for i, child in enumerate(children):
             text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
@@ -92,6 +94,15 @@ def _crawl_course_data(course_url):
                     if i + 2 < len(children)
                     else []
                 )
+            elif "Instructors:" in text:
+                instructors_text = (
+                    children[i + 2].get_text(strip=True)
+                    if i + 2 < len(children)
+                    else ""
+                )
+                instructors = [
+                    name.strip() for name in instructors_text.split(";") if name.strip()
+                ]
 
         result = {
             "course_code": course_code,
@@ -102,6 +113,7 @@ def _crawl_course_data(course_url):
             "pre_requisites": pre_requisites,
             "description": description,
             "course_topics": course_topics,
+            "instructors": instructors,
             "url": course_url,
         }
         return result
@@ -114,13 +126,14 @@ def _crawl_course_data(course_url):
         #     "pre_requisites": None,
         #     "description": "This is a test course",
         #     "course_topics": ["Test Topic"],
+        #     "instructors": ["Test Instructor"],
         #     "url": course_url,
         # }
 
 
 def import_department(department_data):
     for course_data in department_data:
-        Course.objects.update_or_create(
+        course, created = Course.objects.update_or_create(
             course_code=course_data["course_code"],
             defaults={
                 "course_title": course_data["course_title"],
@@ -136,14 +149,26 @@ def import_department(department_data):
             },
         )
 
+        # Handle instructors
+        if "instructors" in course_data and course_data["instructors"]:
+            for instructor_name in course_data["instructors"]:
+                instructor, _ = Instructor.objects.get_or_create(name=instructor_name)
+                # Create a course offering for the current term if it doesn't exist
+                offering, _ = CourseOffering.objects.get_or_create(
+                    course=course,
+                    term=CURRENT_TERM,
+                    defaults={"section": 1, "period": ""},
+                )
+                offering.instructors.add(instructor)
+
 
 def extract_prerequisites(pre_requisites):
     result = pre_requisites
 
     result = result.replace("Pre-requisites:", "").strip()
 
-    result = result.replace("Obtained Credit", "Obtained_Credit").strip()
-    result = result.replace("Credits Submitted", "Credits_Submitted").strip()
+    result = result.replace("Obtained Credit", "obtained_credit").strip()
+    result = result.replace("Credits Submitted", "credits_submitted").strip()
 
     result = result.replace("&&", " && ").strip()
     result = result.replace("||", " || ").strip()
