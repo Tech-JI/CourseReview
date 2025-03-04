@@ -45,8 +45,8 @@ urlpatterns = [
         name="crawled_data",
     ),
     # primary views
-    re_path(r"^$", views.landing, name="landing"),
     re_path(r"^(?P<sort>best|layups)/?", views.current_term, name="current_term"),
+    re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
         views.course_detail_api,

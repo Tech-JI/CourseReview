@@ -3,8 +3,8 @@
     <div class="search-container" v-if="showSearchBar">
       <form @submit.prevent="performSearch">
         <div class="input-group">
-          <input type="text" class="form-control" v-model="searchQuery"
-            placeholder="Search for courses (e.g., ENGR 101)" aria-label="Search for courses">
+          <input type="text" class="form-control" v-model="searchQuery" placeholder="Search for courses (e.g., ENGR101)"
+            aria-label="Search for courses">
           <button class="btn btn-primary" type="submit">Search</button>
         </div>
       </form>
@@ -23,8 +23,8 @@ const searchQuery = ref('');
 
 // Determine if we should show the search bar
 const showSearchBar = computed(() => {
-  // Don't show search bar on the main search page
-  return true;
+  // Don't show search bar on the landing page or search page
+  return route.path !== '/' && route.path !== '/search';
 });
 
 onMounted(() => {
@@ -37,7 +37,6 @@ onMounted(() => {
 const performSearch = () => {
   const query = searchQuery.value.trim();
   if (query.length >= 2) {
-    console.log("Performing search for:", query);
     router.push({
       path: '/search',
       query: { q: query }

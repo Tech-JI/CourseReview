@@ -59,6 +59,17 @@ def get_session_id(request):
     return request.session["user_id"]
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def landing_api(request):
+    """API endpoint for landing page data"""
+    return Response(
+        {
+            "review_count": Review.objects.count(),
+        }
+    )
+
+
 def get_prior_course_id(request, current_course_id):
     prior_course_id = None
     if (
@@ -75,18 +86,6 @@ def get_prior_course_id(request, current_course_id):
     request.session["prior_course_id"] = current_course_id
     request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
     return prior_course_id
-
-
-@require_safe
-def landing(request):
-    return render(
-        request,
-        "landing.html",
-        {
-            "page_javascript": "LayupList.Web.Landing()",
-            "review_count": Review.objects.count(),
-        },
-    )
 
 
 def signup(request):
