@@ -29,7 +29,11 @@ from apps.web.models import (
     Vote,
 )
 from apps.web.models.forms import ReviewForm, SignupForm
-from apps.web.serializers import CourseSearchSerializer, CourseSerializer
+from apps.web.serializers import (
+    CourseSearchSerializer,
+    CourseSerializer,
+    ReviewSerializer,
+)
 from lib import constants
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
@@ -308,30 +312,42 @@ def course_search_api(request):
     )
 
 
-@require_safe
-def course_review_search(request, course_id):
-    if not request.user.is_authenticated:
-        return HttpResponseRedirect(reverse("signup") + "?restriction=see reviews")
+# Removed old template-based view
+# @require_safe
+# def course_review_search(request, course_id):
+# ...
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def course_review_search_api(request, course_id):
+    try:
+        course = Course.objects.get(pk=course_id)
+    except Course.DoesNotExist:
+        return Response({"detail": "Course not found"}, status=404)
 
     query = request.GET.get("q", "").strip()
-    course = Course.objects.get(id=course_id)
     reviews = course.search_reviews(query)
     review_count = reviews.count()
 
     if not request.user.is_authenticated:
         reviews = reviews[: LIMITS["unauthenticated_review_search"]]
 
-    return render(
-        request,
-        "course_review_search.html",
+    serializer = ReviewSerializer(reviews, many=True)
+
+    return Response(
         {
             "query": query,
-            "course": course,
+            "course_id": course.id,
+            "course_short_name": course.short_name(),
             "reviews_full_count": review_count,
-            "remaining": review_count - LIMITS["unauthenticated_review_search"],
-            "reviews": reviews,
-            "page_javascript": "LayupList.Web.CourseReviewSearch()",
-        },
+            "remaining": (
+                review_count - LIMITS["unauthenticated_review_search"]
+                if review_count > LIMITS["unauthenticated_review_search"]
+                else 0
+            ),
+            "reviews": serializer.data,
+        }
     )
 
 
