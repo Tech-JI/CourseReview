@@ -4,7 +4,7 @@
   <div v-else class="course-detail">
     <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
     <h4 v-if="course.courseoffering_set.length > 0">Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period
-    }})</h4>
+      }})</h4>
     <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
@@ -71,7 +71,8 @@
         </thead>
         <tbody>
           <tr v-for="item in course.professors_and_review_count" :key="item[0]">
-            <td>{{ item[0] }}</td>
+            <td><router-link :to="`/course/${courseId}/review_search?q=${encodeURIComponent(item[0])}`">{{ item[0]
+                }}</router-link></td>
             <td>{{ item[1] }}</td>
           </tr>
         </tbody>
