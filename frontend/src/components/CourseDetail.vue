@@ -4,7 +4,7 @@
   <div v-else class="course-detail">
     <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
     <h4 v-if="course.courseoffering_set.length > 0">Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period
-      }})</h4>
+    }})</h4>
     <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
@@ -126,7 +126,9 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
+import { useRoute } from "vue-router";
 
+const route = useRoute();
 const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
@@ -138,13 +140,8 @@ const newReview = ref({
   comments: "",
 });
 
-// Use a computed property for courseId
 const courseId = computed(() => {
-  const pathSegments = window.location.pathname.split("/");
-  const courseIdIndex = pathSegments.indexOf("course") + 1;
-  const courseIdFromPath = courseIdIndex > 0 && courseIdIndex < pathSegments.length ? pathSegments[courseIdIndex] : null;
-
-  return courseIdFromPath;
+  return route.params.course_id;
 });
 
 onMounted(async () => {
@@ -158,7 +155,6 @@ const fetchCourse = async () => {
   loading.value = true;
   error.value = null;
   try {
-    // Use the computed courseId
     const response = await fetch(`/api/course/${courseId.value}/`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -195,7 +191,6 @@ const vote = async (value, forLayup) => {
   }
   try {
     const postData = { value, forLayup };
-    // Use the computed courseId
     const response = await fetch(`/api/course/${courseId.value}/vote`, {
       method: "POST",
       headers: {
@@ -258,7 +253,6 @@ const submitReview = async () => {
     return;
   }
   try {
-    // Use the computed courseId
     const response = await fetch(`/api/course/${courseId.value}/`, {
       method: "POST",
       headers: {
@@ -289,16 +283,11 @@ const submitReview = async () => {
   margin: 2em;
 }
 
-.course-detail {
-  /* Your existing styles for course details */
-}
-
 .vote-arrow {
   cursor: pointer;
 }
 
 .score-box {
-  /* Your existing styles */
   text-align: center;
   border: 1px solid #ddd;
   padding: 10px;
