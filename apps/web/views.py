@@ -105,40 +105,40 @@ def signup(request):
         return render(request, "signup.html", {"form": SignupForm()})
 
 
-def auth_login(request):
-    if request.method == "POST":
-        username = request.POST.get("email").lower().split("@")[0]
-        password = request.POST.get("password")
-        next_url = request.GET.get("next", "/layups")
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def auth_login_api(request):
+    email = request.data.get("email", "").lower()
+    password = request.data.get("password", "")
+    next_url = request.data.get("next", "/layups")
 
-        user = authenticate(username=username, password=password)
-        if user is not None:
-            if user.is_active:
-                login(request, user)
-                if "user_id" in request.session:
-                    student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-                request.session["user_id"] = user.username
+    if not email or not password:
+        return Response({"error": "Email and password are required"}, status=400)
 
-                return redirect(next_url)
-            else:
-                return render(
-                    request,
-                    "login.html",
-                    {
-                        "error": (
-                            "Please activate your account via the activation link "
-                            "first."
-                        )
-                    },
-                )
+    username = email.split("@")[0]
+    user = authenticate(username=username, password=password)
+
+    if user is not None:
+        if user.is_active:
+            login(request, user)
+            if "user_id" in request.session:
+                student = Student.objects.get(user=user)
+                student.unauth_session_ids.append(request.session["user_id"])
+                student.save()
+            request.session["user_id"] = user.username
+
+            return Response(
+                {"success": True, "next": next_url, "username": user.username}
+            )
         else:
-            return render(request, "login.html", {"error": "Invalid login."})
-    elif request.method == "GET":
-        return render(request, "login.html")
+            return Response(
+                {
+                    "error": "Please activate your account via the activation link first."
+                },
+                status=403,
+            )
     else:
-        return render(request, "login.html", {"error": "Please authenticate."})
+        return Response({"error": "Invalid email or password"}, status=401)
 
 
 @login_required
