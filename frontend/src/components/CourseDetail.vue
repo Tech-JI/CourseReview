@@ -26,28 +26,38 @@
 
     <div class="row">
       <div class="col-md-2 col-md-offset-2 text-center score-box">
-        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
-          selected: course.quality_vote && course.quality_vote.is_upvote,
-          unselected: !course.quality_vote || !course.quality_vote.is_upvote,
-        }" @click="vote(1, false)"></span>
-        <h2 class="score">{{ course.quality_score }}</h2>
-        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
-          selected: course.quality_vote && course.quality_vote.is_downvote,
-          unselected: !course.quality_vote || !course.quality_vote.is_downvote,
-        }" @click="vote(-1, false)"></span>
-        <p>said it was good</p>
+        <template v-if="isAuthenticated">
+          <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+            selected: course.quality_vote && course.quality_vote.is_upvote,
+            unselected: !course.quality_vote || !course.quality_vote.is_upvote,
+          }" @click="vote(1, false)"></span>
+          <h2 class="score">{{ course.quality_score }}</h2>
+          <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+            selected: course.quality_vote && course.quality_vote.is_downvote,
+            unselected: !course.quality_vote || !course.quality_vote.is_downvote,
+          }" @click="vote(-1, false)"></span>
+          <p>said it was good</p>
+        </template>
+        <template v-else>
+          <p><a href="/accounts/login/">Login</a> to see quality score</p>
+        </template>
       </div>
       <div class="col-md-2 col-md-offset-4 text-center score-box">
-        <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
-          selected: course.difficulty_vote && course.difficulty_vote.is_upvote,
-          unselected: !course.difficulty_vote || !course.difficulty_vote.is_upvote,
-        }" @click="vote(1, true)"></span>
-        <h2 class="score">{{ course.difficulty_score }}</h2>
-        <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
-          selected: course.difficulty_vote && course.difficulty_vote.is_downvote,
-          unselected: !course.difficulty_vote || !course.difficulty_vote.is_downvote,
-        }" @click="vote(-1, true)"></span>
-        <p>called it a layup</p>
+        <template v-if="isAuthenticated">
+          <span class="vote-arrow glyphicon glyphicon-chevron-up" :class="{
+            selected: course.difficulty_vote && course.difficulty_vote.is_upvote,
+            unselected: !course.difficulty_vote || !course.difficulty_vote.is_upvote,
+          }" @click="vote(1, true)"></span>
+          <h2 class="score">{{ course.difficulty_score }}</h2>
+          <span class="vote-arrow glyphicon glyphicon-chevron-down" :class="{
+            selected: course.difficulty_vote && course.difficulty_vote.is_downvote,
+            unselected: !course.difficulty_vote || !course.difficulty_vote.is_downvote,
+          }" @click="vote(-1, true)"></span>
+          <p>called it a layup</p>
+        </template>
+        <template v-else>
+          <p><a href="/accounts/login/">Login</a> to see difficulty score</p>
+        </template>
       </div>
     </div>
 

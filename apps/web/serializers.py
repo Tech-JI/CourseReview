@@ -146,6 +146,19 @@ class CourseSerializer(serializers.ModelSerializer):
             "course_topics",
         )
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+
+        # Remove scores and votes for unauthenticated users
+        if not request or not request.user.is_authenticated:
+            ret.pop("quality_score", None)
+            ret.pop("difficulty_score", None)
+            ret.pop("difficulty_vote", None)
+            ret.pop("quality_vote", None)
+
+        return ret
+
     def get_review_set(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
