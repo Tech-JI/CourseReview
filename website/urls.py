@@ -28,6 +28,7 @@ urlpatterns = [
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
+    re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
     re_path(r"^analytics/$", aviews.home, name="analytics_home"),
     re_path(
         r"^eligible_for_recommendations/$",
@@ -87,7 +88,6 @@ urlpatterns = [
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
-    re_path(r"^accounts/login/$", views.auth_login, name="auth_login"),
     re_path(r"^accounts/logout$", views.auth_logout, name="auth_logout"),
     re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
