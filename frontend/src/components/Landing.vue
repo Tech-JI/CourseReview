@@ -28,7 +28,8 @@
         <button v-else @click="goToLayups" class="btn btn-default">See Layups (requires login)</button>
         <button @click="goToDepartments" class="btn btn-default">Browse</button>
         <br><br>
-        <p> Know how to code? <a href="https://github.com/layuplist/layup-list">Try contributing to Layup List!</a> </p>
+        <p> Know how to code? <router-link to="https://github.com/layuplist/layup-list" target="_blank">Try contributing
+            to Layup List!</router-link> </p>
       </div>
     </div>
   </div>

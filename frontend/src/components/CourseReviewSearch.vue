@@ -35,7 +35,8 @@
       </table>
 
       <div v-if="!isAuthenticated && remaining > 0" class="col-md-12 text-center">
-        <h3>Please <a href="/accounts/signup/">signup</a> to see the remaining {{ remaining }} reviews for this search.
+        <h3>Please <router-link to="/accounts/login/">login</router-link> to see the remaining {{ remaining }} reviews
+          for this search.
         </h3>
       </div>
     </div>

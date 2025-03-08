@@ -4,7 +4,7 @@
   <div v-else class="course-detail">
     <h1>{{ course.course_code }} | {{ course.course_title }}</h1>
     <h4 v-if="course.courseoffering_set.length > 0">Offered {{ currentTerm }} ({{ course.courseoffering_set[0].period
-      }})</h4>
+    }})</h4>
     <h4 v-else-if="course.last_offered">Last offered {{ course.last_offered }}</h4>
     <p v-if="course.description">{{ course.description }}</p>
 
@@ -39,7 +39,7 @@
           <p>said it was good</p>
         </template>
         <template v-else>
-          <p><a href="/accounts/login/">Login</a> to see quality score</p>
+          <p><router-link to="/accounts/login/">Login</router-link> to see quality score</p>
         </template>
       </div>
       <div class="col-md-2 col-md-offset-4 text-center score-box">
@@ -56,7 +56,7 @@
           <p>called it a layup</p>
         </template>
         <template v-else>
-          <p><a href="/accounts/login/">Login</a> to see difficulty score</p>
+          <p><router-link to="/accounts/login/">Login</router-link> to see difficulty score</p>
         </template>
       </div>
     </div>
@@ -82,7 +82,7 @@
         <tbody>
           <tr v-for="item in course.professors_and_review_count" :key="item[0]">
             <td><router-link :to="`/course/${courseId}/review_search?q=${encodeURIComponent(item[0])}`">{{ item[0]
-                }}</router-link></td>
+            }}</router-link></td>
             <td>{{ item[1] }}</td>
           </tr>
         </tbody>
@@ -104,8 +104,10 @@
       </table>
     </div>
     <div v-else-if="course.review_count > 0" class="auth-message">
-      <p><a href="/accounts/signup/">Signup</a> or <a href="/accounts/login/">Login</a> to view all of the {{
-        course.review_count }} reviews for this class.</p>
+      <p><router-link to="/accounts/signup/">Signup</router-link> or <router-link
+          to="/accounts/login/">Login</router-link>
+        to view all of the {{
+          course.review_count }} reviews for this class.</p>
     </div>
 
     <div v-if="course.can_write_review">
@@ -130,16 +132,17 @@
 
     <div v-else>
       <p v-if="isAuthenticated">Thanks for writing a review of this course!</p>
-      <p v-else><a href="/accounts/login/">Login</a> to write a review.</p>
+      <p v-else><router-link to="/accounts/login/">Login</router-link> to write a review.</p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
@@ -195,8 +198,8 @@ const checkAuthentication = async () => {
 
 const vote = async (value, forLayup) => {
   if (!isAuthenticated.value) {
-    if (confirm("Please sign up to vote!")) {
-      window.location = "/accounts/signup";
+    if (confirm("Please login to vote!")) {
+      router.push("/accounts/login");
     }
     return;
   }

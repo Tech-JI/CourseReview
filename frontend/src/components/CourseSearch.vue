@@ -39,8 +39,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="course in courses" :key="course.id" @click="goToCourse(course.id)" role="button">
-                <td><a>{{ course.course_code }}: {{ course.course_title }}</a></td>
+              <tr v-for="course in courses" :key="course.id">
+                <td>
+                  <router-link :to="`/course/${course.id}`" class="course-link">
+                    {{ course.course_code }}: {{ course.course_title }}
+                  </router-link>
+                </td>
                 <td>
                   <span v-if="course.is_offered_in_current_term">Offered {{ term }}</span>
                   <span v-else-if="course.last_offered">Last offered {{ course.last_offered }}</span>
@@ -59,7 +63,7 @@
                 <td>{{ course.review_count }}</td>
                 <td v-if="isAuthenticated && course.quality_score !== undefined">{{ course.quality_score }}</td>
                 <td v-if="isAuthenticated && course.difficulty_score !== undefined">{{ course.difficulty_score }}</td>
-                <td v-else colspan="2"><a href="/accounts/signup/">Signup to reveal</a></td>
+                <td v-else colspan="2"><router-link to="/accounts/login/">Login to reveal</router-link></td>
               </tr>
             </tbody>
           </table>
@@ -71,10 +75,9 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 
 const route = useRoute();
-const router = useRouter();
 
 const query = ref('');
 const department = ref('');
@@ -155,9 +158,6 @@ const checkAuthentication = async () => {
   }
 };
 
-const goToCourse = (courseId) => {
-  router.push(`/course/${courseId}`);
-};
 </script>
 
 <style scoped>
@@ -186,9 +186,13 @@ td {
   border-bottom: 1px solid #ddd;
 }
 
-tr:hover {
-  background-color: #f5f5f5;
-  cursor: pointer;
+.course-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.course-link:hover {
+  text-decoration: underline;
 }
 
 th {

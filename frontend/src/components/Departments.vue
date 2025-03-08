@@ -13,8 +13,8 @@
       </thead>
       <tbody>
         <tr v-for="dept in departments" :key="dept.code" @click="goToDepartment(dept.code)" role="button">
-          <td><a>{{ dept.code }}</a></td>
-          <td><a v-if="dept.name">{{ dept.name }}</a></td>
+          <td><router-link :to="{ path: '/search', query: { q: dept.code } }">{{ dept.code }}</router-link></td>
+          <td><router-link v-if="dept.name" :to="{ path: '/search', query: { q: dept.code } }">{{ dept.name }}</router-link></td>
           <td>{{ dept.count }}</td>
         </tr>
       </tbody>
