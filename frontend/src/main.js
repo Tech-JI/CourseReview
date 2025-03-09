@@ -12,6 +12,9 @@ import CourseReviewSearch from "./components/CourseReviewSearch.vue";
 import CoursesList from "./components/CoursesList.vue";
 import "./style.css";
 
+// Import icons
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+
 const routes = [
   { path: "/", component: Landing },
   { path: '/accounts/login', component: Login },
@@ -28,6 +31,12 @@ const router = createRouter({
 });
 
 const app = createApp(App);
+
+// Register Element Plus icons
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
+
 app.use(router);
 app.use(ElementPlus);
 app.mount("#app");
