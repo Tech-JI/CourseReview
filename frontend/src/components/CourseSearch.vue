@@ -1,73 +1,85 @@
 <template>
-  <div class="course-search">
-    <div class="row">
-      <div class="col-md-12">
+  <div class="page-container">
+    <div class="course-search">
+      <div class="search-header">
         <h1 v-if="department">{{ department }}</h1>
         <h1 v-else>Search Results For "{{ query }}"</h1>
       </div>
-    </div>
 
-    <div class="row">
-      <div class="col-md-12">
-        <div v-if="!query" class="alert alert-info">
-          <h3>Empty query string. Please enter a search query. Example: ENGR 101</h3>
-        </div>
-        <div v-else-if="query.length < 2" class="alert alert-warning">
-          <h3>Query must be at least 2 characters long.</h3>
-        </div>
-        <div v-else-if="loading" class="loading">
-          <h3>Loading search results...</h3>
-        </div>
-        <div v-else-if="error" class="error">
-          <h3>Error: {{ error }}</h3>
-        </div>
-        <div v-else-if="courses.length === 0" class="alert alert-warning">
-          <h3>Could not find any results. Please double-check your search query, and make sure the department and course
-            number are correct.</h3>
-        </div>
-        <div v-else>
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>Course</th>
-                <th>Offered {{ term }}?</th>
-                <th>Instructors</th>
-                <th>Distribs</th>
-                <th>Reviews</th>
-                <th>Quality</th>
-                <th>Layup</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="course in courses" :key="course.id">
-                <td>
-                  <router-link :to="`/course/${course.id}`" class="course-link">
-                    {{ course.course_code }}: {{ course.course_title }}
-                  </router-link>
-                </td>
-                <td>
-                  <span v-if="course.is_offered_in_current_term">Offered {{ term }}</span>
-                  <span v-else-if="course.last_offered">Last offered {{ course.last_offered }}</span>
-                </td>
-                <td>
-                  <span v-if="course.instructors && course.instructors.length > 0">
-                    {{ course.instructors.slice(0, 2).join(', ') }}
-                    <span v-if="course.instructors.length > 2">...</span>
-                  </span>
-                  <span v-else>-</span>
-                </td>
-                <td>
-                  <span v-for="(distrib, index) in course.distribs" :key="index">
-                    {{ distrib.name }}{{ index < course.distribs.length - 1 ? ', ' : '' }} </span>
-                </td>
-                <td>{{ course.review_count }}</td>
-                <td v-if="isAuthenticated && course.quality_score !== undefined">{{ course.quality_score }}</td>
-                <td v-if="isAuthenticated && course.difficulty_score !== undefined">{{ course.difficulty_score }}</td>
-                <td v-else colspan="2"><router-link to="/accounts/login/">Login to reveal</router-link></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div v-if="!query" class="alert-box info-alert">
+        <h3>Empty query string. Please enter a search query. Example: ENGR 101</h3>
+      </div>
+      <div v-else-if="query.length < 2" class="alert-box warning-alert">
+        <h3>Query must be at least 2 characters long.</h3>
+      </div>
+      <div v-else-if="loading" class="loading">
+        <el-skeleton :rows="10" animated />
+      </div>
+      <div v-else-if="error" class="error">
+        <el-alert :title="error" type="error" show-icon />
+      </div>
+      <div v-else-if="courses.length === 0" class="alert-box warning-alert">
+        <h3>Could not find any results. Please double-check your search query, and make sure the department and course
+          number are correct.</h3>
+      </div>
+      <div v-else>
+        <el-table :data="courses" style="width: 100%">
+          <el-table-column label="Course" min-width="250">
+            <template #default="scope">
+              <router-link :to="`/course/${scope.row.id}`" class="course-link">
+                {{ scope.row.course_code }}: {{ scope.row.course_title }}
+              </router-link>
+            </template>
+          </el-table-column>
+
+          <el-table-column :label="`Offered ${term}?`" width="180">
+            <template #default="scope">
+              <span v-if="scope.row.is_offered_in_current_term">Offered {{ term }}</span>
+              <span v-else-if="scope.row.last_offered">Last offered {{ scope.row.last_offered }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Instructors" min-width="180">
+            <template #default="scope">
+              <span v-if="scope.row.instructors && scope.row.instructors.length > 0">
+                {{ scope.row.instructors.slice(0, 2).join(', ') }}
+                <span v-if="scope.row.instructors.length > 2">...</span>
+              </span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Distribs" min-width="120">
+            <template #default="scope">
+              <span v-for="(distrib, index) in scope.row.distribs" :key="index">
+                {{ distrib.name }}{{ index < scope.row.distribs.length - 1 ? ', ' : '' }} </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Reviews" width="100" align="center">
+            <template #default="scope">
+              {{ scope.row.review_count }}
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Quality" width="100" align="center">
+            <template #default="scope">
+              <template v-if="isAuthenticated && scope.row.quality_score !== undefined">
+                {{ scope.row.quality_score }}
+              </template>
+              <router-link v-else to="/accounts/login/">Login to reveal</router-link>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="Layup" width="100" align="center">
+            <template #default="scope">
+              <template v-if="isAuthenticated && scope.row.difficulty_score !== undefined">
+                {{ scope.row.difficulty_score }}
+              </template>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
     </div>
   </div>
@@ -92,7 +104,6 @@ const fetchSearchResults = async () => {
 
   loading.value = true;
   error.value = null;
-
 
   try {
     // Make sure we're using the full URL path
@@ -133,7 +144,6 @@ watch(() => route.query.q, (newQuery) => {
 
 onMounted(async () => {
   query.value = route.query.q || '';
-  console.log("CourseSearch mounted, query:", query.value);
 
   if (query.value.length >= 2) {
     await fetchSearchResults();
@@ -157,37 +167,43 @@ const checkAuthentication = async () => {
     isAuthenticated.value = false;
   }
 };
-
 </script>
 
 <style scoped>
 .course-search {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+}
+
+.search-header {
+  margin-bottom: 20px;
 }
 
 .loading,
 .error {
-  text-align: center;
-  margin: 2em;
+  margin: 2em 0;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.alert-box {
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
 }
 
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
+.info-alert {
+  color: #31708f;
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+}
+
+.warning-alert {
+  color: #8a6d3b;
+  background-color: #fcf8e3;
+  border-color: #faebcc;
 }
 
 .course-link {
-  color: inherit;
+  color: var(--el-color-primary);
   text-decoration: none;
 }
 
@@ -195,27 +211,7 @@ td {
   text-decoration: underline;
 }
 
-th {
-  background-color: #f2f2f2;
-  font-weight: bold;
-}
-
-.alert {
-  padding: 15px;
+.el-table {
   margin-bottom: 20px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-}
-
-.alert-info {
-  color: #31708f;
-  background-color: #d9edf7;
-  border-color: #bce8f1;
-}
-
-.alert-warning {
-  color: #8a6d3b;
-  background-color: #fcf8e3;
-  border-color: #faebcc;
 }
 </style>

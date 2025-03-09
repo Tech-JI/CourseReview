@@ -1,84 +1,88 @@
 <template>
-  <div class="courses-list">
-    <div class="row">
-      <div class="col-md-10">
-        <h1>{{ term }} {{ courseType }}</h1>
-      </div>
-      <div class="col-md-2 text-right">
-        <select class="form-control" v-model="selectedDistrib" @change="fetchCourses">
-          <option value="">Filter by distrib</option>
-          <option v-for="distrib in distribs" :key="distrib.code" :value="distrib.code">
-            {{ distrib.name.toUpperCase() }}
-          </option>
-        </select>
-      </div>
-    </div>
+  <div class="page-container">
+    <el-skeleton :loading="loading" animated>
+      <template #template>
+        <div style="padding: 20px">
+          <el-skeleton-item variant="h1" style="width: 40%" />
+          <div style="margin-top: 20px">
+            <el-skeleton-item variant="text" style="width: 100%" />
+            <el-skeleton-item variant="text" style="width: 100%" />
+            <el-skeleton-item variant="text" style="width: 100%" />
+          </div>
+        </div>
+      </template>
 
-    <div class="row">
-      <div class="col-md-12">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="text-center">{{ sort === 'best' ? 'Quality Score' : 'Layup Score' }}</th>
-              <th>Course</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="course in courses" :key="course.id">
-              <td class="text-center">
-                <span class="vote-arrow glyphicon glyphicon-chevron-up"
-                  :class="{ selected: course.quality_vote?.is_upvote }"
-                  @click="vote(course.id, 1, sort === 'best')"></span>
-                <h2 class="score">{{ sort === 'best' ? course.quality_score : course.difficulty_score }}</h2>
-                <span class="vote-arrow glyphicon glyphicon-chevron-down"
-                  :class="{ selected: course.quality_vote?.is_downvote }"
-                  @click="vote(course.id, -1, sort === 'best')"></span>
-              </td>
-              <td>
-                <h3>
-                  <router-link :to="`/course/${course.id}`">{{ course.course_code }}: {{ course.course_title
-                  }}</router-link>
-                </h3>
-                <h5>
-                  {{ course.review_count }} reviews
-                  <span v-if="course.distribs.length"> | {{course.distribs.map(d => d.name).join(', ')}}</span>
-                  <span v-if="course.offered_times_string"> | Offered during {{ course.offered_times_string }}</span>
-                </h5>
-                <div v-if="course.short_description">
-                  <p>
-                    {{ course.short_description.length > 250 ?
-                      course.short_description.substring(0, 250) + '...' :
-                      course.short_description
-                    }}
-                    <router-link :to="`/course/${course.id}`">(see more)</router-link>
-                  </p>
+      <template #default>
+        <el-alert v-if="error" :title="error" type="error" show-icon />
+
+        <div v-else class="courses-list">
+          <div class="list-header">
+            <h1>{{ term }} {{ courseType }}</h1>
+
+            <el-select v-model="selectedDistrib" placeholder="Filter by distrib" @change="fetchCourses" clearable>
+              <el-option v-for="distrib in distribs" :key="distrib.code" :label="distrib.name.toUpperCase()"
+                :value="distrib.code" />
+            </el-select>
+          </div>
+
+          <el-card v-for="course in courses" :key="course.id" class="course-card">
+            <div class="course-card-content">
+              <div class="score-column">
+                <div class="score-box">
+                  <i class="fa-solid fa-chevron-up vote-arrow" :class="{ selected: course.quality_vote?.is_upvote }"
+                    @click.stop="vote(course.id, 1, sort === 'best')"></i>
+                  <div class="score">{{ sort === 'best' ? course.quality_score : course.difficulty_score }}</div>
+                  <i class="fa-solid fa-chevron-down vote-arrow" :class="{ selected: course.quality_vote?.is_downvote }"
+                    @click.stop="vote(course.id, -1, sort === 'best')"></i>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+              </div>
 
-    <nav>
-      <ul class="pager">
-        <li :class="{ disabled: currentPage === 1 }">
-          <a @click="changePage(currentPage - 1)">&larr; Previous</a>
-        </li>
-        <li>{{ currentPage }} of {{ totalPages }}</li>
-        <li :class="{ disabled: currentPage === totalPages }">
-          <a @click="changePage(currentPage + 1)">Next &rarr;</a>
-        </li>
-      </ul>
-    </nav>
+              <div class="course-info" @click="goToCourse(course.id)">
+                <h3 class="course-title">
+                  {{ course.course_code }}: {{ course.course_title }}
+                </h3>
+
+                <div class="course-meta">
+                  <el-tag size="small" type="info" effect="plain">{{ course.review_count }} reviews</el-tag>
+
+                  <template v-if="course.distribs.length">
+                    <el-tag v-for="(distrib, index) in course.distribs" :key="index" size="small" class="distrib-tag">
+                      {{ distrib.name }}
+                    </el-tag>
+                  </template>
+
+                  <el-tag v-if="course.offered_times_string" size="small" type="success" effect="plain">
+                    Offered during {{ course.offered_times_string }}
+                  </el-tag>
+                </div>
+
+                <p v-if="course.short_description" class="course-description">
+                  {{ course.short_description.length > 250 ?
+                    course.short_description.substring(0, 250) + '...' :
+                    course.short_description
+                  }}
+                  <span class="see-more">(see more)</span>
+                </p>
+              </div>
+            </div>
+          </el-card>
+
+          <div class="pagination-container">
+            <el-pagination layout="prev, pager, next" :total="totalPages * 10" :current-page="currentPage"
+              @current-change="changePage" :disabled="loading" />
+          </div>
+        </div>
+      </template>
+    </el-skeleton>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
+const router = useRouter();
 const sort = ref(route.params.sort);
 const courses = ref([]);
 const term = ref('');
@@ -145,8 +149,12 @@ const vote = async (courseId, value, isQuality) => {
     await fetchCourses(); // Refresh data after voting
   } catch (e) {
     console.error('Error voting:', e);
-    alert('You must be logged in to vote');
+    ElMessage.warning('You must be logged in to vote');
   }
+};
+
+const goToCourse = (courseId) => {
+  router.push(`/course/${courseId}`);
 };
 
 function getCookie(name) {
@@ -170,46 +178,99 @@ onMounted(() => {
 
 watch(() => route.params.sort, (newSort) => {
   sort.value = newSort;
+  currentPage.value = 1; // Reset to first page when changing sort
   fetchCourses();
 });
 </script>
 
 <style scoped>
-.courses-list {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.vote-arrow {
+.course-card {
+  margin-bottom: 20px;
+}
+
+.course-card-content {
+  display: flex;
+}
+
+.score-column {
+  margin-right: 20px;
+  min-width: 80px;
+}
+
+.score-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f5f7fa;
+}
+
+.course-info {
+  flex: 1;
   cursor: pointer;
-  color: gray;
 }
 
-.vote-arrow.selected {
-  color: green;
+.course-title {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--el-color-primary);
 }
 
-.score {
-  margin: 10px 0;
+.course-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-.pager {
+.distrib-tag {
+  margin-right: 5px;
+}
+
+.course-description {
+  color: #606266;
+  margin-bottom: 0;
+}
+
+.see-more {
+  color: var(--el-color-primary);
+  cursor: pointer;
+}
+
+.pagination-container {
   display: flex;
   justify-content: center;
-  margin: 20px 0;
+  margin-top: 30px;
 }
 
-.pager li {
-  margin: 0 10px;
-}
+@media (max-width: 768px) {
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
 
-.pager li.disabled a {
-  color: #ccc;
-  pointer-events: none;
-}
+  .course-card-content {
+    flex-direction: column;
+  }
 
-.pager li a {
-  cursor: pointer;
+  .score-column {
+    margin-right: 0;
+    margin-bottom: 15px;
+  }
+
+  .score-box {
+    flex-direction: row;
+    justify-content: center;
+    gap: 15px;
+  }
 }
 </style>

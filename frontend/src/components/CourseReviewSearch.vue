@@ -1,45 +1,75 @@
 <template>
-  <div class="course-review-search">
-    <div v-if="loading" class="loading">Loading reviews...</div>
-    <div v-else-if="error" class="error">Error: {{ error }}</div>
-    <div v-else>
-      <h1>{{ reviewsFullCount }} <router-link :to="`/course/${courseId}`">{{ courseShortName }}</router-link> review
-        results for "<span class="query">{{ query }}</span>"</h1>
-
-      <form @submit.prevent="performSearch" class="course-review-search">
-        <div class="form-group">
-          <div class="input-group">
-            <input name="q" type="text" class="form-control" placeholder="Review search..." v-model="searchQuery" />
-            <span class="input-group-btn">
-              <button type="submit" class="btn btn-default">Search</button>
-            </span>
+  <div class="page-container">
+    <el-skeleton :loading="loading" animated>
+      <template #template>
+        <div style="padding: 20px">
+          <el-skeleton-item variant="h1" style="width: 50%" />
+          <div style="margin-top: 20px">
+            <el-skeleton-item variant="text" style="width: 100%" />
+            <el-skeleton-item variant="text" style="width: 100%" />
+            <el-skeleton-item variant="text" style="width: 100%" />
           </div>
         </div>
-      </form>
+      </template>
 
-      <div v-if="reviews.length === 0" class="alert alert-warning">
-        <h3>Could not find any results. Please double-check your search query.</h3>
-      </div>
-      <table v-else class="table table-striped">
-        <tbody>
-          <tr v-for="review in reviews" :key="review.id">
-            <td class="highlight-review">
-              <b v-if="review.term">
-                {{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b>:
-              </b>
-              {{ review.comments }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <template #default>
+        <el-alert v-if="error" :title="error" type="error" show-icon />
 
-      <div v-if="!isAuthenticated && remaining > 0" class="col-md-12 text-center">
-        <h3>Please <router-link to="/accounts/login/">login</router-link> to see the remaining {{ remaining }} reviews
-          for this search.
-        </h3>
-      </div>
-    </div>
+        <div v-else class="review-search">
+          <div class="review-search-header">
+            <h1>
+              {{ reviewsFullCount }}
+              <router-link :to="`/course/${courseId}`">{{ courseShortName }}</router-link>
+              review results for "<span class="query-text">{{ query }}</span>"
+            </h1>
+
+            <el-input v-model="searchQuery" placeholder="Review search..." class="search-input"
+              @keyup.enter="performSearch">
+              <template #append>
+                <el-button @click="performSearch">
+                  <i class="fa-solid fa-search"></i>
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+
+          <div v-if="reviews.length === 0" class="empty-state">
+            <el-empty description="Could not find any results. Please double-check your search query." />
+          </div>
+
+          <div v-else class="reviews-list">
+            <el-card v />
+          </div>
+
+          <div v-else class="reviews-list">
+            <el-card v-for="review in reviews" :key="review.id" class="review-card">
+              <template #header>
+                <div class="review-header">
+                  <span v-if="review.term">
+                    <strong>{{ review.term }}</strong>
+                    <span v-if="review.professor"> with <strong>{{ review.professor }}</strong></span>
+                  </span>
+                  <span v-else>Anonymous Review</span>
+                </div>
+              </template>
+              <div class="review-content">{{ review.comments }}</div>
+            </el-card>
+
+            <div v-if="!isAuthenticated && remaining > 0" class="auth-message">
+              <el-alert title="Want to see more reviews?" type="info" :closable="false" show-icon>
+                <template #default>
+                  <p>
+                    Please <router-link to="/accounts/login/">login</router-link> to see the remaining {{ remaining }}
+                    reviews
+                    for this search.
+                  </p>
+                </template>
+              </el-alert>
+            </div>
+          </div>
+        </div>
+      </template>
+    </el-skeleton>
   </div>
 </template>
 
@@ -122,65 +152,47 @@ const checkAuthentication = async () => {
 </script>
 
 <style scoped>
-.course-review-search {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+.review-search-header {
+  margin-bottom: 30px;
 }
 
-.loading,
-.error {
-  text-align: center;
-  margin: 2em;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-tr:hover {
-  background-color: #f5f5f5;
-}
-
-th {
-  background-color: #f2f2f2;
+.query-text {
   font-weight: bold;
+  color: var(--el-color-primary);
 }
 
-.alert-warning {
-  color: #8a6d3b;
-  background-color: #fcf8e3;
-  border-color: #faebcc;
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid transparent;
-  border-radius: 4px;
+.search-input {
+  max-width: 500px;
+  margin-top: 20px;
 }
 
-.input-group {
+.empty-state {
+  margin: 40px 0;
   display: flex;
+  justify-content: center;
 }
 
-.form-control {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px 0 0 4px;
+.reviews-list {
+  margin-top: 20px;
 }
 
-.btn-default {
-  background-color: #f8f9fa;
-  border-color: #ced4da;
-  color: #343a40;
-  border-radius: 0 4px 4px 0;
+.review-card {
+  margin-bottom: 20px;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.review-content {
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  white-space: pre-line;
+}
+
+.auth-message {
+  margin: 30px 0;
 }
 </style>

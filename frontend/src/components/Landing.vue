@@ -1,37 +1,48 @@
 <template>
   <div class="landing-container">
-    <div class="row">
-      <div class="col-md-12 text-center">
-        <!-- <img class="landing-page-icon" src="/static/img/logo.svg" alt="Logo"> -->
+    <el-card class="landing-card">
+      <div class="landing-header">
+        <img class="landing-logo" src="./placeholder.svg?height=100&width=100" alt="Logo">
         <h1>JI Course Review</h1>
-        <h5>UMJI Course Reviews, Rankings, and Recommendations</h5>
-        <p class="text-muted">
-          {{ reviewCount.toLocaleString() }} reviews and counting<br />
+        <h3>UMJI Course Reviews, Rankings, and Recommendations</h3>
+        <p class="stats-text">
+          {{ reviewCount.toLocaleString() }} reviews and counting
         </p>
       </div>
-    </div>
-    <div class="row">
-      <div class="col-md-6 col-md-offset-3 text-center">
-        <div class="landing-search">
-          <div class="form-group">
-            <div class="input-group">
-              <input v-model="searchQuery" type="text" class="search-input form-control"
-                placeholder="Search for Courses...">
-              <span class="input-group-btn">
-                <button @click="performSearch" class="btn btn-default">Search</button>
-              </span>
-            </div>
-          </div>
-        </div>
-        <button @click="goToBestClasses" class="btn btn-default">See Best Classes</button>
-        <button v-if="isAuthenticated" @click="goToLayups" class="btn btn-default">See Layups</button>
-        <button v-else @click="goToLayups" class="btn btn-default">See Layups (requires login)</button>
-        <button @click="goToDepartments" class="btn btn-default">Browse</button>
-        <br><br>
-        <p> Know how to code? <router-link to="https://github.com/layuplist/layup-list" target="_blank">Try contributing
-            to Layup List!</router-link> </p>
+
+      <div class="landing-search">
+        <el-input v-model="searchQuery" placeholder="Search for courses (e.g., ENGR101)" class="search-input"
+          @keyup.enter="performSearch">
+          <template #append>
+            <el-button @click="performSearch" type="primary">
+              <i class="fa-solid fa-search"></i> Search
+            </el-button>
+          </template>
+        </el-input>
       </div>
-    </div>
+
+      <div class="action-buttons">
+        <el-button type="primary" @click="goToBestClasses" size="large">
+          <i class="fa-solid fa-trophy"></i> Best Classes
+        </el-button>
+        <el-button type="success" @click="goToLayups" size="large">
+          <i class="fa-solid fa-feather"></i>
+          {{ isAuthenticated ? 'See Layups' : 'See Layups (requires login)' }}
+        </el-button>
+        <el-button type="info" @click="goToDepartments" size="large">
+          <i class="fa-solid fa-building-columns"></i> Browse Departments
+        </el-button>
+      </div>
+
+      <div class="contribute-section">
+        <p>
+          Know how to code?
+          <a href="https://github.com/layuplist/layup-list" target="_blank">
+            <i class="fa-brands fa-github"></i> Try contributing to Layup List!
+          </a>
+        </p>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -81,7 +92,10 @@ const performSearch = () => {
       query: { q: searchQuery.value.trim() }
     });
   } else {
-    alert('Search query must be at least 2 characters long');
+    ElMessage({
+      message: 'Search query must be at least 2 characters long',
+      type: 'warning'
+    });
   }
 };
 
@@ -100,31 +114,69 @@ const goToDepartments = () => {
 
 <style scoped>
 .landing-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 120px);
+  padding: 20px;
 }
 
-.landing-page-icon {
-  max-width: 100px;
-  margin-bottom: 1rem;
+.landing-card {
+  width: 100%;
+  max-width: 800px;
+}
+
+.landing-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.landing-logo {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 20px;
+}
+
+.stats-text {
+  color: #909399;
+  margin: 20px 0;
 }
 
 .landing-search {
-  max-width: 500px;
-  margin: 1.5rem auto;
+  margin-bottom: 30px;
 }
 
-.btn {
-  margin: 0.5rem;
-}
-
-.input-group {
+.action-buttons {
   display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 30px;
 }
 
-.form-control {
-  flex: 1;
+.contribute-section {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.contribute-section a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.contribute-section a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons .el-button {
+    width: 100%;
+  }
 }
 </style>

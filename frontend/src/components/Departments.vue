@@ -1,30 +1,42 @@
 <template>
-  <div v-if="loading" class="loading">Loading departments...</div>
-  <div v-else-if="error" class="error">Error: {{ error }}</div>
-  <div v-else class="departments-container">
-    <h1>Departments</h1>
-    <table class="table table-hover">
-      <thead>
-        <tr>
-          <th>Code</th>
-          <th>Department Name</th>
-          <th>Courses</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="dept in departments" :key="dept.code" @click="goToDepartment(dept.code)" role="button">
-          <td><router-link :to="{ path: '/search', query: { q: dept.code } }">{{ dept.code }}</router-link></td>
-          <td><router-link v-if="dept.name" :to="{ path: '/search', query: { q: dept.code } }">{{ dept.name }}</router-link></td>
-          <td>{{ dept.count }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="page-container">
+    <div v-if="loading" class="loading">
+      <el-skeleton :rows="10" animated />
+    </div>
+    <div v-else-if="error" class="error">
+      <el-alert :title="error" type="error" show-icon />
+    </div>
+    <div v-else class="departments-container">
+      <h1>Departments</h1>
+
+      <el-table :data="departments" style="width: 100%" @row-click="goToDepartment">
+        <el-table-column prop="code" label="Code" width="120">
+          <template #default="scope">
+            <router-link :to="{ path: '/search', query: { q: scope.row.code } }">
+              {{ scope.row.code }}
+            </router-link>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="name" label="Department Name">
+          <template #default="scope">
+            <router-link v-if="scope.row.name" :to="{ path: '/search', query: { q: scope.row.code } }">
+              {{ scope.row.name }}
+            </router-link>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="count" label="Courses" width="120" />
+      </el-table>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const departments = ref([]);
 const loading = ref(true);
 const error = ref(null);
@@ -49,47 +61,39 @@ const fetchDepartments = async () => {
   }
 };
 
-import { useRouter } from 'vue-router';
-const router = useRouter();
-
-const goToDepartment = (code) => {
-  router.push({ path: '/search', query: { q: code } });
+const goToDepartment = (row) => {
+  router.push({ path: '/search', query: { q: row.code } });
 };
 </script>
 
 <style scoped>
 .loading,
 .error {
-  text-align: center;
   margin: 2em;
 }
 
 .departments-container {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.el-table {
+  margin-top: 20px;
 }
 
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-tr:hover {
-  background-color: #f5f5f5;
+.el-table :deep(tbody tr) {
   cursor: pointer;
 }
 
-th {
-  background-color: #f2f2f2;
-  font-weight: bold;
+.el-table :deep(tbody tr:hover) {
+  background-color: #f5f7fa;
+}
+
+a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 </style>

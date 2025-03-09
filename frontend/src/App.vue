@@ -1,16 +1,39 @@
 <template>
-  <div class="app-container">
-    <div class="search-container" v-if="showSearchBar">
-      <form @submit.prevent="performSearch">
-        <div class="input-group">
-          <input type="text" class="form-control" v-model="searchQuery" placeholder="Search for courses (e.g., ENGR101)"
-            aria-label="Search for courses">
-          <button class="btn btn-primary" type="submit">Search</button>
-        </div>
-      </form>
-    </div>
-    <router-view></router-view>
-  </div>
+  <v-app>
+    <v-app-bar color="primary" density="compact" elevation="2">
+      <v-app-bar-title>
+        <router-link to="/" class="text-decoration-none text-white">JI Course Review</router-link>
+      </v-app-bar-title>
+      <v-spacer></v-spacer>
+      <v-btn to="/best" variant="text" class="text-white">Best Courses</v-btn>
+      <v-btn to="/layups" variant="text" class="text-white">Layups</v-btn>
+      <v-btn to="/departments" variant="text" class="text-white">Departments</v-btn>
+      <v-spacer></v-spacer>
+      <v-responsive max-width="400" class="mx-4" v-if="showSearchBar">
+        <v-form @submit.prevent="performSearch">
+          <v-text-field v-model="searchQuery" density="compact" variant="solo" hide-details
+            placeholder="Search courses (e.g., ENGR101)" append-inner-icon="mdi-magnify"
+            @click:append-inner="performSearch" bg-color="white"></v-text-field>
+        </v-form>
+      </v-responsive>
+    </v-app-bar>
+
+    <v-main>
+      <v-container fluid>
+        <router-view></router-view>
+      </v-container>
+    </v-main>
+
+    <v-footer app class="bg-primary text-center d-flex flex-column">
+      <div>
+        <v-btn v-for="icon in icons" :key="icon" class="mx-2" :icon="icon" variant="text" color="white"
+          size="small"></v-btn>
+      </div>
+      <div class="text-white text-caption mt-2">
+        &copy; {{ new Date().getFullYear() }} — JI Course Review
+      </div>
+    </v-footer>
+  </v-app>
 </template>
 
 <script setup>
@@ -20,6 +43,7 @@ import { useRouter, useRoute } from 'vue-router';
 const router = useRouter();
 const route = useRoute();
 const searchQuery = ref('');
+const icons = ['mdi-github', 'mdi-linkedin', 'mdi-twitter'];
 
 // Determine if we should show the search bar
 const showSearchBar = computed(() => {
@@ -48,32 +72,24 @@ const performSearch = () => {
 </script>
 
 <style>
-.app-container {
-  width: 100%;
+/* Global styles */
+:root {
+  --v-primary-base: #1867C0;
+  --v-secondary-base: #5CBBF6;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
 }
 
-.search-container {
-  margin-bottom: 20px;
-}
-
-.input-group {
-  display: flex;
-}
-
-.form-control {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
-  border-radius: 4px 0 0 4px;
-}
-
-.btn-primary {
-  background-color: #007bff;
-  border-color: #007bff;
-  color: white;
-  border-radius: 0 4px 4px 0;
+a {
+  text-decoration: none;
 }
 </style>

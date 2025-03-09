@@ -1,5 +1,7 @@
 import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
 import App from "./App.vue";
 import Login from './components/Login.vue';
 import CourseDetail from "./components/CourseDetail.vue";
@@ -27,4 +29,5 @@ const router = createRouter({
 
 const app = createApp(App);
 app.use(router);
+app.use(ElementPlus);
 app.mount("#app");
