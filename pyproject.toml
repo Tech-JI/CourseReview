@@ -20,6 +20,8 @@ dependencies = [
     "requests>=2.32.3",
     "bpython>=0.25",
     "ptpython>=3.0.29",
+    "djangorestframework>=3.16.0",
+    "django-cors-headers>=4.7.0",
 ]
 
 [tool.uv]
