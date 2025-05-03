@@ -38,8 +38,8 @@ const performSearch = () => {
   const query = searchQuery.value.trim();
   if (query.length >= 2) {
     router.push({
-      path: '/search',
-      query: { q: query }
+      path: '/courses', // Navigate to the new courses page
+      query: { code: query.toUpperCase() } // Use 'code' query param
     });
   } else {
     alert("Search query must be at least 2 characters long");
