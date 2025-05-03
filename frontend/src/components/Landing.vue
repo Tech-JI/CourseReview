@@ -26,7 +26,8 @@
         <button @click="goToBestClasses" class="btn btn-default">See Best Classes</button>
         <button v-if="isAuthenticated" @click="goToLayups" class="btn btn-default">See Layups</button>
         <button v-else @click="goToLayups" class="btn btn-default">See Layups (requires login)</button>
-        <button @click="goToDepartments" class="btn btn-default">Browse</button>
+        <button @click="goToDepartments" class="btn btn-default">Browse Departments</button>
+        <button @click="browseAll" class="btn btn-default">Browse All Courses</button>
         <br><br>
         <p> Know how to code? <router-link to="https://github.com/layuplist/layup-list" target="_blank">Try contributing
             to Layup List!</router-link> </p>
@@ -80,18 +81,24 @@ const performSearch = () => {
       path: '/search',
       query: { q: searchQuery.value.trim() }
     });
+  } else if (searchQuery.value.trim().length === 0) {
+    router.push({ path: '/search' });
   } else {
     alert('Search query must be at least 2 characters long');
   }
 };
 
 const goToBestClasses = () => {
-  router.push('/best');
+  router.push({ path: '/search', query: { sort: 'quality' } });
 };
 
 const goToLayups = () => {
-  router.push('/layups');
+  router.push({ path: '/search', query: { sort: 'difficulty' } });
 };
+
+const browseAll = () => {
+  router.push({ path: '/search' });
+}
 
 const goToDepartments = () => {
   router.push('/departments');

@@ -15,9 +15,12 @@ const routes = [
   { path: '/accounts/login', component: Login },
   { path: "/course/:course_id", component: CourseDetail, props: true },
   { path: "/departments", component: Departments },
-  { path: "/search", component: CourseSearch, props: (route) => ({ query: route.query.q }) },
+  {
+    path: "/search",
+    component: CourseSearch,
+    props: (route) => ({ ...route.query })
+  },
   { path: '/course/:courseId/review_search', component: CourseReviewSearch, props: true },
-  { path: '/:sort(best|layups)', component: CoursesList, props: true },
 ];
 
 const router = createRouter({
