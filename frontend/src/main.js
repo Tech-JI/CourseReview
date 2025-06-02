@@ -3,8 +3,6 @@ import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
 import Login from './components/Login.vue';
 import CourseDetail from "./components/CourseDetail.vue";
-import Departments from "./components/Departments.vue";
-import CourseSearch from "./components/CourseSearch.vue";
 import Landing from "./components/Landing.vue";
 import CourseReviewSearch from "./components/CourseReviewSearch.vue";
 import CourseList from "./components/CourseList.vue";
