@@ -77,8 +77,8 @@ const checkAuthentication = async () => {
 const performSearch = () => {
   if (searchQuery.value.trim().length >= 2) {
     router.push({
-      path: '/search',
-      query: { q: searchQuery.value.trim() }
+      path: '/courses', // Navigate to the new courses page
+      query: { code: searchQuery.value.trim().toUpperCase() } // Use 'code' query param
     });
   } else {
     alert('Search query must be at least 2 characters long');
@@ -86,15 +86,15 @@ const performSearch = () => {
 };
 
 const goToBestClasses = () => {
-  router.push('/best');
+  router.push({ path: '/courses', query: { sort_by: 'quality_score', sort_order: 'desc' } });
 };
 
 const goToLayups = () => {
-  router.push('/layups');
+  router.push({ path: '/courses', query: { sort_by: 'difficulty_score', sort_order: 'desc' } });
 };
 
 const goToDepartments = () => {
-  router.push('/departments');
+  router.push('/courses'); // Simply go to the main courses page
 };
 </script>
 
