@@ -46,9 +46,6 @@ urlpatterns = [
         name="crawled_data",
     ),
     # primary views
-    re_path(
-        r"^api/(?P<sort>best|layups)/?", views.current_term_api, name="current_term_api"
-    ),
     re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
@@ -70,15 +67,11 @@ urlpatterns = [
     ),
     re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
     re_path(
-        r"^api/search/$",
-        views.course_search_api,
-        name="course_search_api",
-    ),
-    re_path(
         r"^api/departments/$",
         views.departments_api,
         name="departments_api",
     ),
+    re_path(r"^api/courses/$", views.courses_api, name="courses_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/review_search/$",
         views.course_review_search_api,

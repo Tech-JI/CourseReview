@@ -176,71 +176,76 @@ def confirmation(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def current_term_api(request, sort):
-    if sort == "best":
-        course_type, primary_sort, secondary_sort = (
-            "Best Classes",
-            "-quality_score",
-            "-difficulty_score",
-        )
-        vote_category = Vote.CATEGORIES.QUALITY
+def courses_api(request):
+    """
+    API endpoint for listing courses with filtering, sorting, and pagination.
+    """
+    queryset = Course.objects.all().prefetch_related("distribs", "review_set")
+    queryset = queryset.annotate(num_reviews=Count("review"))
+
+    # --- Filtering ---
+    department = request.query_params.get("department")
+    if department:
+        queryset = queryset.filter(department__iexact=department)
+
+    code = request.query_params.get("code")
+    if code:
+        queryset = queryset.filter(course_code__iexact=code)
+
+    if request.user.is_authenticated:
+        min_quality = request.query_params.get("min_quality")
+        if min_quality:
+            try:
+                queryset = queryset.filter(quality_score__gte=int(min_quality))
+            except (ValueError, TypeError):
+                pass  # Ignore invalid values
+
+        min_difficulty = request.query_params.get("min_difficulty")  # Layup score
+        if min_difficulty:
+            try:
+                queryset = queryset.filter(difficulty_score__gte=int(min_difficulty))
+            except (ValueError, TypeError):
+                pass  # Ignore invalid values
+
+    # --- Sorting ---
+    sort_by = request.query_params.get("sort_by", "course_code")  # Default sort
+    sort_order = request.query_params.get("sort_order", "asc")
+    sort_prefix = "-" if sort_order.lower() == "desc" else ""
+
+    allowed_sort_fields = ["course_code", "num_reviews"]
+    if request.user.is_authenticated:
+        allowed_sort_fields.extend(["quality_score", "difficulty_score"])
+
+    if sort_by in allowed_sort_fields:
+        sort_field = sort_by
     else:
-        if not request.user.is_authenticated:
-            return Response(
-                {"detail": "Authentication required to view layups"}, status=403
-            )
+        sort_field = "course_code"  # Fallback to default if invalid or not allowed
 
-        course_type, primary_sort, secondary_sort = (
-            "Layups",
-            "-difficulty_score",
-            "-quality_score",
-        )
-        vote_category = Vote.CATEGORIES.DIFFICULTY
+    queryset = queryset.order_by(f"{sort_prefix}{sort_field}")
 
-    dist = request.GET.get("dist")
-    dist = dist.upper() if dist else dist
-    page = request.GET.get("page", 1)
-
-    term_courses = (
-        Course.objects.for_term(constants.CURRENT_TERM, dist)
-        .prefetch_related("distribs", "review_set", "courseoffering_set")
-        .order_by(primary_sort, secondary_sort)
-    )
-
-    paginator = Paginator(term_courses, LIMITS["courses"])
+    # --- Pagination ---
+    paginator = Paginator(queryset, LIMITS["courses"])
+    page_number = request.query_params.get("page", 1)
     try:
-        courses = paginator.page(page)
+        page = paginator.page(page_number)
     except (PageNotAnInteger, EmptyPage):
-        courses = paginator.page(1)
+        page = paginator.page(1)
 
-    if courses.number > 1 and not request.user.is_authenticated:
-        return Response(
-            {"detail": "Authentication required to view more pages"}, status=403
-        )
-
-    courses_and_votes = Vote.objects.authenticated_group_courses_with_votes(
-        courses.object_list, vote_category, request.user
-    )
-
+    # --- Serialization ---
     serializer = CourseSearchSerializer(
-        [course for course, _ in courses_and_votes],
-        many=True,
-        context={"request": request},
+        page.object_list, many=True, context={"request": request}
     )
 
     return Response(
         {
-            "term": constants.CURRENT_TERM,
-            "sort": sort,
-            "course_type": course_type,
             "courses": serializer.data,
-            "current_page": courses.number,
-            "total_pages": paginator.num_pages,
-            "distribs": [
-                {"name": d.name, "code": d.name.lower()}
-                for d in DistributiveRequirement.objects.all()
-            ],
-            "selected_distrib": dist.lower() if dist else None,
+            "pagination": {
+                "current_page": page.number,
+                "total_pages": paginator.num_pages,
+                "total_courses": paginator.count,
+                "limit": LIMITS["courses"],
+            },
+            "query_params": request.query_params,  # Return applied params for context
         }
     )
 
@@ -319,12 +324,6 @@ def course_search_api(request):
             "courses": serializer.data,
         }
     )
-
-
-# Removed old template-based view
-# @require_safe
-# def course_review_search(request, course_id):
-# ...
 
 
 @api_view(["GET"])
