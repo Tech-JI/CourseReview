@@ -1,12 +1,12 @@
-from django.contrib.auth.models import User
 import factory
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+
 from apps.web import models
 from lib import constants
-from django.db.models.signals import post_save
 
 
 class UserFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = User
 
@@ -19,9 +19,9 @@ class UserFactory(factory.django.DjangoModelFactory):
     @classmethod
     def _prepare(cls, create, **kwargs):
         # thanks: https://gist.github.com/mbrochh/2433411
-        password = factory.Faker('password')
-        if 'password' in kwargs:
-            password = kwargs.pop('password')
+        password = factory.Faker("password")
+        if "password" in kwargs:
+            password = kwargs.pop("password")
         user = super(UserFactory, cls)._prepare(create, **kwargs)
         user.set_password(password)
         if create:
@@ -30,7 +30,6 @@ class UserFactory(factory.django.DjangoModelFactory):
 
 
 class CourseFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.Course
 
@@ -42,7 +41,6 @@ class CourseFactory(factory.django.DjangoModelFactory):
 
 
 class CourseOfferingFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.CourseOffering
 
@@ -54,7 +52,6 @@ class CourseOfferingFactory(factory.django.DjangoModelFactory):
 
 
 class ReviewFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.Review
 
@@ -67,7 +64,6 @@ class ReviewFactory(factory.django.DjangoModelFactory):
 
 
 class DistributiveRequirementFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.DistributiveRequirement
 
@@ -76,7 +72,6 @@ class DistributiveRequirementFactory(factory.django.DjangoModelFactory):
 
 
 class StudentFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.Student
 
@@ -85,7 +80,6 @@ class StudentFactory(factory.django.DjangoModelFactory):
 
 
 class VoteFactory(factory.django.DjangoModelFactory):
-
     class Meta:
         model = models.Vote
 
