@@ -3,13 +3,25 @@
     <div v-if="loading" class="loading">Loading reviews...</div>
     <div v-else-if="error" class="error">Error: {{ error }}</div>
     <div v-else>
-      <h1>{{ reviewsFullCount }} <router-link :to="`/course/${courseId}`">{{ courseShortName }}</router-link> review
-        results for "<span class="query">{{ query }}</span>"</h1>
+      <h1>
+        {{ reviewsFullCount }}
+        <router-link :to="`/course/${courseId}`">{{
+          courseShortName
+        }}</router-link>
+        review results for "<span class="query">{{ query }}</span
+        >"
+      </h1>
 
       <form @submit.prevent="performSearch" class="course-review-search">
         <div class="form-group">
           <div class="input-group">
-            <input name="q" type="text" class="form-control" placeholder="Review search..." v-model="searchQuery" />
+            <input
+              name="q"
+              type="text"
+              class="form-control"
+              placeholder="Review search..."
+              v-model="searchQuery"
+            />
             <span class="input-group-btn">
               <button type="submit" class="btn btn-default">Search</button>
             </span>
@@ -18,7 +30,9 @@
       </form>
 
       <div v-if="reviews.length === 0" class="alert alert-warning">
-        <h3>Could not find any results. Please double-check your search query.</h3>
+        <h3>
+          Could not find any results. Please double-check your search query.
+        </h3>
       </div>
       <table v-else class="table table-striped">
         <tbody>
@@ -26,7 +40,8 @@
             <td class="highlight-review">
               <b v-if="review.term">
                 {{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b>:
+                <b v-if="review.professor"> with {{ review.professor }}</b
+                >:
               </b>
               {{ review.comments }}
             </td>
@@ -34,9 +49,13 @@
         </tbody>
       </table>
 
-      <div v-if="!isAuthenticated && remaining > 0" class="col-md-12 text-center">
-        <h3>Please <router-link to="/accounts/login/">login</router-link> to see the remaining {{ remaining }} reviews
-          for this search.
+      <div
+        v-if="!isAuthenticated && remaining > 0"
+        class="col-md-12 text-center"
+      >
+        <h3>
+          Please <router-link to="/accounts/login/">login</router-link> to see
+          the remaining {{ remaining }} reviews for this search.
         </h3>
       </div>
     </div>
@@ -44,33 +63,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 const props = defineProps({
   courseId: {
     type: String,
-    required: true
-  }
+    required: true,
+  },
 });
 
 const route = useRoute();
 const router = useRouter();
-const searchQuery = ref('');
+const searchQuery = ref("");
 const reviews = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const reviewsFullCount = ref(0);
 const remaining = ref(0);
-const courseShortName = ref('');
-const query = ref('');
+const courseShortName = ref("");
+const query = ref("");
 const isAuthenticated = ref(false);
 
 const fetchReviews = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await fetch(`/api/course/${props.courseId}/review_search/?q=${encodeURIComponent(searchQuery.value)}`);
+    const response = await fetch(
+      `/api/course/${props.courseId}/review_search/?q=${encodeURIComponent(searchQuery.value)}`,
+    );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -92,22 +113,26 @@ const performSearch = () => {
 };
 
 // Watch for changes in the route query
-watch(() => route.query.q, (newQuery) => {
-  if (newQuery !== searchQuery.value) {
-    searchQuery.value = newQuery || '';
-    fetchReviews();
-  }
-}, { immediate: true });
+watch(
+  () => route.query.q,
+  (newQuery) => {
+    if (newQuery !== searchQuery.value) {
+      searchQuery.value = newQuery || "";
+      fetchReviews();
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
-  searchQuery.value = route.query.q || '';
+  searchQuery.value = route.query.q || "";
   await fetchReviews();
   await checkAuthentication();
 });
 
 const checkAuthentication = async () => {
   try {
-    const response = await fetch('/api/user/status/');
+    const response = await fetch("/api/user/status/");
     if (response.ok) {
       const data = await response.json();
       isAuthenticated.value = data.isAuthenticated;
@@ -115,7 +140,7 @@ const checkAuthentication = async () => {
       isAuthenticated.value = false;
     }
   } catch (e) {
-    console.error('Error checking authentication:', e);
+    console.error("Error checking authentication:", e);
     isAuthenticated.value = false;
   }
 };
