@@ -1,20 +1,19 @@
 from __future__ import unicode_literals
+
 from django.db import models
+
 from lib import constants
 
 
 class CourseOfferingManager(models.Manager):
-
     def course_ids_for_term(self, term=constants.CURRENT_TERM):
-        return self.filter(
-            term=term
-        ).values_list('course_id', flat=True).distinct()
+        return self.filter(term=term).values_list("course_id", flat=True).distinct()
 
 
 class CourseOffering(models.Model):
     objects = CourseOfferingManager()
 
-    course = models.ForeignKey("Course")
+    course = models.ForeignKey("Course", on_delete=models.CASCADE)
     instructors = models.ManyToManyField("Instructor")
 
     term = models.CharField(max_length=4, db_index=True)

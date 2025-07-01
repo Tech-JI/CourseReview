@@ -1,38 +1,44 @@
 import difflib
-import json
 
 from django.conf import settings
-from django.contrib.postgres.fields import JSONField
 from django.core.mail import send_mail
-from django.db import models, transaction
+from django.db import models
 
-from apps.spider.crawlers import medians
 from apps.spider import utils
-
 from lib import constants
 
 
 class CrawledDataManager(models.Manager):
-
     def handle_new_crawled_data(self, new_data, resource_name, data_type):
-        db_data, created = self.update_or_create(
-            resource=resource_name,
-            data_type=data_type,
-            defaults={"pending_data": new_data},
-        )
+        print(f"Handling new crawled data: {new_data}")
+        print(f"Resource name: {resource_name}")
+        print(f"Data type: {data_type}")
+        try:
+            db_data, created = self.update_or_create(
+                resource=resource_name,
+                data_type=data_type,
+                defaults={"pending_data": new_data},
+            )
+            print(f"Created new crawled data: {db_data}")
+            print(f"Created: {created}")
+        except Exception as e:
+            print(f"Error in update_or_create: {e}")
+            return False
+
         if created or db_data.has_change():
             db_data.email_change()
+            print("Emailing change")
             if settings.AUTO_IMPORT_CRAWLED_DATA:
+                print("Auto importing change")
                 db_data.approve_change()
+            print("True")
             return True
+        print("False")
         return False
 
     def sorted(self):
         qs = self.order_by("-updated_at").all()
-        return (
-            [d for d in qs if d.has_change()] +
-            [d for d in qs if not d.has_change()]
-        )
+        return [d for d in qs if d.has_change()] + [d for d in qs if not d.has_change()]
 
 
 class CrawledData(models.Model):
@@ -46,10 +52,10 @@ class CrawledData(models.Model):
     )
     objects = CrawledDataManager()
 
-    resource = models.CharField(max_length=128, db_index=True, unique=True)
-    data_type = models.CharField(max_length=32, choices=DATA_TYPE_CHOICES)
-    pending_data = JSONField()
-    current_data = JSONField(null=True)
+    resource = models.CharField(max_length=128, db_index=True, unique=True, default="")
+    data_type = models.CharField(max_length=32, choices=DATA_TYPE_CHOICES, default="")
+    current_data = models.JSONField(null=True, blank=True)
+    pending_data = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -68,10 +74,12 @@ class CrawledData(models.Model):
         if not self.current_data:
             return utils.pretty_json(self.pending_data)
         if self.has_change:
-            return "\n".join(difflib.unified_diff(
-                utils.pretty_json(self.current_data).splitlines(),
-                utils.pretty_json(self.pending_data).splitlines(),
-            ))
+            return "\n".join(
+                difflib.unified_diff(
+                    utils.pretty_json(self.current_data).splitlines(),
+                    utils.pretty_json(self.pending_data).splitlines(),
+                )
+            )
 
     @property
     def pretty_current_data(self):
@@ -93,4 +101,5 @@ class CrawledData(models.Model):
 
     def approve_change(self):
         from apps.spider.tasks import import_pending_crawled_data
+
         import_pending_crawled_data.delay(self.pk)
