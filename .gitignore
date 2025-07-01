@@ -68,6 +68,7 @@ target/
 
 package-lock.json
 pnpm-lock.yaml
+bun.lock
 
 node_modules
 **/node_modules
