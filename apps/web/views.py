@@ -190,7 +190,7 @@ def courses_api(request):
 
     code = request.query_params.get("code")
     if code:
-        queryset = queryset.filter(course_code__iexact=code)
+        queryset = queryset.filter(course_code__icontains=code)
 
     if request.user.is_authenticated:
         min_quality = request.query_params.get("min_quality")
