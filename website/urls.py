@@ -85,7 +85,7 @@ urlpatterns = [
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
-    re_path(r"^accounts/logout$", views.auth_logout, name="auth_logout"),
+    re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
     re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
     re_path(

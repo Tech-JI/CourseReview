@@ -126,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
 
@@ -136,6 +136,20 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 const loading = ref(false);
+
+onMounted(async () => {
+  try {
+    const response = await fetch("/api/user/status/");
+    if (response.ok) {
+      const data = await response.json();
+      if (data.isAuthenticated) {
+        router.push("/courses");
+      }
+    }
+  } catch (error) {
+    console.error("Error checking authentication:", error);
+  }
+});
 
 const handleLogin = async () => {
   error.value = "";
@@ -151,7 +165,7 @@ const handleLogin = async () => {
       body: JSON.stringify({
         email: email.value,
         password: password.value,
-        next: route.query.next || "/layups",
+        next: route.query.next || "/courses",
       }),
     });
 
@@ -161,8 +175,7 @@ const handleLogin = async () => {
       throw new Error(data.error || "Login failed");
     }
 
-    // Redirect to next URL or default
-    router.push(data.next || "/layups");
+    window.location.href = data.next || "/courses";
   } catch (err) {
     error.value = err.message;
   } finally {

@@ -13,7 +13,7 @@
                 JI Course Review
               </router-link>
             </div>
-            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
+            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8 relative z-10">
               <router-link
                 v-for="item in navigation"
                 :key="item.name"
@@ -24,7 +24,7 @@
                     item.name === 'Browse Courses')
                     ? 'border-indigo-500 text-gray-900'
                     : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
-                  'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium',
+                  'inline-flex items-center border-b-2 px-3 py-2 text-sm font-medium cursor-pointer min-h-[44px]',
                 ]"
               >
                 {{ item.name }}
@@ -61,13 +61,13 @@
             </div>
           </div>
 
-          <div class="hidden sm:ml-6 sm:flex sm:items-center">
+          <div class="hidden sm:ml-6 sm:flex sm:items-center relative z-10">
             <!-- User menu -->
             <div v-if="isAuthenticated" class="relative">
               <Menu as="div" class="relative">
                 <div>
                   <MenuButton
-                    class="relative flex max-w-xs items-center rounded-full bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden"
+                    class="relative flex max-w-xs items-center rounded-full bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden cursor-pointer hover:bg-gray-50"
                   >
                     <span class="absolute -inset-1.5" />
                     <span class="sr-only">Open user menu</span>
@@ -94,14 +94,15 @@
                       :key="item.name"
                       v-slot="{ active }"
                     >
-                      <a
-                        :href="item.href"
+                      <button
+                        @click="item.action"
                         :class="[
                           active ? 'bg-gray-100 outline-hidden' : '',
-                          'block px-4 py-2 text-sm text-gray-700',
+                          'block px-4 py-2 text-sm text-gray-700 w-full text-left cursor-pointer hover:bg-gray-100',
                         ]"
-                        >{{ item.name }}</a
                       >
+                        {{ item.name }}
+                      </button>
                     </MenuItem>
                   </MenuItems>
                 </transition>
@@ -110,7 +111,7 @@
             <div v-else class="space-x-4">
               <router-link
                 to="/accounts/login"
-                class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium"
+                class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium cursor-pointer inline-flex items-center min-h-[44px]"
               >
                 Login
               </router-link>
@@ -201,7 +202,35 @@ const navigation = [
   { name: "Browse Courses", href: "/courses" },
 ];
 
-const userNavigation = [{ name: "Sign out", href: "/accounts/logout/" }];
+const handleLogout = async () => {
+  console.log("Logout button clicked"); 
+  try {
+    const response = await fetch("/api/auth/logout/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+    });
+
+    console.log("Response status:", response.status);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("Logout response:", data); 
+      isAuthenticated.value = false;
+      router.push("/");
+    } else {
+      console.error("Logout failed with status:", response.status);
+      const errorData = await response.json();
+      console.error("Error data:", errorData);
+    }
+  } catch (error) {
+    console.error("Error during logout:", error);
+  }
+};
+
+const userNavigation = [{ name: "Sign out", href: "#", action: handleLogout }];
 
 const showSearchBar = computed(() => {
   return route.path !== "/";
@@ -232,5 +261,20 @@ const performSearch = () => {
     });
     searchQuery.value = "";
   }
+};
+
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === name + "=") {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
 };
 </script>
