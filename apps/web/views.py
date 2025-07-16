@@ -15,9 +15,15 @@ from django.http import (
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return 
 
 from apps.web.models import (
     Course,
@@ -106,11 +112,12 @@ def signup(request):
 
 
 @api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request):
     email = request.data.get("email", "").lower()
     password = request.data.get("password", "")
-    next_url = request.data.get("next", "/layups")
+    next_url = request.data.get("next", "/courses")
 
     if not email or not password:
         return Response({"error": "Email and password are required"}, status=400)
@@ -122,9 +129,12 @@ def auth_login_api(request):
         if user.is_active:
             login(request, user)
             if "user_id" in request.session:
-                student = Student.objects.get(user=user)
-                student.unauth_session_ids.append(request.session["user_id"])
-                student.save()
+                try:
+                    student = Student.objects.get(user=user)
+                    student.unauth_session_ids.append(request.session["user_id"])
+                    student.save()
+                except Student.DoesNotExist:
+                    student = Student.objects.create(user=user, unauth_session_ids=[request.session["user_id"]])
             request.session["user_id"] = user.username
 
             return Response(
@@ -141,11 +151,30 @@ def auth_login_api(request):
         return Response({"error": "Invalid email or password"}, status=401)
 
 
-@login_required
-def auth_logout(request):
-    logout(request)
-    request.session["userID"] = uuid.uuid4().hex
-    return render(request, "logout.html")
+@api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def auth_logout_api(request):
+    """
+    API endpoint for user logout.
+    """
+    if request.user.is_authenticated:
+        try:
+            student = Student.objects.get(user=request.user)
+            if "user_id" in request.session:
+                if request.session["user_id"] in student.unauth_session_ids:
+                    student.unauth_session_ids.remove(request.session["user_id"])
+                    student.save()
+        except Student.DoesNotExist:
+            pass
+        
+        logout(request)
+        request.session["userID"] = uuid.uuid4().hex
+        return Response({"success": True, "message": "Logged out successfully"})
+    else:
+        return Response(
+            {"success": False, "message": "User not authenticated"}, status=400
+        )
 
 
 @require_safe
