@@ -437,9 +437,16 @@ def vote(request, course_id):
         return HttpResponseForbidden()
 
     try:
-        value = request.POST["value"]
-        forLayup = request.POST["forLayup"] == "true"
-    except KeyError:
+        import json
+
+        if request.content_type == "application/json":
+            data = json.loads(request.body)
+            value = data["value"]
+            forLayup = data["forLayup"]
+        else:
+            value = request.POST["value"]
+            forLayup = request.POST["forLayup"] == "true"
+    except (KeyError, json.JSONDecodeError):
         return HttpResponseBadRequest()
 
     category = Vote.CATEGORIES.DIFFICULTY if forLayup else Vote.CATEGORIES.QUALITY
@@ -448,3 +455,67 @@ def vote(request, course_id):
     )
 
     return JsonResponse({"new_score": new_score, "was_unvote": is_unvote})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def course_vote_api(request, course_id):
+    """
+    API endpoint for voting on courses (quality and difficulty).
+    Expects JSON: {value: 1-5, forLayup: boolean}
+    """
+    try:
+        course = Course.objects.get(id=course_id)
+    except Course.DoesNotExist:
+        return Response({"error": "Course not found"}, status=404)
+
+    data = request.data
+    value = data.get("value")
+    for_layup = data.get("forLayup", False)
+
+    if value is None:
+        return Response({"error": "Missing value"}, status=400)
+
+    try:
+        value = int(value)
+    except (ValueError, TypeError):
+        return Response({"error": "Invalid value format"}, status=400)
+
+    if value != 0 and (value < 1 or value > 5):
+        return Response(
+            {"error": "Value must be between 1 and 5, or 0 to remove vote"}, status=400
+        )
+
+    category = Vote.CATEGORIES.DIFFICULTY if for_layup else Vote.CATEGORIES.QUALITY
+
+    vote, created = Vote.objects.get_or_create(
+        user=request.user, course=course, category=category, defaults={"value": value}
+    )
+
+    if not created:
+        if vote.value == value:
+            vote.value = 0
+        else:
+            vote.value = value
+        vote.save()
+
+    course.recalculate_scores()
+
+    return Response(
+        {
+            "success": True,
+            "vote_value": vote.value,
+            "quality_score": float(course.quality_score),
+            "difficulty_score": float(course.difficulty_score),
+            "num_quality_votes": course.vote_set.filter(
+                category=Vote.CATEGORIES.QUALITY
+            )
+            .exclude(value=0)
+            .count(),
+            "num_difficulty_votes": course.vote_set.filter(
+                category=Vote.CATEGORIES.DIFFICULTY
+            )
+            .exclude(value=0)
+            .count(),
+        }
+    )

@@ -11,34 +11,44 @@ class VoteManager(models.Manager):
     def vote(self, value, course_id, category, user):
         is_unvote = False
 
-        if abs(value) > 1:
+        # Allow values from 1 to 5, or 0 for unvote
+        if value != 0 and (value < 1 or value > 5):
             return None, is_unvote
 
         course = Course.objects.get(id=course_id)
         vote, created = self.get_or_create(course=course, category=category, user=user)
 
-        # if previously voted, reverse the old value of the vote
-        if not created:
-            if category == Vote.CATEGORIES.QUALITY:
-                course.quality_score -= vote.value
-            elif category == Vote.CATEGORIES.DIFFICULTY:
-                course.difficulty_score -= vote.value
+        # Handle unvote (when same value is clicked again)
+        if not created and vote.value == value:
+            vote.value = 0
+            is_unvote = True
+        else:
+            vote.value = value
+            is_unvote = value == 0
 
-        vote.value = value if vote.value != value else 0
-        is_unvote = vote.value == 0
-
-        # add the new value of the vote
+        # Recalculate average score
         new_score = None
         if category == Vote.CATEGORIES.QUALITY:
-            course.quality_score += vote.value
-            new_score = course.quality_score
+            new_score = self._calculate_average_score(course, category)
+            course.quality_score = new_score
         elif category == Vote.CATEGORIES.DIFFICULTY:
-            course.difficulty_score += vote.value
-            new_score = course.difficulty_score
+            new_score = self._calculate_average_score(course, category)
+            course.difficulty_score = new_score
 
         course.save()
         vote.save()
         return new_score, is_unvote
+
+    def _calculate_average_score(self, course, category):
+        """Calculate the average score for a course in a specific category"""
+        votes = self.filter(course=course, category=category).exclude(value=0)
+        if not votes.exists():
+            return 0
+
+        total_score = sum(vote.value for vote in votes)
+        vote_count = votes.count()
+        # Return average rounded to 1 decimal place
+        return round(total_score / vote_count, 1)
 
     def authenticated_group_courses_with_votes(self, courses, category, user):
         # returns a list of tuples: (course, user's corresponding vote or None)
@@ -73,7 +83,9 @@ class VoteManager(models.Manager):
         return difficulty_vote, quality_vote
 
     def num_quality_upvotes_for_user(self, user):
-        return self.filter(user=user, category=Vote.CATEGORIES.QUALITY, value=1).count()
+        return self.filter(
+            user=user, category=Vote.CATEGORIES.QUALITY, value__gte=4
+        ).count()
 
 
 class Vote(models.Model):

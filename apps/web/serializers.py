@@ -200,7 +200,7 @@ class CourseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             vote, _ = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
+            if vote and vote.value > 0:
                 return {
                     "value": vote.value,
                     "is_upvote": vote.is_upvote(),
@@ -212,7 +212,7 @@ class CourseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             _, vote = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
+            if vote and vote.value > 0:
                 return {
                     "value": vote.value,
                     "is_upvote": vote.is_upvote(),

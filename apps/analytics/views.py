@@ -31,7 +31,7 @@ def home(request):
         .distinct()
         .count()
     )
-    num_layup_voters = (
+    num_difficulty_voters = (
         non_zero_votes.filter(category=models.Vote.CATEGORIES.DIFFICULTY)
         .values_list("user")
         .distinct()
@@ -85,16 +85,10 @@ def home(request):
         (
             "Total",
             models.Vote.objects.filter(
-                value__gt=0, category=models.Vote.CATEGORIES.QUALITY
+                value__gte=1, category=models.Vote.CATEGORIES.QUALITY
             ).count(),
             models.Vote.objects.filter(
-                value__lt=0, category=models.Vote.CATEGORIES.QUALITY
-            ).count(),
-            models.Vote.objects.filter(
-                value__gt=0, category=models.Vote.CATEGORIES.DIFFICULTY
-            ).count(),
-            models.Vote.objects.filter(
-                value__lt=0, category=models.Vote.CATEGORIES.DIFFICULTY
+                value__gte=1, category=models.Vote.CATEGORIES.DIFFICULTY
             ).count(),
             models.Vote.objects.filter(value=0).count(),
         )
@@ -104,22 +98,12 @@ def home(request):
             (
                 name,
                 models.Vote.objects.filter(
-                    value__gt=0,
+                    value__gte=1,
                     category=models.Vote.CATEGORIES.QUALITY,
                     created_at__gte=earliest_date,
                 ).count(),
                 models.Vote.objects.filter(
-                    value__lt=0,
-                    category=models.Vote.CATEGORIES.QUALITY,
-                    created_at__gte=earliest_date,
-                ).count(),
-                models.Vote.objects.filter(
-                    value__gt=0,
-                    category=models.Vote.CATEGORIES.DIFFICULTY,
-                    created_at__gte=earliest_date,
-                ).count(),
-                models.Vote.objects.filter(
-                    value__lt=0,
+                    value__gte=1,
                     category=models.Vote.CATEGORIES.DIFFICULTY,
                     created_at__gte=earliest_date,
                 ).count(),
@@ -163,7 +147,7 @@ def home(request):
             "vote_table": vote_table,
             "num_voters": num_voters,
             "num_quality_voters": num_quality_voters,
-            "num_layup_voters": num_layup_voters,
+            "num_difficulty_voters": num_difficulty_voters,
             "num_reviewers": num_reviewers,
             "recommendations_last_updated": recommendations_last_updated,
             "activated_accounts": User.objects.filter(is_active=True).count(),
@@ -177,7 +161,9 @@ def home(request):
 @user_passes_test(lambda u: u.is_superuser)
 def eligible_for_recommendations(request):
     eligible_users_and_votes = (
-        models.Vote.objects.filter(value=1, category=models.Vote.CATEGORIES.QUALITY)
+        models.Vote.objects.filter(
+            value__gte=4, category=models.Vote.CATEGORIES.QUALITY
+        )
         .values_list("user")
         .annotate(vote_count=Count("user"))
         .filter(vote_count__gte=constants.REC_UPVOTE_REQ)
