@@ -276,7 +276,11 @@
                       <!-- Quality Score (Auth Only) -->
                       <div v-if="isAuthenticated" class="text-center">
                         <div class="text-2xl font-bold text-indigo-600">
-                          {{ course.quality_score ?? "N/A" }}
+                          {{
+                            course.quality_score > 0
+                              ? course.quality_score.toFixed(1)
+                              : "N/A"
+                          }}
                         </div>
                         <div class="text-xs text-gray-500">Quality</div>
                       </div>
@@ -284,7 +288,11 @@
                       <!-- Difficulty Score (Auth Only) -->
                       <div v-if="isAuthenticated" class="text-center">
                         <div class="text-2xl font-bold text-green-600">
-                          {{ course.difficulty_score ?? "N/A" }}
+                          {{
+                            course.difficulty_score > 0
+                              ? course.difficulty_score.toFixed(1)
+                              : "N/A"
+                          }}
                         </div>
                         <div class="text-xs text-gray-500">Difficulty</div>
                       </div>

@@ -138,33 +138,44 @@
                 Quality Score
               </h3>
               <template v-if="isAuthenticated">
-                <div class="space-y-2">
-                  <button
-                    @click="vote(1, false)"
-                    :class="[
-                      'p-2 rounded-full transition-colors',
-                      course.quality_vote && course.quality_vote.is_upvote
-                        ? 'bg-green-100 text-green-600'
-                        : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500',
-                    ]"
-                  >
-                    <ChevronUpIcon class="h-6 w-6" />
-                  </button>
+                <div class="space-y-4">
                   <div class="text-3xl font-bold text-indigo-600">
-                    {{ course.quality_score }}
+                    {{
+                      course.quality_score > 0
+                        ? course.quality_score.toFixed(1)
+                        : "N/A"
+                    }}
                   </div>
-                  <button
-                    @click="vote(-1, false)"
-                    :class="[
-                      'p-2 rounded-full transition-colors',
-                      course.quality_vote && course.quality_vote.is_downvote
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500',
-                    ]"
-                  >
-                    <ChevronDownIcon class="h-6 w-6" />
-                  </button>
-                  <p class="text-sm text-gray-500">said it was good</p>
+                  <div class="text-sm text-gray-500 mb-4">
+                    Rate this course (1-5 stars)
+                  </div>
+                  <div class="flex justify-center space-x-1">
+                    <button
+                      v-for="star in 5"
+                      :key="star"
+                      @click="vote(star, false)"
+                      :class="[
+                        'p-1 rounded transition-colors',
+                        course.quality_vote && course.quality_vote.value >= star
+                          ? 'text-yellow-500 hover:text-yellow-600'
+                          : 'text-gray-300 hover:text-yellow-400',
+                      ]"
+                    >
+                      <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                        <path
+                          d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    Your rating:
+                    {{
+                      course.quality_vote
+                        ? course.quality_vote.value
+                        : "Not rated"
+                    }}
+                  </div>
                 </div>
               </template>
               <template v-else>
@@ -188,37 +199,48 @@
           <div class="bg-white overflow-hidden shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6 text-center">
               <h3 class="text-lg font-medium text-gray-900 mb-4">
-                Difficulty (Layup)
+                Difficulty Score
               </h3>
               <template v-if="isAuthenticated">
-                <div class="space-y-2">
-                  <button
-                    @click="vote(1, true)"
-                    :class="[
-                      'p-2 rounded-full transition-colors',
-                      course.difficulty_vote && course.difficulty_vote.is_upvote
-                        ? 'bg-green-100 text-green-600'
-                        : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500',
-                    ]"
-                  >
-                    <ChevronUpIcon class="h-6 w-6" />
-                  </button>
+                <div class="space-y-4">
                   <div class="text-3xl font-bold text-green-600">
-                    {{ course.difficulty_score }}
+                    {{
+                      course.difficulty_score > 0
+                        ? course.difficulty_score.toFixed(1)
+                        : "N/A"
+                    }}
                   </div>
-                  <button
-                    @click="vote(-1, true)"
-                    :class="[
-                      'p-2 rounded-full transition-colors',
-                      course.difficulty_vote &&
-                      course.difficulty_vote.is_downvote
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500',
-                    ]"
-                  >
-                    <ChevronDownIcon class="h-6 w-6" />
-                  </button>
-                  <p class="text-sm text-gray-500">called it a layup</p>
+                  <div class="text-sm text-gray-500 mb-4">
+                    Rate difficulty (1=Very Easy, 5=Very Hard)
+                  </div>
+                  <div class="flex justify-center space-x-1">
+                    <button
+                      v-for="star in 5"
+                      :key="star"
+                      @click="vote(star, true)"
+                      :class="[
+                        'p-1 rounded transition-colors',
+                        course.difficulty_vote &&
+                        course.difficulty_vote.value >= star
+                          ? 'text-red-500 hover:text-red-600'
+                          : 'text-gray-300 hover:text-red-400',
+                      ]"
+                    >
+                      <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                        <path
+                          d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    Your rating:
+                    {{
+                      course.difficulty_vote
+                        ? course.difficulty_vote.value
+                        : "Not rated"
+                    }}
+                  </div>
                 </div>
               </template>
               <template v-else>
