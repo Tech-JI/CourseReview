@@ -201,11 +201,7 @@ class CourseSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             vote, _ = Vote.objects.for_course_and_user(obj, request.user)
             if vote and vote.value > 0:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+                return {"value": vote.value}
         return None
 
     def get_quality_vote(self, obj):
@@ -213,11 +209,7 @@ class CourseSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             _, vote = Vote.objects.for_course_and_user(obj, request.user)
             if vote and vote.value > 0:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+                return {"value": vote.value}
         return None
 
     def get_can_write_review(self, obj):

@@ -605,9 +605,7 @@ const vote = async (value, forLayup) => {
         course.value.difficulty_vote = null;
       } else {
         course.value.difficulty_vote = {
-          value: value,
-          is_upvote: value > 0,
-          is_downvote: value < 0,
+          value: value
         };
       }
     } else {
@@ -616,9 +614,7 @@ const vote = async (value, forLayup) => {
         course.value.quality_vote = null;
       } else {
         course.value.quality_vote = {
-          value: value,
-          is_upvote: value > 0,
-          is_downvote: value < 0,
+          value: value
         };
       }
     }
