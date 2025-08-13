@@ -160,6 +160,8 @@ class CourseSerializer(serializers.ModelSerializer):
             ret.pop("difficulty_score", None)
             ret.pop("difficulty_vote", None)
             ret.pop("quality_vote", None)
+            ret.pop("quality_vote_count", None)
+            ret.pop("difficulty_vote_count", None)
 
         return ret
 
