@@ -120,6 +120,8 @@ class CourseSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
     course_topics = serializers.SerializerMethodField()
+    quality_vote_count = serializers.SerializerMethodField()
+    difficulty_vote_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -137,6 +139,8 @@ class CourseSerializer(serializers.ModelSerializer):
             "courseoffering_set",
             "difficulty_score",
             "quality_score",
+            "quality_vote_count",
+            "difficulty_vote_count",
             "last_offered",
             "professors_and_review_count",
             "difficulty_vote",
@@ -211,6 +215,12 @@ class CourseSerializer(serializers.ModelSerializer):
             if vote and vote.value > 0:
                 return {"value": vote.value}
         return None
+
+    def get_quality_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "quality")
+
+    def get_difficulty_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "difficulty")
 
     def get_can_write_review(self, obj):
         request = self.context.get("request")

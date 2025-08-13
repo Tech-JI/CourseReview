@@ -12,7 +12,7 @@ class VoteManager(models.Manager):
         is_unvote = False
 
         if value > 5 or value < 1:
-            return None, is_unvote
+            return None, is_unvote, None
 
         course = Course.objects.get(id=course_id)
         vote, created = self.get_or_create(course=course, category=category, user=user)
@@ -47,11 +47,11 @@ class VoteManager(models.Manager):
         elif category == Vote.CATEGORIES.DIFFICULTY:
             course.difficulty_score = new_score
         course.save()
-        return new_score, is_unvote
+        return new_score, is_unvote, self.get_vote_count(course, category)
 
     def _calculate_average_score(self, course, category):
         """Calculate the average score for a course in a specific category"""
-        votes = self.filter(course=course, category=category).exclude(value=0)
+        votes = self.filter(course=course, category=category)
         if not votes.exists():
             return 0
 
@@ -59,6 +59,10 @@ class VoteManager(models.Manager):
         vote_count = votes.count()
         # Return average rounded to 1 decimal place
         return round(total_score / vote_count, 1)
+
+    def get_vote_count(self, course, category):
+        """Get the vote count for a course in a specific category"""
+        return self.filter(course=course, category=category).count()
 
     def authenticated_group_courses_with_votes(self, courses, category, user):
         # returns a list of tuples: (course, user's corresponding vote or None)
