@@ -486,8 +486,14 @@ def vote(request, course_id):
         return HttpResponseBadRequest()
 
     category = Vote.CATEGORIES.DIFFICULTY if forLayup else Vote.CATEGORIES.QUALITY
-    new_score, is_unvote = Vote.objects.vote(
+    new_score, is_unvote, new_vote_count = Vote.objects.vote(
         int(value), course_id, category, request.user
     )
 
-    return JsonResponse({"new_score": new_score, "was_unvote": is_unvote})
+    return JsonResponse(
+        {
+            "new_score": new_score,
+            "was_unvote": is_unvote,
+            "new_vote_count": new_vote_count,
+        }
+    )
