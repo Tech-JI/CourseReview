@@ -67,8 +67,8 @@ urlpatterns = [
     ),
     re_path(
         r"^api/course/(?P<course_id>[0-9].*)/vote",
-        views.vote,
-        name="vote",
+        views.course_vote_api,
+        name="course_vote_api",
     ),
     re_path(
         r"^api/departments/$",

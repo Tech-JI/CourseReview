@@ -468,7 +468,7 @@ def course_instructors(request, course_id):
 
 
 @require_POST
-def vote(request, course_id):
+def course_vote_api(request, course_id):
     if not request.user.is_authenticated:
         return HttpResponseForbidden()
 
