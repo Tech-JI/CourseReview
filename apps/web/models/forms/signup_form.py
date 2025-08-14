@@ -49,8 +49,7 @@ class SignupForm(forms.Form):
 
         if not Student.objects.is_valid_sjtu_student_email(email):
             raise ValidationError(
-                "Only SJTU student emails are permitted for registration"
-                " at this time."
+                "Only SJTU student emails are permitted for registration at this time."
             )
 
         if len(username) > 30:

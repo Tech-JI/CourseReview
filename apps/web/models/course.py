@@ -206,33 +206,3 @@ class Course(models.Model):
                 unique_instructors.append(instructor)
 
         return unique_instructors
-
-    def recalculate_scores(self):
-        """Recalculate quality and difficulty scores based on current votes."""
-        from .vote import Vote
-
-        quality_votes = Vote.objects.filter(
-            course=self, category=Vote.CATEGORIES.QUALITY
-        ).exclude(value=0)
-
-        if quality_votes.exists():
-            avg_quality = (
-                sum(vote.value for vote in quality_votes) / quality_votes.count()
-            )
-            self.quality_score = round(avg_quality, 1)
-        else:
-            self.quality_score = 0.0
-
-        difficulty_votes = Vote.objects.filter(
-            course=self, category=Vote.CATEGORIES.DIFFICULTY
-        ).exclude(value=0)
-
-        if difficulty_votes.exists():
-            avg_difficulty = (
-                sum(vote.value for vote in difficulty_votes) / difficulty_votes.count()
-            )
-            self.difficulty_score = round(avg_difficulty, 1)
-        else:
-            self.difficulty_score = 0.0
-
-        self.save()
