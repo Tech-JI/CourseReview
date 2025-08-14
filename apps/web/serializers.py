@@ -120,6 +120,8 @@ class CourseSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
     course_topics = serializers.SerializerMethodField()
+    quality_vote_count = serializers.SerializerMethodField()
+    difficulty_vote_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -137,6 +139,8 @@ class CourseSerializer(serializers.ModelSerializer):
             "courseoffering_set",
             "difficulty_score",
             "quality_score",
+            "quality_vote_count",
+            "difficulty_vote_count",
             "last_offered",
             "professors_and_review_count",
             "difficulty_vote",
@@ -156,6 +160,8 @@ class CourseSerializer(serializers.ModelSerializer):
             ret.pop("difficulty_score", None)
             ret.pop("difficulty_vote", None)
             ret.pop("quality_vote", None)
+            ret.pop("quality_vote_count", None)
+            ret.pop("difficulty_vote_count", None)
 
         return ret
 
@@ -200,25 +206,23 @@ class CourseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             vote, _ = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+            if vote and vote.value > 0:
+                return {"value": vote.value}
         return None
 
     def get_quality_vote(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             _, vote = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+            if vote and vote.value > 0:
+                return {"value": vote.value}
         return None
+
+    def get_quality_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "quality")
+
+    def get_difficulty_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "difficulty")
 
     def get_can_write_review(self, obj):
         request = self.context.get("request")
