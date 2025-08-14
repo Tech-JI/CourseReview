@@ -13,7 +13,9 @@
                 JI Course Review
               </router-link>
             </div>
-            <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8 relative z-10">
+            <div
+              class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8 relative z-10"
+            >
               <router-link
                 v-for="item in navigation"
                 :key="item.name"
@@ -203,7 +205,7 @@ const navigation = [
 ];
 
 const handleLogout = async () => {
-  console.log("Logout button clicked"); 
+  console.log("Logout button clicked");
   try {
     const response = await fetch("/api/auth/logout/", {
       method: "POST",
@@ -217,7 +219,7 @@ const handleLogout = async () => {
 
     if (response.ok) {
       const data = await response.json();
-      console.log("Logout response:", data); 
+      console.log("Logout response:", data);
       isAuthenticated.value = false;
       router.push("/");
     } else {

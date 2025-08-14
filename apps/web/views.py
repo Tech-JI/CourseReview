@@ -15,15 +15,20 @@ from django.http import (
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
-        return 
+        return
+
 
 from apps.web.models import (
     Course,
@@ -134,7 +139,9 @@ def auth_login_api(request):
                     student.unauth_session_ids.append(request.session["user_id"])
                     student.save()
                 except Student.DoesNotExist:
-                    student = Student.objects.create(user=user, unauth_session_ids=[request.session["user_id"]])
+                    student = Student.objects.create(
+                        user=user, unauth_session_ids=[request.session["user_id"]]
+                    )
             request.session["user_id"] = user.username
 
             return Response(
@@ -167,7 +174,7 @@ def auth_logout_api(request):
                     student.save()
         except Student.DoesNotExist:
             pass
-        
+
         logout(request)
         request.session["userID"] = uuid.uuid4().hex
         return Response({"success": True, "message": "Logged out successfully"})
@@ -474,77 +481,19 @@ def vote(request, course_id):
             forLayup = data["forLayup"]
         else:
             value = request.POST["value"]
-            forLayup = request.POST["forLayup"] == "true"
+            forLayup = request.POST["forLayup"]
     except (KeyError, json.JSONDecodeError):
         return HttpResponseBadRequest()
 
     category = Vote.CATEGORIES.DIFFICULTY if forLayup else Vote.CATEGORIES.QUALITY
-    new_score, is_unvote = Vote.objects.vote(
+    new_score, is_unvote, new_vote_count = Vote.objects.vote(
         int(value), course_id, category, request.user
     )
 
-    return JsonResponse({"new_score": new_score, "was_unvote": is_unvote})
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def course_vote_api(request, course_id):
-    """
-    API endpoint for voting on courses (quality and difficulty).
-    Expects JSON: {value: 1-5, forLayup: boolean}
-    """
-    try:
-        course = Course.objects.get(id=course_id)
-    except Course.DoesNotExist:
-        return Response({"error": "Course not found"}, status=404)
-
-    data = request.data
-    value = data.get("value")
-    for_layup = data.get("forLayup", False)
-
-    if value is None:
-        return Response({"error": "Missing value"}, status=400)
-
-    try:
-        value = int(value)
-    except (ValueError, TypeError):
-        return Response({"error": "Invalid value format"}, status=400)
-
-    if value != 0 and (value < 1 or value > 5):
-        return Response(
-            {"error": "Value must be between 1 and 5, or 0 to remove vote"}, status=400
-        )
-
-    category = Vote.CATEGORIES.DIFFICULTY if for_layup else Vote.CATEGORIES.QUALITY
-
-    vote, created = Vote.objects.get_or_create(
-        user=request.user, course=course, category=category, defaults={"value": value}
-    )
-
-    if not created:
-        if vote.value == value:
-            vote.value = 0
-        else:
-            vote.value = value
-        vote.save()
-
-    course.recalculate_scores()
-
-    return Response(
+    return JsonResponse(
         {
-            "success": True,
-            "vote_value": vote.value,
-            "quality_score": float(course.quality_score),
-            "difficulty_score": float(course.difficulty_score),
-            "num_quality_votes": course.vote_set.filter(
-                category=Vote.CATEGORIES.QUALITY
-            )
-            .exclude(value=0)
-            .count(),
-            "num_difficulty_votes": course.vote_set.filter(
-                category=Vote.CATEGORIES.DIFFICULTY
-            )
-            .exclude(value=0)
-            .count(),
+            "new_score": new_score,
+            "was_unvote": is_unvote,
+            "new_vote_count": new_vote_count,
         }
     )

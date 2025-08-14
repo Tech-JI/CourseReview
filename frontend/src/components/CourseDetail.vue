@@ -139,12 +139,17 @@
               </h3>
               <template v-if="isAuthenticated">
                 <div class="space-y-4">
-                  <div class="text-3xl font-bold text-indigo-600">
-                    {{
-                      course.quality_score > 0
-                        ? course.quality_score.toFixed(1)
-                        : "N/A"
-                    }}
+                  <div class="flex items-center justify-center gap-2 mb-2">
+                    <span class="text-3xl font-bold text-indigo-600">
+                      {{
+                        course.quality_score > 0
+                          ? course.quality_score.toFixed(1)
+                          : "N/A"
+                      }}
+                    </span>
+                    <span class="text-xs text-gray-500">
+                      ({{ course.quality_vote_count ?? 0 }} ratings)
+                    </span>
                   </div>
                   <div class="text-sm text-gray-500 mb-4">
                     Rate this course (1-5 stars)
@@ -203,12 +208,17 @@
               </h3>
               <template v-if="isAuthenticated">
                 <div class="space-y-4">
-                  <div class="text-3xl font-bold text-green-600">
-                    {{
-                      course.difficulty_score > 0
-                        ? course.difficulty_score.toFixed(1)
-                        : "N/A"
-                    }}
+                  <div class="flex items-center justify-center gap-2 mb-2">
+                    <span class="text-3xl font-bold text-green-600">
+                      {{
+                        course.difficulty_score > 0
+                          ? course.difficulty_score.toFixed(1)
+                          : "N/A"
+                      }}
+                    </span>
+                    <span class="text-xs text-gray-500">
+                      ({{ course.difficulty_vote_count ?? 0 }} ratings)
+                    </span>
                   </div>
                   <div class="text-sm text-gray-500 mb-4">
                     Rate difficulty (1=Very Easy, 5=Very Hard)
@@ -606,9 +616,10 @@ const vote = async (value, forLayup) => {
       } else {
         course.value.difficulty_vote = {
           value: value,
-          is_upvote: value > 0,
-          is_downvote: value < 0,
         };
+      }
+      if (typeof data.new_vote_count !== "undefined") {
+        course.value.difficulty_vote_count = data.new_vote_count;
       }
     } else {
       course.value.quality_score = data.new_score;
@@ -617,11 +628,13 @@ const vote = async (value, forLayup) => {
       } else {
         course.value.quality_vote = {
           value: value,
-          is_upvote: value > 0,
-          is_downvote: value < 0,
         };
       }
+      if (typeof data.new_vote_count !== "undefined") {
+        course.value.quality_vote_count = data.new_vote_count;
+      }
     }
+    // Update new_vote_count if present in response
   } catch (e) {
     console.error("Error voting:", e);
   }
