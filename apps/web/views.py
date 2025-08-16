@@ -317,6 +317,18 @@ def course_detail_api(request, course_id):
         return Response(form.errors, status=400)
 
 
+@api_view(["DELETE"])
+@permission_classes([AllowAny])
+def delete_review_api(request, course_id):
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+    course = Course.objects.get(id=course_id)
+    Review.objects.delete_reviews_for_user_course(user=request.user, course=course)
+    serializer = CourseSerializer(course, context={"request": request})
+    return Response(serializer.data, status=200)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def departments_api(request):

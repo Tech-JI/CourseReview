@@ -408,7 +408,7 @@
               </h3>
               <div class="mt-2 text-sm text-blue-700">
                 <router-link
-                  to="/accounts/signup/"
+                  to="/accounts/login/"
                   class="font-medium underline hover:text-blue-600"
                 >
                   Sign up
@@ -523,11 +523,11 @@
       <!-- Review Status Message -->
       <div v-else class="mb-8">
         <div class="rounded-md bg-gray-50 p-4">
-          <div class="text-center">
-            <p v-if="isAuthenticated" class="text-sm text-gray-600">
+          <div class="text-center flex items-center justify-between">
+            <p v-if="isAuthenticated" class="text-sm text-gray-600 flex-1">
               Thanks for writing a review of this course!
             </p>
-            <p v-else class="text-sm text-gray-600">
+            <p v-else class="text-sm text-gray-600 flex-1">
               <router-link
                 to="/accounts/login/"
                 class="font-medium text-indigo-600 hover:text-indigo-500"
@@ -536,6 +536,13 @@
               </router-link>
               to write a review.
             </p>
+            <button
+              v-if="isAuthenticated && !course.can_write_review"
+              @click="deleteReview"
+              class="ml-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+            >
+              Delete Review
+            </button>
           </div>
         </div>
       </div>
@@ -754,6 +761,45 @@ const submitReview = async () => {
     console.error("Error submitting review:", error);
     // Use alert with newline characters preserved
     alert(`Error submitting review:\n${error.message}`);
+  }
+};
+
+const deleteReview = async () => {
+  if (!isAuthenticated.value) {
+    alert("You must be logged in to delete a review.");
+    return;
+  }
+
+  if (
+    !confirm("Are you sure you want to delete your review for this course?")
+  ) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/course/${courseId.value}/review/delete/`,
+      {
+        method: "DELETE",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`,
+      );
+    }
+
+    // Refresh the course data to reflect the deletion
+    course.value = await response.json();
+    alert("Review deleted successfully!");
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    alert(`Error deleting review: ${error.message}`);
   }
 };
 </script>

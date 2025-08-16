@@ -11,6 +11,9 @@ class ReviewManager(models.Manager):
     def num_reviews_for_user(self, user):
         return self.filter(user=user).count()
 
+    def delete_reviews_for_user_course(self, user, course):
+        self.filter(course=course, user=user).delete()
+
 
 class Review(models.Model):
     objects = ReviewManager()
