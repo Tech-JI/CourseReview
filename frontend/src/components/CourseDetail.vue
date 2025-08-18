@@ -381,9 +381,11 @@
                         with {{ review.professor }}</span
                       >
                     </div>
-                    <div class="mt-2 text-sm text-indigo-700">
-                      {{ review.comments }}
-                    </div>
+                    <!-- Use MdPreview for displaying review comments -->
+                    <MdPreview
+                      :model-value="review.comments"
+                      class="mt-2 text-sm text-indigo-700"
+                    />
                   </div>
                 </div>
               </div>
@@ -468,19 +470,40 @@
               </div>
               <div>
                 <label
-                  for="comments"
+                  for="review-comments"
                   class="block text-sm font-medium leading-6 text-gray-900"
                 >
                   Review
                 </label>
-                <textarea
-                  id="comments"
+                <!-- Use MdEditor for writing reviews -->
+                <MdEditor
+                  id="review-comments"
                   v-model="newReview.comments"
-                  required
-                  rows="4"
-                  class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  placeholder="Share your experience with this course..."
-                ></textarea>
+                  :toolbars="[
+                    'bold',
+                    'italic',
+                    'strikeThrough',
+                    'title',
+                    'sub',
+                    'sup',
+                    'quote',
+                    'unorderedList',
+                    'orderedList',
+                    'task',
+                    'codeRow',
+                    'code',
+                    'link',
+                    'table',
+                    'mermaid',
+                    'katex',
+                    'revoke',
+                    'next',
+                    'preview',
+                    'htmlPreview',
+                  ]"
+                  style="height: 300px"
+                  class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                />
               </div>
               <div class="flex justify-end">
                 <button
@@ -530,6 +553,8 @@ import {
   UsersIcon,
   InformationCircleIcon,
 } from "@heroicons/vue/24/outline";
+import { MdEditor, MdPreview } from "md-editor-v3";
+import "md-editor-v3/lib/style.css";
 
 const route = useRoute();
 const router = useRouter();

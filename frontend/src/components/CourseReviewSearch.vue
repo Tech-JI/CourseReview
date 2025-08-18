@@ -43,7 +43,8 @@
                 <b v-if="review.professor"> with {{ review.professor }}</b
                 >:
               </b>
-              {{ review.comments }}
+              <!-- Use MdPreview for displaying review comments in search results -->
+              <MdPreview :model-value="review.comments" />
             </td>
           </tr>
         </tbody>
@@ -65,6 +66,8 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { MdPreview } from "md-editor-v3";
+import "md-editor-v3/lib/style.css";
 
 const props = defineProps({
   courseId: {
