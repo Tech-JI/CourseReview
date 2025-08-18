@@ -43,6 +43,10 @@ class Review(models.Model):
     difficulty_sentiment = models.FloatField(default=None, null=True, blank=True)
     quality_sentiment = models.FloatField(default=None, null=True, blank=True)
 
+    # Kudos and dislike counts
+    kudos_count = models.PositiveIntegerField(default=0, db_index=True)
+    dislike_count = models.PositiveIntegerField(default=0, db_index=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
