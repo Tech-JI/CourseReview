@@ -694,17 +694,48 @@ const submitReview = async () => {
       body: JSON.stringify(newReview.value),
     });
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`,
-      );
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        // Handle Django REST Framework serializer errors (which are objects with field arrays)
+        if (errorData && typeof errorData === 'object' && !Array.isArray(errorData)) {
+          const errorLines = [];
+          for (const [field, messages] of Object.entries(errorData)) {
+            if (Array.isArray(messages) && messages.length > 0) {
+              // Join multiple messages for a single field with a space
+              errorLines.push(`${field}: ${messages.join(' ')}`);
+            } else if (typeof messages === 'string') {
+              errorLines.push(`${field}: ${messages}`);
+            }
+          }
+          if (errorLines.length > 0) {
+            errorMessage = errorLines.join('\n'); // Join fields with a newline
+          } else {
+            // Fallback if structure is not as expected
+            errorMessage = JSON.stringify(errorData);
+          }
+        } else if (errorData.detail) {
+          // Handle generic DRF error responses
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else {
+          // Fallback for other object types or arrays
+          errorMessage = JSON.stringify(errorData);
+        }
+      } catch (e) {
+        // If parsing JSON fails, use the status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
     course.value = await response.json();
     newReview.value = { term: "", professor: "", comments: "" };
     alert("Review submitted successfully!");
   } catch (error) {
     console.error("Error submitting review:", error);
-    alert(`Error submitting review: ${error.message}`);
+    // Use alert with newline characters preserved
+    alert(`Error submitting review:\n${error.message}`);
   }
 };
 </script>
