@@ -470,12 +470,11 @@
               </div>
               <div>
                 <label
-                  for="review-comments"
+                  id="review-comments-label"
                   class="block text-sm font-medium leading-6 text-gray-900"
                 >
                   Review
                 </label>
-                <!-- Use MdEditor for writing reviews -->
                 <MdEditor
                   id="review-comments"
                   v-model="newReview.comments"
@@ -501,6 +500,9 @@
                     'preview',
                     'htmlPreview',
                   ]"
+                  aria-labelledby="review-comments-label"
+                  role="textbox"
+                  tabindex="0"
                   style="height: 300px"
                   class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                 />
@@ -698,18 +700,22 @@ const submitReview = async () => {
       try {
         const errorData = await response.json();
         // Handle Django REST Framework serializer errors (which are objects with field arrays)
-        if (errorData && typeof errorData === 'object' && !Array.isArray(errorData)) {
+        if (
+          errorData &&
+          typeof errorData === "object" &&
+          !Array.isArray(errorData)
+        ) {
           const errorLines = [];
           for (const [field, messages] of Object.entries(errorData)) {
             if (Array.isArray(messages) && messages.length > 0) {
               // Join multiple messages for a single field with a space
-              errorLines.push(`${field}: ${messages.join(' ')}`);
-            } else if (typeof messages === 'string') {
+              errorLines.push(`${field}: ${messages.join(" ")}`);
+            } else if (typeof messages === "string") {
               errorLines.push(`${field}: ${messages}`);
             }
           }
           if (errorLines.length > 0) {
-            errorMessage = errorLines.join('\n'); // Join fields with a newline
+            errorMessage = errorLines.join("\n"); // Join fields with a newline
           } else {
             // Fallback if structure is not as expected
             errorMessage = JSON.stringify(errorData);
@@ -717,7 +723,7 @@ const submitReview = async () => {
         } else if (errorData.detail) {
           // Handle generic DRF error responses
           errorMessage = errorData.detail;
-        } else if (typeof errorData === 'string') {
+        } else if (typeof errorData === "string") {
           errorMessage = errorData;
         } else {
           // Fallback for other object types or arrays
