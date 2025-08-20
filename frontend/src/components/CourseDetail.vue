@@ -381,9 +381,12 @@
                         with {{ review.professor }}</span
                       >
                     </div>
-                    <div class="mt-2 text-sm text-indigo-700">
-                      {{ review.comments }}
-                    </div>
+                    <!-- Use MdPreview for displaying review comments -->
+                    <MdPreview
+                      :model-value="review.comments"
+                      :sanitize="sanitize"
+                      class="mt-2 text-sm text-indigo-700 markdown-content"
+                    />
                   </div>
                 </div>
               </div>
@@ -468,19 +471,41 @@
               </div>
               <div>
                 <label
-                  for="comments"
+                  id="review-comments-label"
                   class="block text-sm font-medium leading-6 text-gray-900"
                 >
                   Review
                 </label>
-                <textarea
-                  id="comments"
+                <MdEditor
+                  id="review-comments"
                   v-model="newReview.comments"
-                  required
-                  rows="4"
-                  class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  placeholder="Share your experience with this course..."
-                ></textarea>
+                  :sanitize="sanitize"
+                  :toolbars="[
+                    'bold',
+                    'italic',
+                    'strikeThrough',
+                    'title',
+                    'sub',
+                    'sup',
+                    'quote',
+                    'unorderedList',
+                    'orderedList',
+                    'task',
+                    'codeRow',
+                    'code',
+                    'link',
+                    'table',
+                    'revoke',
+                    'next',
+                    'preview',
+                    'htmlPreview',
+                  ]"
+                  aria-labelledby="review-comments-label"
+                  role="textbox"
+                  tabindex="0"
+                  style="height: 300px"
+                  class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 markdown-content"
+                />
               </div>
               <div class="flex justify-end">
                 <button
@@ -530,6 +555,9 @@ import {
   UsersIcon,
   InformationCircleIcon,
 } from "@heroicons/vue/24/outline";
+import { MdEditor, MdPreview } from "md-editor-v3";
+import "md-editor-v3/lib/style.css";
+import DOMPurify from "dompurify";
 
 const route = useRoute();
 const router = useRouter();
@@ -654,6 +682,17 @@ function getCookie(name) {
   }
   return cookieValue;
 }
+// Sanitize function using DOMPurify with enhanced security configuration
+const sanitize = (html) =>
+  DOMPurify.sanitize(html, {
+    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
+    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
+    SAFE_FOR_TEMPLATES: true, // Protect against template injection
+    SANITIZE_DOM: true, // Protect against DOM clobbering
+    KEEP_CONTENT: false, // Remove content of forbidden tags
+  });
+
 const submitReview = async () => {
   if (!isAuthenticated.value) {
     alert("You must be logged in to submit a review.");
@@ -669,17 +708,75 @@ const submitReview = async () => {
       body: JSON.stringify(newReview.value),
     });
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`,
-      );
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        // Handle Django REST Framework serializer errors (which are objects with field arrays)
+        if (
+          errorData &&
+          typeof errorData === "object" &&
+          !Array.isArray(errorData)
+        ) {
+          const errorLines = [];
+          for (const [field, messages] of Object.entries(errorData)) {
+            if (Array.isArray(messages) && messages.length > 0) {
+              // Join multiple messages for a single field with a space
+              errorLines.push(`${field}: ${messages.join(" ")}`);
+            } else if (typeof messages === "string") {
+              errorLines.push(`${field}: ${messages}`);
+            }
+          }
+          if (errorLines.length > 0) {
+            errorMessage = errorLines.join("\n"); // Join fields with a newline
+          } else {
+            // Fallback if structure is not as expected
+            errorMessage = JSON.stringify(errorData);
+          }
+        } else if (errorData.detail) {
+          // Handle generic DRF error responses
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === "string") {
+          errorMessage = errorData;
+        } else {
+          // Fallback for other object types or arrays
+          errorMessage = JSON.stringify(errorData);
+        }
+      } catch (e) {
+        // If parsing JSON fails, use the status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
     course.value = await response.json();
     newReview.value = { term: "", professor: "", comments: "" };
     alert("Review submitted successfully!");
   } catch (error) {
     console.error("Error submitting review:", error);
-    alert(`Error submitting review: ${error.message}`);
+    // Use alert with newline characters preserved
+    alert(`Error submitting review:\n${error.message}`);
   }
 };
 </script>
+
+<style scoped>
+/* Restore list styling for markdown content */
+:deep(.markdown-content) ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ul ul,
+:deep(.markdown-content) ol ul {
+  list-style-type: circle;
+}
+
+:deep(.markdown-content) ul ol,
+:deep(.markdown-content) ol ol {
+  list-style-type: lower-alpha;
+}
+</style>

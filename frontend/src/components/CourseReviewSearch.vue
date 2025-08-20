@@ -43,7 +43,12 @@
                 <b v-if="review.professor"> with {{ review.professor }}</b
                 >:
               </b>
-              {{ review.comments }}
+              <!-- Use MdPreview for displaying review comments in search results -->
+              <MdPreview
+                :model-value="review.comments"
+                :sanitize="sanitize"
+                class="markdown-content"
+              />
             </td>
           </tr>
         </tbody>
@@ -65,6 +70,9 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { MdPreview } from "md-editor-v3";
+import "md-editor-v3/lib/style.css";
+import DOMPurify from "dompurify";
 
 const props = defineProps({
   courseId: {
@@ -72,6 +80,17 @@ const props = defineProps({
     required: true,
   },
 });
+
+// Sanitize function using DOMPurify with enhanced security configuration
+const sanitize = (html) =>
+  DOMPurify.sanitize(html, {
+    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
+    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
+    SAFE_FOR_TEMPLATES: true, // Protect against template injection
+    SANITIZE_DOM: true, // Protect against DOM clobbering
+    KEEP_CONTENT: false, // Remove content of forbidden tags
+  });
 
 const route = useRoute();
 const router = useRouter();
@@ -207,5 +226,26 @@ th {
   border-color: #ced4da;
   color: #343a40;
   border-radius: 0 4px 4px 0;
+}
+
+/* Restore list styling for markdown content */
+:deep(.markdown-content) ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ul ul,
+:deep(.markdown-content) ol ul {
+  list-style-type: circle;
+}
+
+:deep(.markdown-content) ul ol,
+:deep(.markdown-content) ol ol {
+  list-style-type: lower-alpha;
 }
 </style>
