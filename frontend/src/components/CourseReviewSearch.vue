@@ -44,7 +44,7 @@
                 >:
               </b>
               <!-- Use MdPreview for displaying review comments in search results -->
-              <MdPreview :model-value="review.comments" />
+              <MdPreview :model-value="review.comments" :sanitize="sanitize" />
             </td>
           </tr>
         </tbody>
@@ -68,6 +68,7 @@ import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
+import DOMPurify from "dompurify";
 
 const props = defineProps({
   courseId: {
@@ -75,6 +76,17 @@ const props = defineProps({
     required: true,
   },
 });
+
+// Sanitize function using DOMPurify with enhanced security configuration
+const sanitize = (html) =>
+  DOMPurify.sanitize(html, {
+    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
+    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
+    SAFE_FOR_TEMPLATES: true, // Protect against template injection
+    SANITIZE_DOM: true, // Protect against DOM clobbering
+    KEEP_CONTENT: false, // Remove content of forbidden tags
+  });
 
 const route = useRoute();
 const router = useRouter();

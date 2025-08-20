@@ -384,6 +384,7 @@
                     <!-- Use MdPreview for displaying review comments -->
                     <MdPreview
                       :model-value="review.comments"
+                      :sanitize="sanitize"
                       class="mt-2 text-sm text-indigo-700"
                     />
                   </div>
@@ -478,6 +479,7 @@
                 <MdEditor
                   id="review-comments"
                   v-model="newReview.comments"
+                  :sanitize="sanitize"
                   :toolbars="[
                     'bold',
                     'italic',
@@ -493,7 +495,6 @@
                     'code',
                     'link',
                     'table',
-                    'mermaid',
                     'katex',
                     'revoke',
                     'next',
@@ -557,6 +558,7 @@ import {
 } from "@heroicons/vue/24/outline";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
+import DOMPurify from "dompurify";
 
 const route = useRoute();
 const router = useRouter();
@@ -681,6 +683,17 @@ function getCookie(name) {
   }
   return cookieValue;
 }
+// Sanitize function using DOMPurify with enhanced security configuration
+const sanitize = (html) =>
+  DOMPurify.sanitize(html, {
+    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
+    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
+    SAFE_FOR_TEMPLATES: true, // Protect against template injection
+    SANITIZE_DOM: true, // Protect against DOM clobbering
+    KEEP_CONTENT: false, // Remove content of forbidden tags
+  });
+
 const submitReview = async () => {
   if (!isAuthenticated.value) {
     alert("You must be logged in to submit a review.");
