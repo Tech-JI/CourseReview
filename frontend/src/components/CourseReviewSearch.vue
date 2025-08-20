@@ -44,7 +44,11 @@
                 >:
               </b>
               <!-- Use MdPreview for displaying review comments in search results -->
-              <MdPreview :model-value="review.comments" :sanitize="sanitize" />
+              <MdPreview
+                :model-value="review.comments"
+                :sanitize="sanitize"
+                class="markdown-content"
+              />
             </td>
           </tr>
         </tbody>
@@ -222,5 +226,26 @@ th {
   border-color: #ced4da;
   color: #343a40;
   border-radius: 0 4px 4px 0;
+}
+
+/* Restore list styling for markdown content */
+:deep(.markdown-content) ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ul ul,
+:deep(.markdown-content) ol ul {
+  list-style-type: circle;
+}
+
+:deep(.markdown-content) ul ol,
+:deep(.markdown-content) ol ol {
+  list-style-type: lower-alpha;
 }
 </style>

@@ -385,7 +385,7 @@
                     <MdPreview
                       :model-value="review.comments"
                       :sanitize="sanitize"
-                      class="mt-2 text-sm text-indigo-700"
+                      class="mt-2 text-sm text-indigo-700 markdown-content"
                     />
                   </div>
                 </div>
@@ -505,7 +505,7 @@
                   role="textbox"
                   tabindex="0"
                   style="height: 300px"
-                  class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 markdown-content"
                 />
               </div>
               <div class="flex justify-end">
@@ -758,3 +758,26 @@ const submitReview = async () => {
   }
 };
 </script>
+
+<style scoped>
+/* Restore list styling for markdown content */
+:deep(.markdown-content) ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+:deep(.markdown-content) ul ul,
+:deep(.markdown-content) ol ul {
+  list-style-type: circle;
+}
+
+:deep(.markdown-content) ul ol,
+:deep(.markdown-content) ol ol {
+  list-style-type: lower-alpha;
+}
+</style>
