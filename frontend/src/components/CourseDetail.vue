@@ -495,7 +495,6 @@
                     'code',
                     'link',
                     'table',
-                    'katex',
                     'revoke',
                     'next',
                     'preview',
