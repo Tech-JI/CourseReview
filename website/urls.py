@@ -76,6 +76,11 @@ urlpatterns = [
         name="delete_review_api",
     ),
     re_path(
+        r"^api/review/(?P<review_id>[0-9]+)/vote/$",
+        views.review_vote_api,
+        name="review_vote_api",
+    ),
+    re_path(
         r"^api/departments/$",
         views.departments_api,
         name="departments_api",

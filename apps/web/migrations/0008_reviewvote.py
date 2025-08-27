@@ -6,25 +6,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('web', '0007_review_dislike_count_review_kudos_count'),
+        ("web", "0007_review_dislike_count_review_kudos_count"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ReviewVote',
+            name="ReviewVote",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('is_kudos', models.BooleanField(default=True)),
-                ('review', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='votes', to='web.review')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("is_kudos", models.BooleanField(default=True)),
+                (
+                    "review",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="votes",
+                        to="web.review",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Review Vote',
-                'verbose_name_plural': 'Review Votes',
-                'unique_together': {('review', 'user')},
+                "verbose_name": "Review Vote",
+                "verbose_name_plural": "Review Votes",
+                "unique_together": {("review", "user")},
             },
         ),
     ]

@@ -13,12 +13,12 @@ class ReviewVoteManager(models.Manager):
         Add a vote (kudos or dislike) to a review by a user.
         If the user has already given the same vote, remove it (cancel).
         If the user has given the opposite vote, change it.
-        
+
         Args:
             review_id: ID of the review
             user: User giving the vote
             is_kudos: True for kudos, False for dislike
-            
+
         Returns:
             tuple: (kudos_count, dislike_count, user_vote)
             user_vote will be True (kudos), False (dislike), or None (no vote)
@@ -26,22 +26,20 @@ class ReviewVoteManager(models.Manager):
         try:
             review = Review.objects.get(id=review_id)
         except Review.DoesNotExist:
-            return 0, 0, None
+            return None, None, None
 
         # Get or create the vote
         review_vote, created = self.get_or_create(
-            review=review, 
-            user=user, 
-            defaults={'is_kudos': is_kudos}
+            review=review, user=user, defaults={"is_kudos": is_kudos}
         )
-        
+
         if created:
             # New vote, increment the appropriate counter
             if is_kudos:
-                review.kudos_count = models.F('kudos_count') + 1
+                review.kudos_count = models.F("kudos_count") + 1
             else:
-                review.dislike_count = models.F('dislike_count') + 1
-            review.save(update_fields=['kudos_count', 'dislike_count'])
+                review.dislike_count = models.F("dislike_count") + 1
+            review.save(update_fields=["kudos_count", "dislike_count"])
             vote_value = is_kudos
         else:
             # Existing vote
@@ -49,25 +47,25 @@ class ReviewVoteManager(models.Manager):
                 # Same vote type, remove it (cancel)
                 review_vote.delete()
                 if is_kudos:
-                    review.kudos_count = models.F('kudos_count') - 1
+                    review.kudos_count = models.F("kudos_count") - 1
                 else:
-                    review.dislike_count = models.F('dislike_count') - 1
-                review.save(update_fields=['kudos_count', 'dislike_count'])
+                    review.dislike_count = models.F("dislike_count") - 1
+                review.save(update_fields=["kudos_count", "dislike_count"])
                 vote_value = None  # User cancelled their vote
             else:
                 # Change vote from kudos to dislike or vice versa
                 old_is_kudos = review_vote.is_kudos
                 review_vote.is_kudos = is_kudos
                 review_vote.save()
-                
+
                 # Update counts: decrease old vote type, increase new vote type
                 if old_is_kudos:  # Was kudos, changing to dislike
-                    review.kudos_count = models.F('kudos_count') - 1
-                    review.dislike_count = models.F('dislike_count') + 1
+                    review.kudos_count = models.F("kudos_count") - 1
+                    review.dislike_count = models.F("dislike_count") + 1
                 else:  # Was dislike, changing to kudos
-                    review.dislike_count = models.F('dislike_count') - 1
-                    review.kudos_count = models.F('kudos_count') + 1
-                review.save(update_fields=['kudos_count', 'dislike_count'])
+                    review.dislike_count = models.F("dislike_count") - 1
+                    review.kudos_count = models.F("kudos_count") + 1
+                review.save(update_fields=["kudos_count", "dislike_count"])
                 vote_value = is_kudos
 
         # Return updated counts and user's current vote
@@ -96,9 +94,10 @@ class ReviewVote(models.Model):
     Users can give either kudos (is_kudos=True) or dislike (is_kudos=False) to a review.
     Giving the same vote again will cancel it.
     """
+
     objects = ReviewVoteManager()
 
-    review = models.ForeignKey("Review", on_delete=models.CASCADE, related_name='votes')
+    review = models.ForeignKey("Review", on_delete=models.CASCADE, related_name="votes")
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_kudos = models.BooleanField(default=True)  # True for kudos, False for dislike
 
