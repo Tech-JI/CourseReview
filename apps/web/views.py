@@ -1,5 +1,6 @@
 import datetime
 import uuid
+import traceback
 
 import dateutil.parser
 from django.contrib.auth import authenticate, login, logout
@@ -36,6 +37,7 @@ from apps.web.models import (
     DistributiveRequirement,
     Instructor,
     Review,
+    ReviewVote,
     Student,
     Vote,
 )
@@ -509,3 +511,54 @@ def course_vote_api(request, course_id):
             "new_vote_count": new_vote_count,
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def review_vote_api(request, review_id):
+    """
+    API endpoint for voting on reviews (kudos/dislike).
+
+    URL: /api/review/{review_id}/vote/
+    POST data:
+    - is_kudos: boolean (True for kudos, False for dislike)
+
+    Returns:
+    - kudos_count: updated kudos count
+    - dislike_count: updated dislike count
+    - user_vote: user's current vote (True/False/None)
+    """
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+
+    try:
+        is_kudos = request.data.get("is_kudos")
+
+        if is_kudos is None:
+            return Response({"detail": "is_kudos field is required"}, status=400)
+
+        is_kudos = bool(is_kudos)
+
+        # Use the ReviewVoteManager's vote method
+        kudos_count, dislike_count, user_vote = ReviewVote.objects.vote(
+            review_id=review_id, user=request.user, is_kudos=is_kudos
+        )
+
+        if kudos_count is None or dislike_count is None:
+            # Review doesn't exist
+            return Response({"detail": "Review not found"}, status=404)
+
+        return Response(
+            {
+                "kudos_count": kudos_count,
+                "dislike_count": dislike_count,
+                "user_vote": user_vote,
+            }
+        )
+
+    except Exception as e:
+        # Better error reporting for debugging
+        return Response(
+            {"detail": f"Error: {str(e)}", "traceback": traceback.format_exc()},
+            status=400,
+        )

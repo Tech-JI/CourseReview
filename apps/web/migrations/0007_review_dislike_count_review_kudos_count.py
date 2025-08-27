@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('web', '0006_alter_course_difficulty_score_and_more'),
+        ("web", "0006_alter_course_difficulty_score_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='review',
-            name='dislike_count',
+            model_name="review",
+            name="dislike_count",
             field=models.PositiveIntegerField(db_index=True, default=0),
         ),
         migrations.AddField(
-            model_name='review',
-            name='kudos_count',
+            model_name="review",
+            name="kudos_count",
             field=models.PositiveIntegerField(db_index=True, default=0),
         ),
     ]
