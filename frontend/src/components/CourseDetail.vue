@@ -406,7 +406,10 @@
                               : 'Give kudos'
                           "
                         >
-                          <span class="mr-1 emoji-with-fallback" aria-label="Love">
+                          <span
+                            class="mr-1 emoji-with-fallback"
+                            aria-label="Love"
+                          >
                             <span class="emoji-main">🥰</span>
                             <span class="emoji-fallback">Love</span>
                           </span>
@@ -428,7 +431,10 @@
                               : 'Dislike'
                           "
                         >
-                          <span class="mr-1 emoji-with-fallback" aria-label="Dislike">
+                          <span
+                            class="mr-1 emoji-with-fallback"
+                            aria-label="Dislike"
+                          >
                             <span class="emoji-main">😈</span>
                             <span class="emoji-fallback">Not a fan</span>
                           </span>
@@ -437,7 +443,8 @@
                       </div>
 
                       <div class="text-xs text-gray-500">
-                        on {{ new Date(review.created_at).toLocaleDateString() }}
+                        on
+                        {{ new Date(review.created_at).toLocaleDateString() }}
                       </div>
                     </div>
                   </div>
@@ -573,10 +580,73 @@
         </div>
       </div>
 
-      <!-- Review Status Message -->
+      <!-- Review Status Message / User's Review Display -->
       <div v-else class="mb-8">
         <div class="rounded-md bg-gray-50 p-4">
-          <div class="text-center flex items-center justify-between">
+          <!-- Show user's review if they have written one -->
+          <div
+            v-if="isAuthenticated && !course.can_write_review && userReview"
+            class="space-y-4"
+          >
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-medium text-gray-900">Your Review</h3>
+              <button
+                @click="deleteReview"
+                class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              >
+                Delete Review
+              </button>
+            </div>
+
+            <!-- Review metadata -->
+            <div class="text-sm text-gray-600">
+              <span v-if="userReview.term">{{ userReview.term }}</span>
+              <span v-if="userReview.professor && userReview.term">
+                with {{ userReview.professor }}</span
+              >
+              <span v-else-if="userReview.professor">{{
+                userReview.professor
+              }}</span>
+            </div>
+
+            <!-- Review content with truncation -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+              <MdPreview
+                :model-value="truncatedUserReviewContent"
+                :sanitize="sanitize"
+                class="text-sm text-gray-700 markdown-content"
+              />
+
+              <!-- Expand/Collapse button for long reviews -->
+              <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
+                <button
+                  @click="userReviewExpanded = !userReviewExpanded"
+                  class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                >
+                  {{ userReviewExpanded ? "Show Less" : "Read More" }}
+                  <svg
+                    :class="[
+                      'ml-1 h-3 w-3 transition-transform',
+                      userReviewExpanded && 'rotate-180',
+                    ]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fallback messages for users without reviews -->
+          <div v-else class="text-center flex items-center justify-between">
             <p v-if="isAuthenticated" class="text-sm text-gray-600 flex-1">
               Thanks for writing a review of this course!
             </p>
@@ -590,7 +660,7 @@
               to write a review.
             </p>
             <button
-              v-if="isAuthenticated && !course.can_write_review"
+              v-if="isAuthenticated && !course.can_write_review && !userReview"
               @click="deleteReview"
               class="ml-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
             >
@@ -626,6 +696,8 @@ const loading = ref(true);
 const error = ref(null);
 const currentTerm = "25S";
 const isAuthenticated = ref(false);
+const userReview = ref(null);
+const userReviewExpanded = ref(false);
 const newReview = ref({
   term: "",
   professor: "",
@@ -636,11 +708,34 @@ const courseId = computed(() => {
   return route.params.course_id;
 });
 
+const truncatedUserReviewContent = computed(() => {
+  if (!userReview.value?.comments) return "";
+
+  const content = userReview.value.comments;
+  const lines = content.split("\n");
+  const maxLines = 5;
+
+  if (userReviewExpanded.value || lines.length <= maxLines) {
+    return content;
+  }
+
+  return lines.slice(0, maxLines).join("\n") + "\n\n...";
+});
+
+const reviewNeedsTruncation = computed(() => {
+  return userReview.value?.comments?.split("\n").length > 5;
+});
+
 onMounted(async () => {
   if (courseId.value) {
     await fetchCourse();
   }
-  checkAuthentication();
+  await checkAuthentication();
+
+  // Always fetch user review after authentication check
+  if (isAuthenticated.value) {
+    await fetchUserReview();
+  }
 });
 
 const fetchCourse = async () => {
@@ -671,6 +766,25 @@ const checkAuthentication = async () => {
   } catch (e) {
     console.error("Error checking authentication:", e);
     isAuthenticated.value = false;
+  }
+};
+const fetchUserReview = async () => {
+  if (!isAuthenticated.value || !courseId.value) return;
+
+  try {
+    const response = await fetch(`/api/course/${courseId.value}/my-review/`);
+    if (response.ok) {
+      const data = await response.json();
+      // Handle case where API might return a list - take first one
+      userReview.value = Array.isArray(data) ? data[0] : data;
+    } else if (response.status === 404) {
+      // User hasn't written a review yet - this is expected
+      userReview.value = null;
+    } else {
+      console.error("Error fetching user review:", response.status);
+    }
+  } catch (e) {
+    console.error("Error fetching user review:", e);
   }
 };
 
@@ -848,6 +962,10 @@ const submitReview = async () => {
     }
     course.value = await response.json();
     newReview.value = { term: "", professor: "", comments: "" };
+
+    // Refresh user review after successful submission
+    await fetchUserReview();
+
     alert("Review submitted successfully!");
   } catch (error) {
     console.error("Error submitting review:", error);
@@ -888,6 +1006,10 @@ const deleteReview = async () => {
 
     // Refresh the course data to reflect the deletion
     course.value = await response.json();
+
+    // Clear user review after successful deletion
+    userReview.value = null;
+
     alert("Review deleted successfully!");
   } catch (error) {
     console.error("Error deleting review:", error);
@@ -925,7 +1047,11 @@ const deleteReview = async () => {
 
 /* Show text fallback on old browsers */
 @supports not (font-family: "Apple Color Emoji") {
-  .emoji-main { display: none; }
-  .emoji-fallback { display: inline; }
+  .emoji-main {
+    display: none;
+  }
+  .emoji-fallback {
+    display: inline;
+  }
 }
 </style>
