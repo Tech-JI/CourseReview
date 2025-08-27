@@ -569,7 +569,7 @@ def review_vote_api(request, review_id):
 def get_user_review_api(request, course_id):
     """
     API endpoint to get the authenticated user's review for a specific course.
-    
+
     Returns:
     - Review data if the user has written a review for this course
     - 404 if no review found
@@ -577,23 +577,25 @@ def get_user_review_api(request, course_id):
     """
     if not request.user.is_authenticated:
         return Response({"detail": "Authentication required"}, status=403)
-    
+
     try:
         # Get the course
         try:
             course = Course.objects.get(id=course_id)
         except Course.DoesNotExist:
             return Response({"detail": "Course not found"}, status=404)
-        
+
         # Get the user's review for this course
         review = Review.objects.get_user_review_for_course(request.user, course)
-        
+
         if review is None:
-            return Response({"detail": "No user review found for this course"}, status=404)
-        
+            return Response(
+                {"detail": "No user review found for this course"}, status=404
+            )
+
         # Serialize and return the review
         serializer = ReviewSerializer(review)
         return Response(serializer.data)
-        
+
     except Exception as e:
         return Response({"detail": f"Error: {str(e)}"}, status=400)
