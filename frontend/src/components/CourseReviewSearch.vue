@@ -49,6 +49,29 @@
                 :sanitize="sanitize"
                 class="markdown-content"
               />
+              
+              <!-- Review Vote Counts Display -->
+              <div class="review-votes mt-2">
+                <div class="flex items-center space-x-4">
+                  <!-- Kudos Count -->
+                  <div v-if="review.kudos_count > 0" class="inline-flex items-center text-sm text-green-600">
+                    <span class="mr-1 emoji-with-fallback" aria-label="Kudos">
+                      <span class="emoji-main">🥰</span>
+                      <span class="emoji-fallback">Kudos</span>
+                    </span>
+                    {{ review.kudos_count }}
+                  </div>
+
+                  <!-- Dislikes Count -->
+                  <div v-if="review.dislike_count > 0" class="inline-flex items-center text-sm text-red-600">
+                    <span class="mr-1 emoji-with-fallback" aria-label="Dislikes">
+                      <span class="emoji-main">😈</span>
+                      <span class="emoji-fallback">Dislikes</span>
+                    </span>
+                    {{ review.dislike_count }}
+                  </div>
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -247,5 +270,23 @@ th {
 :deep(.markdown-content) ul ol,
 :deep(.markdown-content) ol ol {
   list-style-type: lower-alpha;
+}
+
+/* Simple emoji fallback */
+.emoji-fallback {
+  display: none;
+}
+
+/* Show text fallback on old browsers */
+@supports not (font-family: "Apple Color Emoji") {
+  .emoji-main { display: none; }
+  .emoji-fallback { display: inline; }
+}
+
+/* Review votes styling */
+.review-votes {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
 }
 </style>

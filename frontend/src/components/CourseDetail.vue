@@ -371,7 +371,7 @@
                 class="border-l-4 border-indigo-400 bg-indigo-50 p-4"
               >
                 <div class="flex">
-                  <div class="ml-3">
+                  <div class="ml-3 flex-1">
                     <div
                       v-if="review.term"
                       class="text-sm font-medium text-indigo-800"
@@ -387,6 +387,59 @@
                       :sanitize="sanitize"
                       class="mt-2 text-sm text-indigo-700 markdown-content"
                     />
+
+                    <!-- Review Voting Section -->
+                    <div class="mt-4 flex items-center justify-between">
+                      <div class="flex items-center space-x-4">
+                        <!-- Kudos Button -->
+                        <button
+                          @click="voteOnReview(review.id, true)"
+                          :class="[
+                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors',
+                            review.user_vote === true
+                              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-800',
+                          ]"
+                          :title="
+                            review.user_vote === true
+                              ? 'Remove kudos'
+                              : 'Give kudos'
+                          "
+                        >
+                          <span class="mr-1 emoji-with-fallback" aria-label="Love">
+                            <span class="emoji-main">🥰</span>
+                            <span class="emoji-fallback">Love</span>
+                          </span>
+                          {{ review.kudos_count || 0 }}
+                        </button>
+
+                        <!-- Dislike Button -->
+                        <button
+                          @click="voteOnReview(review.id, false)"
+                          :class="[
+                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors',
+                            review.user_vote === false
+                              ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-800',
+                          ]"
+                          :title="
+                            review.user_vote === false
+                              ? 'Remove dislike'
+                              : 'Dislike'
+                          "
+                        >
+                          <span class="mr-1 emoji-with-fallback" aria-label="Dislike">
+                            <span class="emoji-main">😈</span>
+                            <span class="emoji-fallback">Not a fan</span>
+                          </span>
+                          {{ review.dislike_count || 0 }}
+                        </button>
+                      </div>
+
+                      <div class="text-xs text-gray-500">
+                        on {{ new Date(review.created_at).toLocaleDateString() }}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -675,6 +728,45 @@ const vote = async (value, forLayup) => {
   }
 };
 
+const voteOnReview = async (reviewId, isKudos) => {
+  if (!isAuthenticated.value) {
+    if (confirm("Please login to vote on reviews!")) {
+      router.push("/accounts/login");
+    }
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/review/${reviewId}/vote/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: JSON.stringify({ is_kudos: isKudos }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Update the review in the course data
+    const reviewIndex = course.value.review_set.findIndex(
+      (r) => r.id === reviewId,
+    );
+    if (reviewIndex !== -1) {
+      course.value.review_set[reviewIndex].kudos_count = data.kudos_count;
+      course.value.review_set[reviewIndex].dislike_count = data.dislike_count;
+      course.value.review_set[reviewIndex].user_vote = data.user_vote;
+    }
+  } catch (e) {
+    console.error("Error voting on review:", e);
+    alert("Error voting on review. Please try again.");
+  }
+};
+
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== "") {
@@ -824,5 +916,16 @@ const deleteReview = async () => {
 :deep(.markdown-content) ul ol,
 :deep(.markdown-content) ol ol {
   list-style-type: lower-alpha;
+}
+
+/* Simple emoji fallback */
+.emoji-fallback {
+  display: none;
+}
+
+/* Show text fallback on old browsers */
+@supports not (font-family: "Apple Color Emoji") {
+  .emoji-main { display: none; }
+  .emoji-fallback { display: inline; }
 }
 </style>

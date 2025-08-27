@@ -10,6 +10,7 @@ from apps.web.models import (
     Instructor,
     Review,
     Vote,
+    ReviewVote,
 )
 from lib import constants
 
@@ -32,10 +33,33 @@ class ReviewSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()  # Display username
     term = serializers.CharField()
     professor = serializers.CharField()
+    user_vote = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
-        fields = ("id", "user", "term", "professor", "comments", "kudos_count","dislike_count","created_at")
+        fields = (
+            "id",
+            "user",
+            "term",
+            "professor",
+            "comments",
+            "kudos_count",
+            "dislike_count",
+            "created_at",
+            "user_vote",
+        )
+
+    def get_user_vote(self, obj):
+        """Get the current user's vote for this review"""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+
+        try:
+            vote = ReviewVote.objects.get(review=obj, user=request.user)
+            return vote.is_kudos  # True for kudos, False for dislike
+        except ReviewVote.DoesNotExist:
+            return None
 
 
 class DepartmentSerializer(serializers.Serializer):
@@ -168,7 +192,9 @@ class CourseSerializer(serializers.ModelSerializer):
     def get_review_set(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            return ReviewSerializer(obj.review_set.all(), many=True).data
+            return ReviewSerializer(
+                obj.review_set.all(), many=True, context=self.context
+            ).data
         return []
 
     def get_review_count(self, obj):
