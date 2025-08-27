@@ -13,6 +13,16 @@ class ReviewManager(models.Manager):
 
     def delete_reviews_for_user_course(self, user, course):
         self.filter(course=course, user=user).delete()
+    
+    def get_user_review_for_course(self, user, course):
+        """
+        Get the review written by a user for a specific course.
+        Returns the Review object if found, None otherwise.
+        """
+        try:
+            return self.get(user=user, course=course)
+        except self.model.DoesNotExist:
+            return None
 
 
 class Review(models.Model):
