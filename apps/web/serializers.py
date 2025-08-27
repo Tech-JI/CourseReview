@@ -30,7 +30,7 @@ class CourseOfferingSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()  # Display username
+    #    user = serializers.StringRelatedField()  # Display username
     term = serializers.CharField()
     professor = serializers.CharField()
     user_vote = serializers.SerializerMethodField()
@@ -39,7 +39,8 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = (
             "id",
-            "user",
+            # don't return the author of this review
+            #            "user",
             "term",
             "professor",
             "comments",
