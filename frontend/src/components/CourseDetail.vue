@@ -987,15 +987,12 @@ const deleteReview = async () => {
   }
 
   try {
-    const response = await fetch(
-      `/api/course/${courseId.value}/review/delete/`,
-      {
-        method: "DELETE",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken"),
-        },
+    const response = await fetch(`/api/course/${courseId.value}/review/`, {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
       },
-    );
+    });
 
     if (!response.ok) {
       const errorData = await response.json();

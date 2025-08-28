@@ -556,11 +556,10 @@ def review_vote_api(request, review_id):
             }
         )
 
-    except Exception as e:
-        # Better error reporting for debugging
+    except Exception:
         return Response(
-            {"detail": f"Error: {str(e)}", "traceback": traceback.format_exc()},
-            status=400,
+            {"detail": "An error occurred processing your request"},
+            status=500,
         )
 
 
@@ -597,5 +596,8 @@ def get_user_review_api(request, course_id):
         serializer = ReviewSerializer(review)
         return Response(serializer.data)
 
-    except Exception as e:
-        return Response({"detail": f"Error: {str(e)}"}, status=400)
+    except Exception:
+        return Response(
+            {"detail": "An error occurred processing your request"},
+            status=500,
+        )
