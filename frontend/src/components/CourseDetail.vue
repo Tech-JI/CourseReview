@@ -364,88 +364,94 @@
             <h3 class="text-lg font-medium leading-6 text-gray-900 mb-6">
               Reviews ({{ course.review_count }})
             </h3>
-            <div class="space-y-4">
+            <div class="space-y-6">
               <div
                 v-for="review in course.review_set"
                 :key="review.id"
-                class="border-l-4 border-indigo-400 bg-indigo-50 p-4"
+                class="bg-white overflow-hidden shadow rounded-2xl ring-1 ring-indigo-100"
               >
-                <div class="flex">
-                  <div class="ml-3 flex-1">
-                    <div
-                      v-if="review.term"
-                      class="text-sm font-medium text-indigo-800"
-                    >
-                      {{ review.term }}
-                      <span v-if="review.professor">
-                        with {{ review.professor }}</span
+                <div class="px-4 py-5 sm:p-6">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                      <div
+                        v-if="review.term"
+                        class="text-sm font-medium text-indigo-800"
                       >
+                        {{ review.term }}
+                        <span v-if="review.professor" class="text-indigo-600">
+                          with {{ review.professor }}</span
+                        >
+                      </div>
                     </div>
-                    <!-- Use MdPreview for displaying review comments -->
+                    <div class="text-xs text-indigo-500">
+                      {{ new Date(review.created_at).toLocaleDateString() }}
+                    </div>
+                  </div>
+
+                  <!-- Use MdPreview for displaying review comments -->
+                  <div class="mt-4">
                     <MdPreview
                       :model-value="review.comments"
                       :sanitize="sanitize"
-                      class="mt-2 text-sm text-indigo-700 markdown-content"
+                      previewTheme="github"
+                      class="text-sm text-indigo-700 markdown-content"
                     />
+                  </div>
 
-                    <!-- Review Voting Section -->
-                    <div class="mt-4 flex items-center justify-between">
-                      <div class="flex items-center space-x-4">
-                        <!-- Kudos Button -->
-                        <button
-                          @click="voteOnReview(review.id, true)"
+                  <!-- Review Voting Section -->
+                  <div class="mt-6 flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                      <!-- Kudos Button -->
+                      <button
+                        @click="voteOnReview(review.id, true)"
+                        :class="[
+                          'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
+                          review.user_vote === true
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
+                        ]"
+                        :title="
+                          review.user_vote === true
+                            ? 'Remove kudos'
+                            : 'Give kudos'
+                        "
+                      >
+                        <HandThumbUpIcon
                           :class="[
-                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors',
+                            'mr-1.5 h-4 w-4',
                             review.user_vote === true
-                              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                              : 'bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-800',
+                              ? 'text-green-600'
+                              : 'text-indigo-400',
                           ]"
-                          :title="
-                            review.user_vote === true
-                              ? 'Remove kudos'
-                              : 'Give kudos'
-                          "
-                        >
-                          <span
-                            class="mr-1 emoji-with-fallback"
-                            aria-label="Love"
-                          >
-                            <span class="emoji-main">🥰</span>
-                            <span class="emoji-fallback">Love</span>
-                          </span>
-                          {{ review.kudos_count || 0 }}
-                        </button>
+                        />
+                        {{ review.kudos_count || 0 }}
+                      </button>
 
-                        <!-- Dislike Button -->
-                        <button
-                          @click="voteOnReview(review.id, false)"
+                      <!-- Dislike Button -->
+                      <button
+                        @click="voteOnReview(review.id, false)"
+                        :class="[
+                          'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
+                          review.user_vote === false
+                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
+                        ]"
+                        :title="
+                          review.user_vote === false
+                            ? 'Remove dislike'
+                            : 'Dislike'
+                        "
+                      >
+                        <HandThumbDownIcon
                           :class="[
-                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors',
+                            'mr-1.5 h-4 w-4',
                             review.user_vote === false
-                              ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                              : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-800',
+                              ? 'text-red-600'
+                              : 'text-indigo-400',
                           ]"
-                          :title="
-                            review.user_vote === false
-                              ? 'Remove dislike'
-                              : 'Dislike'
-                          "
-                        >
-                          <span
-                            class="mr-1 emoji-with-fallback"
-                            aria-label="Dislike"
-                          >
-                            <span class="emoji-main">😈</span>
-                            <span class="emoji-fallback">Not a fan</span>
-                          </span>
-                          {{ review.dislike_count || 0 }}
-                        </button>
-                      </div>
-
-                      <div class="text-xs text-gray-500">
-                        on
-                        {{ new Date(review.created_at).toLocaleDateString() }}
-                      </div>
+                        />
+                        {{ review.dislike_count || 0 }}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -586,61 +592,65 @@
           <!-- Show user's review if they have written one -->
           <div
             v-if="isAuthenticated && !course.can_write_review && userReview"
-            class="space-y-4"
+            class="bg-indigo-50 overflow-hidden shadow rounded-lg ring-1 ring-indigo-200"
           >
-            <div class="flex items-center justify-between">
-              <h3 class="text-lg font-medium text-gray-900">Your Review</h3>
-              <button
-                @click="deleteReview"
-                class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
-              >
-                Delete Review
-              </button>
-            </div>
-
-            <!-- Review metadata -->
-            <div class="text-sm text-gray-600">
-              <span v-if="userReview.term">{{ userReview.term }}</span>
-              <span v-if="userReview.professor && userReview.term">
-                with {{ userReview.professor }}</span
-              >
-              <span v-else-if="userReview.professor">{{
-                userReview.professor
-              }}</span>
-            </div>
-
-            <!-- Review content with truncation -->
-            <div class="bg-white rounded-lg p-4 border border-gray-200">
-              <MdPreview
-                :model-value="truncatedUserReviewContent"
-                :sanitize="sanitize"
-                class="text-sm text-gray-700 markdown-content"
-              />
-
-              <!-- Expand/Collapse button for long reviews -->
-              <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
+            <div class="px-4 py-5 sm:px-6 bg-indigo-100">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-indigo-900">Your Review</h3>
                 <button
-                  @click="userReviewExpanded = !userReviewExpanded"
-                  class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                  @click="deleteReview"
+                  class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
                 >
-                  {{ userReviewExpanded ? "Show Less" : "Read More" }}
-                  <svg
-                    :class="[
-                      'ml-1 h-3 w-3 transition-transform',
-                      userReviewExpanded && 'rotate-180',
-                    ]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  Delete Review
                 </button>
+              </div>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <!-- Review metadata -->
+              <div class="text-sm text-indigo-700 font-medium mb-4">
+                <span v-if="userReview.term">{{ userReview.term }}</span>
+                <span v-if="userReview.professor && userReview.term">
+                  with {{ userReview.professor }}</span
+                >
+                <span v-else-if="userReview.professor">{{
+                  userReview.professor
+                }}</span>
+              </div>
+
+              <!-- Review content with truncation -->
+              <div class="bg-white rounded-2xl p-4 border border-indigo-200">
+                <MdPreview
+                  :model-value="truncatedUserReviewContent"
+                  :sanitize="sanitize"
+                  previewTheme="github"
+                  class="text-sm text-gray-700 markdown-content"
+                />
+
+                <!-- Expand/Collapse button for long reviews -->
+                <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
+                  <button
+                    @click="userReviewExpanded = !userReviewExpanded"
+                    class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                  >
+                    {{ userReviewExpanded ? "Show Less" : "Read More" }}
+                    <svg
+                      :class="[
+                        'ml-1 h-3 w-3 transition-transform',
+                        userReviewExpanded && 'rotate-180',
+                      ]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -684,6 +694,8 @@ import {
   LockClosedIcon,
   UsersIcon,
   InformationCircleIcon,
+  HandThumbUpIcon,
+  HandThumbDownIcon,
 } from "@heroicons/vue/24/outline";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
@@ -1016,39 +1028,5 @@ const deleteReview = async () => {
 </script>
 
 <style scoped>
-/* Restore list styling for markdown content */
-:deep(.markdown-content) ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ul ul,
-:deep(.markdown-content) ol ul {
-  list-style-type: circle;
-}
-
-:deep(.markdown-content) ul ol,
-:deep(.markdown-content) ol ol {
-  list-style-type: lower-alpha;
-}
-
-/* Simple emoji fallback */
-.emoji-fallback {
-  display: none;
-}
-
-/* Show text fallback on old browsers */
-@supports not (font-family: "Apple Color Emoji") {
-  .emoji-main {
-    display: none;
-  }
-  .emoji-fallback {
-    display: inline;
-  }
-}
+@import "./MarkdownContent.css";
 </style>

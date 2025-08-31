@@ -3,12 +3,16 @@
     <div v-if="loading" class="loading">Loading reviews...</div>
     <div v-else-if="error" class="error">Error: {{ error }}</div>
     <div v-else>
-      <h1>
+      <h1 class="text-xl font-medium leading-6 text-gray-900 mb-6">
         {{ reviewsFullCount }}
-        <router-link :to="`/course/${courseId}`">{{
-          courseShortName
-        }}</router-link>
-        review results for "<span class="query">{{ query }}</span
+        <router-link
+          :to="`/course/${courseId}`"
+          class="text-indigo-600 hover:text-indigo-800"
+          >{{ courseShortName }}</router-link
+        >
+        review results for "<span class="query font-medium text-indigo-700">{{
+          query
+        }}</span
         >"
       </h1>
 
@@ -37,47 +41,53 @@
       <table v-else class="table table-striped">
         <tbody>
           <tr v-for="review in reviews" :key="review.id">
-            <td class="highlight-review">
-              <b v-if="review.term">
-                {{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b
-                >:
-              </b>
-              <!-- Use MdPreview for displaying review comments in search results -->
-              <MdPreview
-                :model-value="review.comments"
-                :sanitize="sanitize"
-                class="markdown-content"
-              />
-
-              <!-- Review Vote Counts Display -->
-              <div class="review-votes mt-2">
-                <div class="flex items-center space-x-4">
-                  <!-- Kudos Count -->
-                  <div
-                    v-if="review.kudos_count > 0"
-                    class="inline-flex items-center text-sm text-green-600"
-                  >
-                    <span class="mr-1 emoji-with-fallback" aria-label="Kudos">
-                      <span class="emoji-main">🥰</span>
-                      <span class="emoji-fallback">Love</span>
-                    </span>
-                    {{ review.kudos_count }}
+            <td class="highlight-review p-0">
+              <div
+                class="bg-white overflow-hidden shadow rounded-lg ring-1 ring-indigo-100 mb-4"
+              >
+                <div class="px-4 py-5 sm:p-6">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                      <div
+                        v-if="review.term"
+                        class="text-sm font-medium text-indigo-800"
+                      >
+                        {{ review.term }}
+                        <span v-if="review.professor" class="text-indigo-600">
+                          with {{ review.professor }}</span
+                        >:
+                      </div>
+                    </div>
                   </div>
 
-                  <!-- Dislikes Count -->
-                  <div
-                    v-if="review.dislike_count > 0"
-                    class="inline-flex items-center text-sm text-red-600"
-                  >
-                    <span
-                      class="mr-1 emoji-with-fallback"
-                      aria-label="Dislikes"
+                  <!-- Use MdPreview for displaying review comments in search results -->
+                  <div class="mt-4">
+                    <MdPreview
+                      :model-value="review.comments"
+                      :sanitize="sanitize"
+                      class="text-sm text-indigo-700 markdown-content"
+                    />
+                  </div>
+
+                  <!-- Review Vote Counts Display -->
+                  <div class="mt-6 flex items-center space-x-4">
+                    <!-- Kudos Count -->
+                    <div
+                      v-if="review.kudos_count > 0"
+                      class="inline-flex items-center text-sm text-green-600"
                     >
-                      <span class="emoji-main">😈</span>
-                      <span class="emoji-fallback">Not a fan</span>
-                    </span>
-                    {{ review.dislike_count }}
+                      <HandThumbUpIcon class="mr-1.5 h-4 w-4" />
+                      {{ review.kudos_count }}
+                    </div>
+
+                    <!-- Dislikes Count -->
+                    <div
+                      v-if="review.dislike_count > 0"
+                      class="inline-flex items-center text-sm text-red-600"
+                    >
+                      <HandThumbDownIcon class="mr-1.5 h-4 w-4" />
+                      {{ review.dislike_count }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -103,6 +113,12 @@
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { MdPreview } from "md-editor-v3";
+import {
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  HandThumbUpIcon,
+  HandThumbDownIcon,
+} from "@heroicons/vue/24/outline";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
 
@@ -198,6 +214,7 @@ const checkAuthentication = async () => {
 </script>
 
 <style scoped>
+@import "./MarkdownContent.css";
 .course-review-search {
   width: 100%;
   max-width: 1200px;
@@ -260,41 +277,6 @@ th {
   border-radius: 0 4px 4px 0;
 }
 
-/* Restore list styling for markdown content */
-:deep(.markdown-content) ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ul ul,
-:deep(.markdown-content) ol ul {
-  list-style-type: circle;
-}
-
-:deep(.markdown-content) ul ol,
-:deep(.markdown-content) ol ol {
-  list-style-type: lower-alpha;
-}
-
-/* Simple emoji fallback */
-.emoji-fallback {
-  display: none;
-}
-
-/* Show text fallback on old browsers */
-@supports not (font-family: "Apple Color Emoji") {
-  .emoji-main {
-    display: none;
-  }
-  .emoji-fallback {
-    display: inline;
-  }
-}
 
 /* Review votes styling */
 .review-votes {
