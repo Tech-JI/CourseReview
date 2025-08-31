@@ -38,63 +38,17 @@
           Could not find any results. Please double-check your search query.
         </h3>
       </div>
-      <table v-else class="table table-striped">
-        <tbody>
-          <tr v-for="review in reviews" :key="review.id">
-            <td class="highlight-review p-0">
-              <div
-                class="bg-white overflow-hidden shadow rounded-lg ring-1 ring-indigo-100 mb-4"
-              >
-                <div class="px-4 py-5 sm:p-6">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                      <div
-                        v-if="review.term"
-                        class="text-sm font-medium text-indigo-800"
-                      >
-                        {{ review.term }}
-                        <span v-if="review.professor" class="text-indigo-600">
-                          with {{ review.professor }}</span
-                        >:
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Use MdPreview for displaying review comments in search results -->
-                  <div class="mt-4">
-                    <MdPreview
-                      :model-value="review.comments"
-                      :sanitize="sanitize"
-                      class="text-sm text-indigo-700 markdown-content"
-                    />
-                  </div>
-
-                  <!-- Review Vote Counts Display -->
-                  <div class="mt-6 flex items-center space-x-4">
-                    <!-- Kudos Count -->
-                    <div
-                      v-if="review.kudos_count > 0"
-                      class="inline-flex items-center text-sm text-green-600"
-                    >
-                      <HandThumbUpIcon class="mr-1.5 h-4 w-4" />
-                      {{ review.kudos_count }}
-                    </div>
-
-                    <!-- Dislikes Count -->
-                    <div
-                      v-if="review.dislike_count > 0"
-                      class="inline-flex items-center text-sm text-red-600"
-                    >
-                      <HandThumbDownIcon class="mr-1.5 h-4 w-4" />
-                      {{ review.dislike_count }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="space-y-6">
+        <ReviewCard
+          v-for="review in reviews"
+          :key="review.id"
+          :review="review"
+          :isAuthenticated="isAuthenticated"
+          :sanitize="sanitize"
+          :maxLines="3"
+          @reviewUpdated="updateReviewData"
+        />
+      </div>
 
       <div
         v-if="!isAuthenticated && remaining > 0"
@@ -121,6 +75,7 @@ import {
 } from "@heroicons/vue/24/outline";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
+import ReviewCard from "./ReviewCard.vue";
 
 const props = defineProps({
   courseId: {
@@ -211,10 +166,22 @@ const checkAuthentication = async () => {
     isAuthenticated.value = false;
   }
 };
+
+const updateReviewData = (updateData) => {
+  const reviewIndex = reviews.value.findIndex(
+    (r) => r.id === updateData.reviewId,
+  );
+  if (reviewIndex !== -1) {
+    reviews.value[reviewIndex].kudos_count = updateData.kudos_count;
+    reviews.value[reviewIndex].dislike_count = updateData.dislike_count;
+    reviews.value[reviewIndex].user_vote = updateData.user_vote;
+  }
+};
 </script>
 
 <style scoped>
-@import "./MarkdownContent.css";
+@import "../styles/MarkdownContent.css";
+
 .course-review-search {
   width: 100%;
   max-width: 1200px;
@@ -226,27 +193,6 @@ const checkAuthentication = async () => {
 .error {
   text-align: center;
   margin: 2em;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-tr:hover {
-  background-color: #f5f5f5;
-}
-
-th {
-  background-color: #f2f2f2;
-  font-weight: bold;
 }
 
 .alert-warning {
@@ -275,13 +221,5 @@ th {
   border-color: #ced4da;
   color: #343a40;
   border-radius: 0 4px 4px 0;
-}
-
-
-/* Review votes styling */
-.review-votes {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
 }
 </style>

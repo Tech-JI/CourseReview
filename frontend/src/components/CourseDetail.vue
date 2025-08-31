@@ -365,97 +365,15 @@
               Reviews ({{ course.review_count }})
             </h3>
             <div class="space-y-6">
-              <div
+              <ReviewCard
                 v-for="review in course.review_set"
                 :key="review.id"
-                class="bg-white overflow-hidden shadow rounded-2xl ring-1 ring-indigo-100"
-              >
-                <div class="px-4 py-5 sm:p-6">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                      <div
-                        v-if="review.term"
-                        class="text-sm font-medium text-indigo-800"
-                      >
-                        {{ review.term }}
-                        <span v-if="review.professor" class="text-indigo-600">
-                          with {{ review.professor }}</span
-                        >
-                      </div>
-                    </div>
-                    <div class="text-xs text-indigo-500">
-                      {{ new Date(review.created_at).toLocaleDateString() }}
-                    </div>
-                  </div>
-
-                  <!-- Use MdPreview for displaying review comments -->
-                  <div class="mt-4">
-                    <MdPreview
-                      :model-value="review.comments"
-                      :sanitize="sanitize"
-                      previewTheme="github"
-                      class="text-sm text-indigo-700 markdown-content"
-                    />
-                  </div>
-
-                  <!-- Review Voting Section -->
-                  <div class="mt-6 flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                      <!-- Kudos Button -->
-                      <button
-                        @click="voteOnReview(review.id, true)"
-                        :class="[
-                          'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
-                          review.user_vote === true
-                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
-                        ]"
-                        :title="
-                          review.user_vote === true
-                            ? 'Remove kudos'
-                            : 'Give kudos'
-                        "
-                      >
-                        <HandThumbUpIcon
-                          :class="[
-                            'mr-1.5 h-4 w-4',
-                            review.user_vote === true
-                              ? 'text-green-600'
-                              : 'text-indigo-400',
-                          ]"
-                        />
-                        {{ review.kudos_count || 0 }}
-                      </button>
-
-                      <!-- Dislike Button -->
-                      <button
-                        @click="voteOnReview(review.id, false)"
-                        :class="[
-                          'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
-                          review.user_vote === false
-                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
-                        ]"
-                        :title="
-                          review.user_vote === false
-                            ? 'Remove dislike'
-                            : 'Dislike'
-                        "
-                      >
-                        <HandThumbDownIcon
-                          :class="[
-                            'mr-1.5 h-4 w-4',
-                            review.user_vote === false
-                              ? 'text-red-600'
-                              : 'text-indigo-400',
-                          ]"
-                        />
-                        {{ review.dislike_count || 0 }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                :review="review"
+                :isAuthenticated="isAuthenticated"
+                :sanitize="sanitize"
+                :maxLines="5"
+                @reviewUpdated="updateReviewData"
+              />
             </div>
           </div>
         </div>
@@ -700,6 +618,7 @@ import {
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
+import ReviewCard from "./ReviewCard.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -893,6 +812,17 @@ const voteOnReview = async (reviewId, isKudos) => {
   }
 };
 
+const updateReviewData = (updateData) => {
+  const reviewIndex = course.value.review_set.findIndex(
+    (r) => r.id === updateData.reviewId,
+  );
+  if (reviewIndex !== -1) {
+    course.value.review_set[reviewIndex].kudos_count = updateData.kudos_count;
+    course.value.review_set[reviewIndex].dislike_count = updateData.dislike_count;
+    course.value.review_set[reviewIndex].user_vote = updateData.user_vote;
+  }
+};
+
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== "") {
@@ -1028,5 +958,5 @@ const deleteReview = async () => {
 </script>
 
 <style scoped>
-@import "./MarkdownContent.css";
+@import "../styles/MarkdownContent.css";
 </style>

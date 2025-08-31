@@ -391,7 +391,7 @@ def course_review_search_api(request, course_id):
     if not request.user.is_authenticated:
         reviews = reviews[: LIMITS["unauthenticated_review_search"]]
 
-    serializer = ReviewSerializer(reviews, many=True)
+    serializer = ReviewSerializer(reviews, many=True, context={"request": request})
 
     return Response(
         {
