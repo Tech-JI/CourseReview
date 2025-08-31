@@ -6,3 +6,4 @@ from .instructor import Instructor
 from .review import Review
 from .student import Student
 from .vote import Vote
+from .vote_for_review import ReviewVote

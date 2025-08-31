@@ -3,12 +3,16 @@
     <div v-if="loading" class="loading">Loading reviews...</div>
     <div v-else-if="error" class="error">Error: {{ error }}</div>
     <div v-else>
-      <h1>
+      <h1 class="text-xl font-medium leading-6 text-gray-900 mb-6">
         {{ reviewsFullCount }}
-        <router-link :to="`/course/${courseId}`">{{
-          courseShortName
-        }}</router-link>
-        review results for "<span class="query">{{ query }}</span
+        <router-link
+          :to="`/course/${courseId}`"
+          class="text-indigo-600 hover:text-indigo-800"
+          >{{ courseShortName }}</router-link
+        >
+        review results for "<span class="query font-medium text-indigo-700">{{
+          query
+        }}</span
         >"
       </h1>
 
@@ -34,25 +38,16 @@
           Could not find any results. Please double-check your search query.
         </h3>
       </div>
-      <table v-else class="table table-striped">
-        <tbody>
-          <tr v-for="review in reviews" :key="review.id">
-            <td class="highlight-review">
-              <b v-if="review.term">
-                {{ review.term }}
-                <b v-if="review.professor"> with {{ review.professor }}</b
-                >:
-              </b>
-              <!-- Use MdPreview for displaying review comments in search results -->
-              <MdPreview
-                :model-value="review.comments"
-                :sanitize="sanitize"
-                class="markdown-content"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else>
+        <ReviewPagination
+          :reviews="reviews"
+          :isAuthenticated="isAuthenticated"
+          :sanitize="sanitize"
+          :maxLines="3"
+          :pageSize="10"
+          @reviewUpdated="updateReviewData"
+        />
+      </div>
 
       <div
         v-if="!isAuthenticated && remaining > 0"
@@ -70,9 +65,9 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
+import ReviewPagination from "./ReviewPagination.vue";
 
 const props = defineProps({
   courseId: {
@@ -163,9 +158,22 @@ const checkAuthentication = async () => {
     isAuthenticated.value = false;
   }
 };
+
+const updateReviewData = (updateData) => {
+  const reviewIndex = reviews.value.findIndex(
+    (r) => r.id === updateData.reviewId,
+  );
+  if (reviewIndex !== -1) {
+    reviews.value[reviewIndex].kudos_count = updateData.kudos_count;
+    reviews.value[reviewIndex].dislike_count = updateData.dislike_count;
+    reviews.value[reviewIndex].user_vote = updateData.user_vote;
+  }
+};
 </script>
 
 <style scoped>
+@import "../styles/MarkdownContent.css";
+
 .course-review-search {
   width: 100%;
   max-width: 1200px;
@@ -177,27 +185,6 @@ const checkAuthentication = async () => {
 .error {
   text-align: center;
   margin: 2em;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-tr:hover {
-  background-color: #f5f5f5;
-}
-
-th {
-  background-color: #f2f2f2;
-  font-weight: bold;
 }
 
 .alert-warning {
@@ -226,26 +213,5 @@ th {
   border-color: #ced4da;
   color: #343a40;
   border-radius: 0 4px 4px 0;
-}
-
-/* Restore list styling for markdown content */
-:deep(.markdown-content) ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ul ul,
-:deep(.markdown-content) ol ul {
-  list-style-type: circle;
-}
-
-:deep(.markdown-content) ul ol,
-:deep(.markdown-content) ol ol {
-  list-style-type: lower-alpha;
 }
 </style>

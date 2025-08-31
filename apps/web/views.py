@@ -1,5 +1,6 @@
 import datetime
 import uuid
+import traceback
 
 import dateutil.parser
 from django.contrib.auth import authenticate, login, logout
@@ -36,6 +37,7 @@ from apps.web.models import (
     DistributiveRequirement,
     Instructor,
     Review,
+    ReviewVote,
     Student,
     Vote,
 )
@@ -317,6 +319,18 @@ def course_detail_api(request, course_id):
         return Response(form.errors, status=400)
 
 
+@api_view(["DELETE"])
+@permission_classes([AllowAny])
+def delete_review_api(request, course_id):
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+    course = Course.objects.get(id=course_id)
+    Review.objects.delete_reviews_for_user_course(user=request.user, course=course)
+    serializer = CourseSerializer(course, context={"request": request})
+    return Response(serializer.data, status=200)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def departments_api(request):
@@ -377,7 +391,7 @@ def course_review_search_api(request, course_id):
     if not request.user.is_authenticated:
         reviews = reviews[: LIMITS["unauthenticated_review_search"]]
 
-    serializer = ReviewSerializer(reviews, many=True)
+    serializer = ReviewSerializer(reviews, many=True, context={"request": request})
 
     return Response(
         {
@@ -497,3 +511,93 @@ def course_vote_api(request, course_id):
             "new_vote_count": new_vote_count,
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def review_vote_api(request, review_id):
+    """
+    API endpoint for voting on reviews (kudos/dislike).
+
+    URL: /api/review/{review_id}/vote/
+    POST data:
+    - is_kudos: boolean (True for kudos, False for dislike)
+
+    Returns:
+    - kudos_count: updated kudos count
+    - dislike_count: updated dislike count
+    - user_vote: user's current vote (True/False/None)
+    """
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+
+    try:
+        is_kudos = request.data.get("is_kudos")
+
+        if is_kudos is None:
+            return Response({"detail": "is_kudos field is required"}, status=400)
+
+        is_kudos = bool(is_kudos)
+
+        # Use the ReviewVoteManager's vote method
+        kudos_count, dislike_count, user_vote = ReviewVote.objects.vote(
+            review_id=review_id, user=request.user, is_kudos=is_kudos
+        )
+
+        if kudos_count is None or dislike_count is None:
+            # Review doesn't exist
+            return Response({"detail": "Review not found"}, status=404)
+
+        return Response(
+            {
+                "kudos_count": kudos_count,
+                "dislike_count": dislike_count,
+                "user_vote": user_vote,
+            }
+        )
+
+    except Exception:
+        return Response(
+            {"detail": "An error occurred processing your request"},
+            status=500,
+        )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_user_review_api(request, course_id):
+    """
+    API endpoint to get the authenticated user's review for a specific course.
+
+    Returns:
+    - Review data if the user has written a review for this course
+    - 404 if no review found
+    - 403 if user is not authenticated
+    """
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+
+    try:
+        # Get the course
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found"}, status=404)
+
+        # Get the user's review for this course
+        review = Review.objects.get_user_review_for_course(request.user, course)
+
+        if review is None:
+            return Response(
+                {"detail": "No user review found for this course"}, status=404
+            )
+
+        # Serialize and return the review
+        serializer = ReviewSerializer(review)
+        return Response(serializer.data)
+
+    except Exception:
+        return Response(
+            {"detail": "An error occurred processing your request"},
+            status=500,
+        )
