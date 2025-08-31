@@ -7,6 +7,7 @@ from .models import (
     DistributiveRequirement,
     Instructor,
     Review,
+    ReviewVote,
     Student,
     Vote,
 )
@@ -17,5 +18,6 @@ admin.site.register(DistributiveRequirement)
 admin.site.register(Instructor)
 admin.site.register(CourseMedian)
 admin.site.register(Review)
+admin.site.register(ReviewVote)
 admin.site.register(Vote)
 admin.site.register(Student)
