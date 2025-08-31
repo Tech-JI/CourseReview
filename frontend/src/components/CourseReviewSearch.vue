@@ -38,14 +38,13 @@
           Could not find any results. Please double-check your search query.
         </h3>
       </div>
-      <div v-else class="space-y-6">
-        <ReviewCard
-          v-for="review in reviews"
-          :key="review.id"
-          :review="review"
+      <div v-else>
+        <ReviewPagination
+          :reviews="reviews"
           :isAuthenticated="isAuthenticated"
           :sanitize="sanitize"
           :maxLines="3"
+          :pageSize="10"
           @reviewUpdated="updateReviewData"
         />
       </div>
@@ -76,6 +75,7 @@ import {
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
 import ReviewCard from "./ReviewCard.vue";
+import ReviewPagination from "./ReviewPagination.vue";
 
 const props = defineProps({
   courseId: {

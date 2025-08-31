@@ -364,17 +364,14 @@
             <h3 class="text-lg font-medium leading-6 text-gray-900 mb-6">
               Reviews ({{ course.review_count }})
             </h3>
-            <div class="space-y-6">
-              <ReviewCard
-                v-for="review in course.review_set"
-                :key="review.id"
-                :review="review"
-                :isAuthenticated="isAuthenticated"
-                :sanitize="sanitize"
-                :maxLines="5"
-                @reviewUpdated="updateReviewData"
-              />
-            </div>
+            <ReviewPagination
+              :reviews="course.review_set"
+              :isAuthenticated="isAuthenticated"
+              :sanitize="sanitize"
+              :maxLines="5"
+              :pageSize="10"
+              @reviewUpdated="updateReviewData"
+            />
           </div>
         </div>
       </div>
@@ -619,6 +616,7 @@ import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
 import ReviewCard from "./ReviewCard.vue";
+import ReviewPagination from "./ReviewPagination.vue";
 
 const route = useRoute();
 const router = useRouter();
