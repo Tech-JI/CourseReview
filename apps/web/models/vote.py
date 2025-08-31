@@ -24,11 +24,7 @@ class VoteManager(models.Manager):
             elif category == Vote.CATEGORIES.DIFFICULTY:
                 course.difficulty_score -= vote.value
 
-        is_unvote = False
-        if not created and vote.value == value:
-            is_unvote = True
-        else:
-            is_unvote = False
+        is_unvote = not created and vote.value == value
 
         if is_unvote:
             vote.delete()
