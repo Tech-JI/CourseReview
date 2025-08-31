@@ -11,6 +11,19 @@ class ReviewManager(models.Manager):
     def num_reviews_for_user(self, user):
         return self.filter(user=user).count()
 
+    def delete_reviews_for_user_course(self, user, course):
+        self.filter(course=course, user=user).delete()
+
+    def get_user_review_for_course(self, user, course):
+        """
+        Get the review written by a user for a specific course.
+        Returns the Review object if found, None otherwise.
+        """
+        try:
+            return self.get(user=user, course=course)
+        except self.model.DoesNotExist:
+            return None
+
 
 class Review(models.Model):
     objects = ReviewManager()
@@ -39,6 +52,10 @@ class Review(models.Model):
     )
     difficulty_sentiment = models.FloatField(default=None, null=True, blank=True)
     quality_sentiment = models.FloatField(default=None, null=True, blank=True)
+
+    # Kudos and dislike counts
+    kudos_count = models.PositiveIntegerField(default=0, db_index=True)
+    dislike_count = models.PositiveIntegerField(default=0, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
