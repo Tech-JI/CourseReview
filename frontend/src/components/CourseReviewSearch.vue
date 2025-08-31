@@ -65,16 +65,8 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { MdPreview } from "md-editor-v3";
-import {
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  HandThumbUpIcon,
-  HandThumbDownIcon,
-} from "@heroicons/vue/24/outline";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
-import ReviewCard from "./ReviewCard.vue";
 import ReviewPagination from "./ReviewPagination.vue";
 
 const props = defineProps({

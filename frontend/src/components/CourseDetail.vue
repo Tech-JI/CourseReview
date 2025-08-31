@@ -481,6 +481,7 @@
                     'preview',
                     'htmlPreview',
                   ]"
+                  previewTheme="github"
                   aria-labelledby="review-comments-label"
                   role="textbox"
                   tabindex="0"
@@ -615,7 +616,6 @@ import {
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
-import ReviewCard from "./ReviewCard.vue";
 import ReviewPagination from "./ReviewPagination.vue";
 
 const route = useRoute();
@@ -816,7 +816,8 @@ const updateReviewData = (updateData) => {
   );
   if (reviewIndex !== -1) {
     course.value.review_set[reviewIndex].kudos_count = updateData.kudos_count;
-    course.value.review_set[reviewIndex].dislike_count = updateData.dislike_count;
+    course.value.review_set[reviewIndex].dislike_count =
+      updateData.dislike_count;
     course.value.review_set[reviewIndex].user_vote = updateData.user_vote;
   }
 };

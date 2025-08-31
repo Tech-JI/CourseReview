@@ -1,12 +1,11 @@
 <template>
-  <div class="bg-white overflow-hidden shadow rounded-2xl ring-1 ring-indigo-100">
+  <div
+    class="bg-white overflow-hidden shadow rounded-2xl ring-1 ring-indigo-100"
+  >
     <div class="px-4 py-5 sm:p-6">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div
-            v-if="review.term"
-            class="text-sm font-medium text-indigo-800"
-          >
+          <div v-if="review.term" class="text-sm font-medium text-indigo-800">
             {{ review.term }}
             <span v-if="review.professor" class="text-indigo-600">
               with {{ review.professor }}</span
@@ -56,7 +55,10 @@
       </div>
 
       <!-- Review Voting Section -->
-      <div v-if="isAuthenticated" class="mt-6 flex items-center justify-between">
+      <div
+        v-if="isAuthenticated"
+        class="mt-6 flex items-center justify-between"
+      >
         <div class="flex items-center space-x-4">
           <!-- Kudos Button -->
           <button
@@ -67,11 +69,7 @@
                 ? 'bg-green-100 text-green-800 hover:bg-green-200'
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
             ]"
-            :title="
-              review.user_vote === true
-                ? 'Remove kudos'
-                : 'Give kudos'
-            "
+            :title="review.user_vote === true ? 'Remove kudos' : 'Give kudos'"
           >
             <HandThumbUpIcon
               :class="[
@@ -93,18 +91,12 @@
                 ? 'bg-red-100 text-red-800 hover:bg-red-200'
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
             ]"
-            :title="
-              review.user_vote === false
-                ? 'Remove dislike'
-                : 'Dislike'
-            "
+            :title="review.user_vote === false ? 'Remove dislike' : 'Dislike'"
           >
             <HandThumbDownIcon
               :class="[
                 'mr-1.5 h-4 w-4',
-                review.user_vote === false
-                  ? 'text-red-600'
-                  : 'text-indigo-400',
+                review.user_vote === false ? 'text-red-600' : 'text-indigo-400',
               ]"
             />
             {{ review.dislike_count || 0 }}
@@ -139,10 +131,7 @@
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { MdPreview } from "md-editor-v3";
-import {
-  HandThumbUpIcon,
-  HandThumbDownIcon,
-} from "@heroicons/vue/24/outline";
+import { HandThumbUpIcon, HandThumbDownIcon } from "@heroicons/vue/24/outline";
 import "md-editor-v3/lib/style.css";
 
 const props = defineProps({
@@ -164,7 +153,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['reviewUpdated']);
+const emit = defineEmits(["reviewUpdated"]);
 
 const router = useRouter();
 const expanded = ref(false);
@@ -211,7 +200,7 @@ const handleVote = async (reviewId, isKudos) => {
     const data = await response.json();
 
     // Emit event to parent so it can update the review data
-    emit('reviewUpdated', {
+    emit("reviewUpdated", {
       reviewId,
       kudos_count: data.kudos_count,
       dislike_count: data.dislike_count,
