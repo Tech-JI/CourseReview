@@ -71,6 +71,21 @@ urlpatterns = [
         name="course_vote_api",
     ),
     re_path(
+        r"^api/course/(?P<course_id>[0-9]+)/review/$",
+        views.delete_review_api,
+        name="delete_review_api",
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9]+)/my-review/$",
+        views.get_user_review_api,
+        name="get_user_review_api",
+    ),
+    re_path(
+        r"^api/review/(?P<review_id>[0-9]+)/vote/$",
+        views.review_vote_api,
+        name="review_vote_api",
+    ),
+    re_path(
         r"^api/departments/$",
         views.departments_api,
         name="departments_api",

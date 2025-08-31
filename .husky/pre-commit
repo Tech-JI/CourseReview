@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+make format
+git add --update
+echo "formatted."

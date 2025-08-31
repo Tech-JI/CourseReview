@@ -364,33 +364,14 @@
             <h3 class="text-lg font-medium leading-6 text-gray-900 mb-6">
               Reviews ({{ course.review_count }})
             </h3>
-            <div class="space-y-4">
-              <div
-                v-for="review in course.review_set"
-                :key="review.id"
-                class="border-l-4 border-indigo-400 bg-indigo-50 p-4"
-              >
-                <div class="flex">
-                  <div class="ml-3">
-                    <div
-                      v-if="review.term"
-                      class="text-sm font-medium text-indigo-800"
-                    >
-                      {{ review.term }}
-                      <span v-if="review.professor">
-                        with {{ review.professor }}</span
-                      >
-                    </div>
-                    <!-- Use MdPreview for displaying review comments -->
-                    <MdPreview
-                      :model-value="review.comments"
-                      :sanitize="sanitize"
-                      class="mt-2 text-sm text-indigo-700 markdown-content"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ReviewPagination
+              :reviews="course.review_set"
+              :isAuthenticated="isAuthenticated"
+              :sanitize="sanitize"
+              :maxLines="5"
+              :pageSize="10"
+              @reviewUpdated="updateReviewData"
+            />
           </div>
         </div>
       </div>
@@ -408,7 +389,7 @@
               </h3>
               <div class="mt-2 text-sm text-blue-700">
                 <router-link
-                  to="/accounts/signup/"
+                  to="/accounts/login/"
                   class="font-medium underline hover:text-blue-600"
                 >
                   Sign up
@@ -500,6 +481,7 @@
                     'preview',
                     'htmlPreview',
                   ]"
+                  previewTheme="github"
                   aria-labelledby="review-comments-label"
                   role="textbox"
                   tabindex="0"
@@ -520,14 +502,81 @@
         </div>
       </div>
 
-      <!-- Review Status Message -->
+      <!-- Review Status Message / User's Review Display -->
       <div v-else class="mb-8">
         <div class="rounded-md bg-gray-50 p-4">
-          <div class="text-center">
-            <p v-if="isAuthenticated" class="text-sm text-gray-600">
+          <!-- Show user's review if they have written one -->
+          <div
+            v-if="isAuthenticated && !course.can_write_review && userReview"
+            class="bg-indigo-50 overflow-hidden shadow rounded-lg ring-1 ring-indigo-200"
+          >
+            <div class="px-4 py-5 sm:px-6 bg-indigo-100">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-indigo-900">Your Review</h3>
+                <button
+                  @click="deleteReview"
+                  class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                >
+                  Delete Review
+                </button>
+              </div>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <!-- Review metadata -->
+              <div class="text-sm text-indigo-700 font-medium mb-4">
+                <span v-if="userReview.term">{{ userReview.term }}</span>
+                <span v-if="userReview.professor && userReview.term">
+                  with {{ userReview.professor }}</span
+                >
+                <span v-else-if="userReview.professor">{{
+                  userReview.professor
+                }}</span>
+              </div>
+
+              <!-- Review content with truncation -->
+              <div class="bg-white rounded-2xl p-4 border border-indigo-200">
+                <MdPreview
+                  :model-value="truncatedUserReviewContent"
+                  :sanitize="sanitize"
+                  previewTheme="github"
+                  class="text-sm text-gray-700 markdown-content"
+                />
+
+                <!-- Expand/Collapse button for long reviews -->
+                <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
+                  <button
+                    @click="userReviewExpanded = !userReviewExpanded"
+                    class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                  >
+                    {{ userReviewExpanded ? "Show Less" : "Read More" }}
+                    <svg
+                      :class="[
+                        'ml-1 h-3 w-3 transition-transform',
+                        userReviewExpanded && 'rotate-180',
+                      ]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fallback messages for users without reviews -->
+          <div v-else class="text-center flex items-center justify-between">
+            <p v-if="isAuthenticated" class="text-sm text-gray-600 flex-1">
               Thanks for writing a review of this course!
             </p>
-            <p v-else class="text-sm text-gray-600">
+            <p v-else class="text-sm text-gray-600 flex-1">
               <router-link
                 to="/accounts/login/"
                 class="font-medium text-indigo-600 hover:text-indigo-500"
@@ -536,6 +585,13 @@
               </router-link>
               to write a review.
             </p>
+            <button
+              v-if="isAuthenticated && !course.can_write_review && !userReview"
+              @click="deleteReview"
+              class="ml-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+            >
+              Delete Review
+            </button>
           </div>
         </div>
       </div>
@@ -554,10 +610,13 @@ import {
   LockClosedIcon,
   UsersIcon,
   InformationCircleIcon,
+  HandThumbUpIcon,
+  HandThumbDownIcon,
 } from "@heroicons/vue/24/outline";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
+import ReviewPagination from "./ReviewPagination.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -566,6 +625,8 @@ const loading = ref(true);
 const error = ref(null);
 const currentTerm = "25S";
 const isAuthenticated = ref(false);
+const userReview = ref(null);
+const userReviewExpanded = ref(false);
 const newReview = ref({
   term: "",
   professor: "",
@@ -576,11 +637,34 @@ const courseId = computed(() => {
   return route.params.course_id;
 });
 
+const truncatedUserReviewContent = computed(() => {
+  if (!userReview.value?.comments) return "";
+
+  const content = userReview.value.comments;
+  const lines = content.split("\n");
+  const maxLines = 5;
+
+  if (userReviewExpanded.value || lines.length <= maxLines) {
+    return content;
+  }
+
+  return lines.slice(0, maxLines).join("\n") + "\n\n...";
+});
+
+const reviewNeedsTruncation = computed(() => {
+  return userReview.value?.comments?.split("\n").length > 5;
+});
+
 onMounted(async () => {
   if (courseId.value) {
     await fetchCourse();
   }
-  checkAuthentication();
+  await checkAuthentication();
+
+  // Always fetch user review after authentication check
+  if (isAuthenticated.value) {
+    await fetchUserReview();
+  }
 });
 
 const fetchCourse = async () => {
@@ -611,6 +695,25 @@ const checkAuthentication = async () => {
   } catch (e) {
     console.error("Error checking authentication:", e);
     isAuthenticated.value = false;
+  }
+};
+const fetchUserReview = async () => {
+  if (!isAuthenticated.value || !courseId.value) return;
+
+  try {
+    const response = await fetch(`/api/course/${courseId.value}/my-review/`);
+    if (response.ok) {
+      const data = await response.json();
+      // Handle case where API might return a list - take first one
+      userReview.value = Array.isArray(data) ? data[0] : data;
+    } else if (response.status === 404) {
+      // User hasn't written a review yet - this is expected
+      userReview.value = null;
+    } else {
+      console.error("Error fetching user review:", response.status);
+    }
+  } catch (e) {
+    console.error("Error fetching user review:", e);
   }
 };
 
@@ -665,6 +768,57 @@ const vote = async (value, forLayup) => {
     // Update new_vote_count if present in response
   } catch (e) {
     console.error("Error voting:", e);
+  }
+};
+
+const voteOnReview = async (reviewId, isKudos) => {
+  if (!isAuthenticated.value) {
+    if (confirm("Please login to vote on reviews!")) {
+      router.push("/accounts/login");
+    }
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/review/${reviewId}/vote/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: JSON.stringify({ is_kudos: isKudos }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Update the review in the course data
+    const reviewIndex = course.value.review_set.findIndex(
+      (r) => r.id === reviewId,
+    );
+    if (reviewIndex !== -1) {
+      course.value.review_set[reviewIndex].kudos_count = data.kudos_count;
+      course.value.review_set[reviewIndex].dislike_count = data.dislike_count;
+      course.value.review_set[reviewIndex].user_vote = data.user_vote;
+    }
+  } catch (e) {
+    console.error("Error voting on review:", e);
+    alert("Error voting on review. Please try again.");
+  }
+};
+
+const updateReviewData = (updateData) => {
+  const reviewIndex = course.value.review_set.findIndex(
+    (r) => r.id === updateData.reviewId,
+  );
+  if (reviewIndex !== -1) {
+    course.value.review_set[reviewIndex].kudos_count = updateData.kudos_count;
+    course.value.review_set[reviewIndex].dislike_count =
+      updateData.dislike_count;
+    course.value.review_set[reviewIndex].user_vote = updateData.user_vote;
   }
 };
 
@@ -749,6 +903,10 @@ const submitReview = async () => {
     }
     course.value = await response.json();
     newReview.value = { term: "", professor: "", comments: "" };
+
+    // Refresh user review after successful submission
+    await fetchUserReview();
+
     alert("Review submitted successfully!");
   } catch (error) {
     console.error("Error submitting review:", error);
@@ -756,27 +914,48 @@ const submitReview = async () => {
     alert(`Error submitting review:\n${error.message}`);
   }
 };
+
+const deleteReview = async () => {
+  if (!isAuthenticated.value) {
+    alert("You must be logged in to delete a review.");
+    return;
+  }
+
+  if (
+    !confirm("Are you sure you want to delete your review for this course?")
+  ) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/course/${courseId.value}/review/`, {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`,
+      );
+    }
+
+    // Refresh the course data to reflect the deletion
+    course.value = await response.json();
+
+    // Clear user review after successful deletion
+    userReview.value = null;
+
+    alert("Review deleted successfully!");
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    alert(`Error deleting review: ${error.message}`);
+  }
+};
 </script>
 
 <style scoped>
-/* Restore list styling for markdown content */
-:deep(.markdown-content) ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ul ul,
-:deep(.markdown-content) ol ul {
-  list-style-type: circle;
-}
-
-:deep(.markdown-content) ul ol,
-:deep(.markdown-content) ol ol {
-  list-style-type: lower-alpha;
-}
+@import "../styles/MarkdownContent.css";
 </style>
