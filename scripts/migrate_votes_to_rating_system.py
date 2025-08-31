@@ -9,8 +9,9 @@ import sys
 
 import django
 
-# Add the project directory to the path
-sys.path.insert(0, "/home/nuoxi/CourseReview")
+# Add the project directory to the path dynamically
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.insert(0, project_root)
 
 # Set Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
