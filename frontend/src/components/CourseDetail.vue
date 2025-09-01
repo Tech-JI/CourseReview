@@ -482,8 +482,6 @@
                     'htmlPreview',
                   ]"
                   previewTheme="github"
-                  aria-labelledby="review-comments-label"
-                  role="textbox"
                   tabindex="0"
                   style="height: 300px"
                   class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 markdown-content"
@@ -661,8 +659,9 @@ onMounted(async () => {
   }
   await checkAuthentication();
 
-  // Always fetch user review after authentication check
-  if (isAuthenticated.value) {
+  // Only fetch user review if authenticated and they are NOT able to write a review
+  // (can_write_review === false means they already have a review)
+  if (isAuthenticated.value && course.value && !course.value.can_write_review) {
     await fetchUserReview();
   }
 });
