@@ -38,8 +38,7 @@ format: format-backend format-frontend
 
 format-backend:
 	@echo "Formatting backend (Python) code with isort and black..."
-	uvx isort .
-	uvx black .
+	uvx ruff format
 
 format-frontend:
 	@echo "Formatting frontend code with prettier..."

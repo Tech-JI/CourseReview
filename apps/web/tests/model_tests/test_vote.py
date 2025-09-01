@@ -13,13 +13,13 @@ class VoteTestCase(TestCase):
         c = gv.course
         u = gv.user
 
-        # doesn't work if value > 1
+        # doesn't work if value > 5
         self.assertEqual(
             (
                 None,
                 False,
             ),
-            Vote.objects.vote(5, c.id, Vote.CATEGORIES.DIFFICULTY, u),
+            Vote.objects.vote(6, c.id, Vote.CATEGORIES.DIFFICULTY, u),
         )
 
         self.assertEqual(gv.value, 0)
@@ -27,44 +27,44 @@ class VoteTestCase(TestCase):
         self.assertEqual(c.difficulty_score, 0)
         self.assertEqual(c.quality_score, 0)
 
-        # can upvote and downvote
+        # can rate 1-5
         self.assertEqual(
             (
-                1,
+                5.0,
                 False,
             ),
-            Vote.objects.vote(1, c.id, Vote.CATEGORIES.QUALITY, u.id),
+            Vote.objects.vote(5, c.id, Vote.CATEGORIES.QUALITY, u.id),
         )
         self.assertEqual(
             (
-                -1,
+                2.0,
                 False,
             ),
-            Vote.objects.vote(-1, c.id, Vote.CATEGORIES.DIFFICULTY, u.id),
+            Vote.objects.vote(2, c.id, Vote.CATEGORIES.DIFFICULTY, u.id),
         )
 
         gv.refresh_from_db()
         lv.refresh_from_db()
         c.refresh_from_db()
-        self.assertEqual(gv.value, 1)
-        self.assertEqual(lv.value, -1)
-        self.assertEqual(c.quality_score, 1)
-        self.assertEqual(c.difficulty_score, -1)
+        self.assertEqual(gv.value, 5)
+        self.assertEqual(lv.value, 2)
+        self.assertEqual(c.quality_score, 5.0)
+        self.assertEqual(c.difficulty_score, 2.0)
 
         # can unvote
         self.assertEqual(
             (
-                0,
+                0.0,
                 True,
             ),
-            Vote.objects.vote(1, c.id, Vote.CATEGORIES.QUALITY, u.id),
+            Vote.objects.vote(5, c.id, Vote.CATEGORIES.QUALITY, u.id),
         )
         self.assertEqual(
             (
-                0,
+                0.0,
                 True,
             ),
-            Vote.objects.vote(-1, c.id, Vote.CATEGORIES.DIFFICULTY, u.id),
+            Vote.objects.vote(2, c.id, Vote.CATEGORIES.DIFFICULTY, u.id),
         )
 
         gv.refresh_from_db()
@@ -72,8 +72,8 @@ class VoteTestCase(TestCase):
         c.refresh_from_db()
         self.assertEqual(gv.value, 0)
         self.assertEqual(lv.value, 0)
-        self.assertEqual(c.quality_score, 0)
-        self.assertEqual(c.difficulty_score, 0)
+        self.assertEqual(c.quality_score, 0.0)
+        self.assertEqual(c.difficulty_score, 0.0)
 
     def test_group_courses_with_votes(self):
         factories.CourseFactory()

@@ -65,7 +65,26 @@ urlpatterns = [
         views.course_professors,
         name="course_professors",
     ),
-    re_path(r"^api/course/(?P<course_id>[0-9].*)/vote", views.vote, name="vote"),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9].*)/vote",
+        views.course_vote_api,
+        name="course_vote_api",
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9]+)/review/$",
+        views.delete_review_api,
+        name="delete_review_api",
+    ),
+    re_path(
+        r"^api/course/(?P<course_id>[0-9]+)/my-review/$",
+        views.get_user_review_api,
+        name="get_user_review_api",
+    ),
+    re_path(
+        r"^api/review/(?P<review_id>[0-9]+)/vote/$",
+        views.review_vote_api,
+        name="review_vote_api",
+    ),
     re_path(
         r"^api/departments/$",
         views.departments_api,
@@ -81,7 +100,7 @@ urlpatterns = [
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
     # authentication
     re_path(r"^accounts/signup$", views.signup, name="signup"),
-    re_path(r"^accounts/logout$", views.auth_logout, name="auth_logout"),
+    re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
     re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
     re_path(

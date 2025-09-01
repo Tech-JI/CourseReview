@@ -10,6 +10,7 @@ from apps.web.models import (
     Instructor,
     Review,
     Vote,
+    ReviewVote,
 )
 from lib import constants
 
@@ -29,13 +30,37 @@ class CourseOfferingSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()  # Display username
+    #    user = serializers.StringRelatedField()  # Display username
     term = serializers.CharField()
     professor = serializers.CharField()
+    user_vote = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
-        fields = ("id", "user", "term", "professor", "comments", "created_at")
+        fields = (
+            "id",
+            # don't return the author of this review
+            #            "user",
+            "term",
+            "professor",
+            "comments",
+            "kudos_count",
+            "dislike_count",
+            "created_at",
+            "user_vote",
+        )
+
+    def get_user_vote(self, obj):
+        """Get the current user's vote for this review"""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+
+        try:
+            vote = ReviewVote.objects.get(review=obj, user=request.user)
+            return vote.is_kudos  # True for kudos, False for dislike
+        except ReviewVote.DoesNotExist:
+            return None
 
 
 class DepartmentSerializer(serializers.Serializer):
@@ -120,6 +145,8 @@ class CourseSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
     course_topics = serializers.SerializerMethodField()
+    quality_vote_count = serializers.SerializerMethodField()
+    difficulty_vote_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -137,6 +164,8 @@ class CourseSerializer(serializers.ModelSerializer):
             "courseoffering_set",
             "difficulty_score",
             "quality_score",
+            "quality_vote_count",
+            "difficulty_vote_count",
             "last_offered",
             "professors_and_review_count",
             "difficulty_vote",
@@ -156,13 +185,17 @@ class CourseSerializer(serializers.ModelSerializer):
             ret.pop("difficulty_score", None)
             ret.pop("difficulty_vote", None)
             ret.pop("quality_vote", None)
+            ret.pop("quality_vote_count", None)
+            ret.pop("difficulty_vote_count", None)
 
         return ret
 
     def get_review_set(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            return ReviewSerializer(obj.review_set.all(), many=True).data
+            return ReviewSerializer(
+                obj.review_set.all(), many=True, context=self.context
+            ).data
         return []
 
     def get_review_count(self, obj):
@@ -200,25 +233,23 @@ class CourseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             vote, _ = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+            if vote and vote.value > 0:
+                return {"value": vote.value}
         return None
 
     def get_quality_vote(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             _, vote = Vote.objects.for_course_and_user(obj, request.user)
-            if vote:
-                return {
-                    "value": vote.value,
-                    "is_upvote": vote.is_upvote(),
-                    "is_downvote": vote.is_downvote(),
-                }
+            if vote and vote.value > 0:
+                return {"value": vote.value}
         return None
+
+    def get_quality_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "quality")
+
+    def get_difficulty_vote_count(self, obj):
+        return Vote.objects.get_vote_count(obj, "difficulty")
 
     def get_can_write_review(self, obj):
         request = self.context.get("request")

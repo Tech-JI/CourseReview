@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: format-and-add
+        name: Format code and stage changes
+        entry: uv run scripts/pre-commit-format.py
+        language: system
+        pass_filenames: false
+        always_run: true
