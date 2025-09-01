@@ -18,6 +18,8 @@ Environment:
 
 4. `uv sync`
 
+5. `uv run pre-commit install` (for installing git hook in .git)
+
 5. Make directory for builds of static files: `mkdir staticfiles`
 
 6. Create .env file for storing secrets. The contents should be like:
