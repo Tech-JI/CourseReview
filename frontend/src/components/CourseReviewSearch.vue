@@ -26,20 +26,27 @@
         >"
       </h1>
 
-      <form @submit.prevent="performSearch" class="course-review-search">
-        <div class="form-group">
-          <div class="input-group">
+      <form @submit.prevent="performSearch" class="mb-6">
+        <div class="flex max-w-md mx-auto">
+          <div class="grid grid-cols-1 grow">
             <input
               name="q"
-              type="text"
-              class="form-control"
-              placeholder="Review search..."
+              type="search"
+              class="col-start-1 row-start-1 block w-full rounded-l-md bg-white py-2 pr-3 pl-10 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+              placeholder="Search reviews..."
               v-model="searchQuery"
             />
-            <span class="input-group-btn">
-              <button type="submit" class="btn btn-default">Search</button>
-            </span>
+            <MagnifyingGlassIcon
+              class="pointer-events-none col-start-1 row-start-1 ml-3 size-5 self-center text-gray-400"
+              aria-hidden="true"
+            />
           </div>
+          <button
+            type="submit"
+            class="flex shrink-0 items-center rounded-r-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600"
+          >
+            Search
+          </button>
         </div>
       </form>
 
@@ -65,6 +72,7 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
 import "md-editor-v3/lib/style.css";
 import DOMPurify from "dompurify";
 import ReviewPagination from "./ReviewPagination.vue";
@@ -145,10 +153,9 @@ const performSearch = () => {
 watch(
   () => route.query.q,
   (newQuery) => {
-    if (newQuery !== searchQuery.value) {
-      searchQuery.value = newQuery || "";
-      fetchReviews();
-    }
+    // Always update searchQuery and fetch when route changes
+    searchQuery.value = newQuery || "";
+    fetchReviews();
   },
   { immediate: true },
 );

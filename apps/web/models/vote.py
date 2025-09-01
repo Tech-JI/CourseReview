@@ -31,11 +31,6 @@ class VoteManager(models.Manager):
         else:
             vote.value = value
             vote.save()
-            # add the new value of the vote
-            if category == Vote.CATEGORIES.QUALITY:
-                course.quality_score += vote.value
-            elif category == Vote.CATEGORIES.DIFFICULTY:
-                course.difficulty_score += vote.value
 
         new_score = self._calculate_average_score(course, category)
         if category == Vote.CATEGORIES.QUALITY:
