@@ -1,7 +1,17 @@
 <template>
   <div class="course-review-search">
     <div v-if="loading" class="loading">Loading reviews...</div>
-    <div v-else-if="error" class="error">Error: {{ error }}</div>
+    <div v-else-if="error" class="error">
+      <p>{{ error }}</p>
+      <div v-if="!isAuthenticated" class="mt-4">
+        <router-link
+          to="/accounts/login/"
+          class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        >
+          Log In to Search Reviews
+        </router-link>
+      </div>
+    </div>
     <div v-else>
       <h1 class="text-xl font-medium leading-6 text-gray-900 mb-6">
         {{ reviewsFullCount }}
@@ -48,16 +58,6 @@
           @reviewUpdated="updateReviewData"
         />
       </div>
-
-      <div
-        v-if="!isAuthenticated && remaining > 0"
-        class="col-md-12 text-center"
-      >
-        <h3>
-          Please <router-link to="/accounts/login/">login</router-link> to see
-          the remaining {{ remaining }} reviews for this search.
-        </h3>
-      </div>
     </div>
   </div>
 </template>
@@ -102,12 +102,27 @@ const isAuthenticated = ref(false);
 const fetchReviews = async () => {
   loading.value = true;
   error.value = null;
+
+  // Check authentication before fetching reviews
+  if (!isAuthenticated.value) {
+    error.value = "Please log in to search reviews.";
+    loading.value = false;
+    return;
+  }
+
   try {
     const response = await fetch(
       `/api/course/${props.courseId}/review_search/?q=${encodeURIComponent(searchQuery.value)}`,
     );
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.status === 401 || response.status === 403) {
+        error.value =
+          "Authentication required. Please log in to search reviews.";
+        isAuthenticated.value = false;
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return;
     }
     const data = await response.json();
     reviews.value = data.reviews;
@@ -138,10 +153,18 @@ watch(
   { immediate: true },
 );
 
+// Watch for authentication status changes
+watch(isAuthenticated, (newAuth) => {
+  if (newAuth) {
+    // User just logged in, fetch reviews
+    fetchReviews();
+  }
+});
+
 onMounted(async () => {
   searchQuery.value = route.query.q || "";
-  await fetchReviews();
   await checkAuthentication();
+  await fetchReviews();
 });
 
 const checkAuthentication = async () => {

@@ -22,7 +22,7 @@ from rest_framework.decorators import (
     authentication_classes,
     permission_classes,
 )
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 
@@ -377,7 +377,7 @@ def course_search_api(request):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def course_review_search_api(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
@@ -388,9 +388,7 @@ def course_review_search_api(request, course_id):
     reviews = course.search_reviews(query)
     review_count = reviews.count()
 
-    if not request.user.is_authenticated:
-        reviews = reviews[: LIMITS["unauthenticated_review_search"]]
-
+    # Since we now require authentication, no need to limit reviews
     serializer = ReviewSerializer(reviews, many=True, context={"request": request})
 
     return Response(
@@ -399,11 +397,7 @@ def course_review_search_api(request, course_id):
             "course_id": course.id,
             "course_short_name": course.short_name(),
             "reviews_full_count": review_count,
-            "remaining": (
-                review_count - LIMITS["unauthenticated_review_search"]
-                if review_count > LIMITS["unauthenticated_review_search"]
-                else 0
-            ),
+            "remaining": 0,  # No remaining since user is authenticated
             "reviews": serializer.data,
         }
     )
