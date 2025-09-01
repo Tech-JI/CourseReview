@@ -20,9 +20,9 @@ Environment:
 
 5. `uv run pre-commit install` (for installing git hook in .git)
 
-5. Make directory for builds of static files: `mkdir staticfiles`
+6. Make directory for builds of static files: `mkdir staticfiles`
 
-6. Create .env file for storing secrets. The contents should be like:
+7. Create .env file for storing secrets. The contents should be like:
 
    ```ini
    # PostgreSQL
@@ -36,9 +36,9 @@ Environment:
    OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
    ```
 
-7. Build static files: `make collect`
+8. Build static files: `make collect`
 
-8. Configure database
+9. Configure database
 
    1. Install Postgres:
 
@@ -91,11 +91,11 @@ Environment:
 
    10. Auto setup database connection and static file routes in Django: `make migrate`, `make makemigrations`
 
-9. Install cache database redis: `sudo apt install redis-server`, `sudo systemctl start redis`. Run `sudo systemctl enable redis` to auto-start redis service on start-up.
+10. Install cache database valkey: `sudo apt install valkey`, `sudo systemctl start valkey`. Run `sudo systemctl enable valkey` to auto-start valkey service on start-up.
 
-10. `make run` and visit <http://127.0.0.1:8000/>
+11. `make run` and visit <http://127.0.0.1:8000/>
 
-11. Add local admin:
+12. Add local admin:
 
     1. `make createsuperuser`. The email can be blank. Use a strong password in production.
 
@@ -112,7 +112,7 @@ Environment:
        u.save()
        ```
 
-12. Crawl data from JI official website:
+13. Crawl data from JI official website:
 
     1. Edit `COURSE_DETAIL_URL_PREFIX` in `apps/spider/crawlers/orc.py`: Add a number after url param `id` like this: `...?id=23`, so only course id starting from 23 (e.g. 230-239, 2300) will be crawled, so as to save time during development. Remember not to commit this change.
 
@@ -125,4 +125,4 @@ Environment:
        crawl_and_import_data()
        ```
 
-13. Run frontend (dev mode): `make dev-frontend` and visit http://127.0.0.1:5173/
+14. Run frontend (dev mode): `make dev-frontend` and visit http://127.0.0.1:5173/
