@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urljoin
+import urllib.parse
 import logging
 
 import json
@@ -12,13 +12,11 @@ from lib.constants import CURRENT_TERM
 
 # API endpoints
 BASE_URL = "https://coursesel.umji.sjtu.edu.cn"
-COURSE_DETAIL_URL_PREFIX = urljoin(BASE_URL, "/course/")
+COURSE_DETAIL_URL_PREFIX = urllib.parse.urljoin(BASE_URL, "/course/")
 
 # Legacy compatibility
 ORC_BASE_URL = BASE_URL
 UNDERGRAD_URL = BASE_URL
-
-INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -34,28 +32,39 @@ class CourseSelCrawler:
     3. Prerequisites API: prerequisite rules
     """
 
-    def __init__(self):
+    def __init__(self, jsessionid=None):
         """Initialize crawler with session and authentication"""
         self.session = requests.Session()
+        self.jsessionid = jsessionid
+        self._initialized = False
 
-        print("Please enter your JSESSIONID cookie:")
-        print("(Found in browser dev tools under Network or Application tabs)")
-        jsessionid = input("JSESSIONID: ").strip()
+        logger.info("Crawler created (not yet initialized)")
 
-        if not jsessionid:
+    def _ensure_initialized(self):
+        """Ensure crawler is properly initialized with authentication"""
+        if self._initialized:
+            return
+
+        if not self.jsessionid:
+            print("Please enter your JSESSIONID cookie:")
+            print("(Found in browser dev tools under Network or Application tabs)")
+            self.jsessionid = input("JSESSIONID: ").strip()
+
+        if not self.jsessionid:
             raise ValueError("JSESSIONID cannot be empty")
 
-        cookies = {"JSESSIONID": jsessionid}
+        cookies = {"JSESSIONID": self.jsessionid}
         self.session.cookies.update(cookies)
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Referer": "https://coursesel.umji.sjtu.edu.cn/",
+            "Referer": BASE_URL,
             "X-Requested-With": "XMLHttpRequest",
         }
         self.session.headers.update(headers)
 
+        self._initialized = True
         logger.info("Crawler initialized successfully!")
 
     def get_all_courses(self):
@@ -118,8 +127,6 @@ class CourseSelCrawler:
             "loadDropApprove": True,
             "loadElectApprove": True,
         }
-
-        import urllib.parse
 
         json_string = json.dumps(json_params, separators=(",", ":"))
         encoded_json = urllib.parse.quote(json_string)
