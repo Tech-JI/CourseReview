@@ -74,6 +74,8 @@ class CourseSelCrawler:
         Returns:
             list: Course data with prerequisites, descriptions, and instructors
         """
+        self._ensure_initialized()  # Make sure crawler is initialized
+
         courses_data = self._get_lesson_tasks()
         course_details = self._get_course_catalog()
         prerequisites = self._get_prerequisites()
@@ -97,11 +99,13 @@ class CourseSelCrawler:
                     logger.debug(f"Found current electTurnId: {elect_turn_id}")
                     return elect_turn_id
 
-            logger.warning("Could not find current electTurnId, using fallback")
-            return "1A5D7E45-4C23-4ED4-A3C2-90C45BE2E1E4"  # Fallback
+            logger.error("Could not find current electTurnId in API response")
+            raise ValueError(
+                "Unable to get current electTurnId - API returned no valid election turns"
+            )
         except Exception as e:
-            logger.error(f"Error getting electTurnId: {e}, using fallback")
-            return "1A5D7E45-4C23-4ED4-A3C2-90C45BE2E1E4"  # Fallback
+            logger.error(f"Error getting electTurnId: {e}")
+            raise RuntimeError(f"Failed to retrieve electTurnId from API: {e}") from e
 
     def _get_lesson_tasks(self):
         """Get lesson task data from course selection API"""
@@ -341,10 +345,33 @@ class CourseSelCrawler:
 
         if prereq_codes:
             prerequisites = " || ".join(prereq_codes)
+            # Convert Chinese terms to English
+            prerequisites = self._normalize_prerequisites_to_english(prerequisites)
             logger.debug(f"Final prerequisites for {course_code}: {prerequisites}")
             return prerequisites
 
         return ""
+
+    def _normalize_prerequisites_to_english(self, prerequisites_text):
+        """Convert Chinese prerequisite terms to English"""
+        if not prerequisites_text:
+            return ""
+
+        # Define translation mapping
+        translations = {
+            "已获学分": "Obtained Credit",
+            "已提交学分": "Credits Submitted",
+            "获得学分": "Obtained Credit",
+            "提交学分": "Credits Submitted",
+            "学分": "Credit",
+        }
+
+        # Apply translations
+        normalized = prerequisites_text
+        for chinese, english in translations.items():
+            normalized = normalized.replace(chinese, english)
+
+        return normalized
 
     def _extract_description(self, main_data, catalog_data):
         """Extract course description"""
