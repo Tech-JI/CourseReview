@@ -289,18 +289,15 @@ class CourseSelCrawler:
         ).strip()
 
     def _parse_course_code(self, course_code):
-        """Parse department and number from course code"""
         department = ""
         number = 0
 
         if course_code:
-            dept_match = re.match(r"^([A-Z]+)", course_code)
-            if dept_match:
-                department = dept_match.group(1)
-
-            num_match = re.search(r"(\d+)", course_code)
-            if num_match:
-                number = int(num_match.group(1))
+            # Match DEPT####J? (J is optional)
+            match = re.match(r"^([A-Z]{2,4})(\d{4})J?$", course_code)
+            if match:
+                department = match.group(1)
+                number = int(match.group(2))
 
         return department, number
 
