@@ -10,16 +10,12 @@ from collections import defaultdict
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 # API endpoints
 BASE_URL = "https://coursesel.umji.sjtu.edu.cn"
 COURSE_DETAIL_URL_PREFIX = urllib.parse.urljoin(BASE_URL, "/course/")
-
-# Legacy compatibility
-ORC_BASE_URL = BASE_URL
-UNDERGRAD_URL = BASE_URL
-
-# Set up logger
-logger = logging.getLogger(__name__)
 
 
 class CourseSelCrawler:
@@ -400,7 +396,6 @@ class CourseSelCrawler:
         return f"{COURSE_DETAIL_URL_PREFIX}{course_id}" if course_id else ""
 
 
-# Legacy compatibility functions
 _crawler = None
 
 
@@ -430,16 +425,6 @@ def crawl_program_urls():
             crawl_program_urls._course_data_cache[course["url"]] = course
 
     return course_urls
-
-
-def _get_department_urls_from_url(_):
-    """Legacy function: get department course URLs"""
-    return crawl_program_urls()
-
-
-def _is_department_url(candidate_url):
-    """Check if URL is a valid course detail URL"""
-    return candidate_url.startswith(COURSE_DETAIL_URL_PREFIX)
 
 
 def _crawl_course_data(course_url):
