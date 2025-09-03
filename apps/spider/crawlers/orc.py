@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urljoin
+import logging
 
 import json
 import requests
@@ -18,6 +19,9 @@ ORC_BASE_URL = BASE_URL
 UNDERGRAD_URL = BASE_URL
 
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class CourseSelCrawler:
@@ -52,7 +56,7 @@ class CourseSelCrawler:
         }
         self.session.headers.update(headers)
 
-        print("Crawler initialized successfully!")
+        logger.info("Crawler initialized successfully!")
 
     def get_all_courses(self):
         """
@@ -67,13 +71,39 @@ class CourseSelCrawler:
 
         return self._integrate_course_data(courses_data, course_details, prerequisites)
 
+    def _get_current_elect_turn_id(self):
+        """Get current election turn ID dynamically"""
+        url = f"{BASE_URL}/tpm/findStudentElectTurns_ElectTurn.action"
+
+        try:
+            response = self.session.get(url, params={"_t": int(time.time() * 1000)})
+            response.raise_for_status()
+            data = response.json()
+
+            if data and isinstance(data, list) and len(data) > 0:
+                # Get the first (current) election turn
+                current_turn = data[0]
+                elect_turn_id = current_turn.get("electTurnId")
+                if elect_turn_id:
+                    logger.debug(f"Found current electTurnId: {elect_turn_id}")
+                    return elect_turn_id
+
+            logger.warning("Could not find current electTurnId, using fallback")
+            return "1A5D7E45-4C23-4ED4-A3C2-90C45BE2E1E4"  # Fallback
+        except Exception as e:
+            logger.error(f"Error getting electTurnId: {e}, using fallback")
+            return "1A5D7E45-4C23-4ED4-A3C2-90C45BE2E1E4"  # Fallback
+
     def _get_lesson_tasks(self):
         """Get lesson task data from course selection API"""
         url = f"{BASE_URL}/tpm/findLessonTasksPreview_ElectTurn.action"
 
+        # Get current election turn ID dynamically
+        elect_turn_id = self._get_current_elect_turn_id()
+
         json_params = {
             "isToTheTime": True,
-            "electTurnId": "1A5D7E45-4C23-4ED4-A3C2-90C45BE2E1E4",  # Remember to update for new terms
+            "electTurnId": elect_turn_id,
             "loadCourseGroup": True,
             "loadElectTurn": True,
             "loadCourseType": True,
@@ -116,16 +146,10 @@ class CourseSelCrawler:
             data = response.json()
 
             if data.get("success") and "data" in data:
-                # Handle both possible data structures
                 if isinstance(data["data"], list):
-                    # Direct array of courses
                     courses = data["data"]
-                elif isinstance(data["data"], dict) and "courses" in data["data"]:
-                    # Nested structure with courses key
-                    courses = data["data"]["courses"]
                 else:
                     return {}
-
                 return {course.get("courseId"): course for course in courses}
             return {}
         except Exception:
@@ -140,17 +164,17 @@ class CourseSelCrawler:
             response.raise_for_status()
             data = response.json()
 
-            print(f"[DEBUG] Prerequisites API response: success={data.get('success')}")
-            print(
-                f"[DEBUG] Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not dict'}"
+            logger.debug(f"Prerequisites API response: success={data.get('success')}")
+            logger.debug(
+                f"Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not dict'}"
             )
 
             if data.get("success") and "data" in data:
                 raw_prereqs = data["data"]
-                print(f"[DEBUG] Raw prerequisites data: {len(raw_prereqs)} items")
+                logger.debug(f"Raw prerequisites data: {len(raw_prereqs)} items")
 
                 if raw_prereqs and len(raw_prereqs) > 0:
-                    print(f"[DEBUG] First prerequisite item: {raw_prereqs[0]}")
+                    logger.debug(f"First prerequisite item: {raw_prereqs[0]}")
 
                 prereqs = defaultdict(list)
                 for item in raw_prereqs:
@@ -158,21 +182,21 @@ class CourseSelCrawler:
                     if course_id:
                         prereqs[course_id].append(item)
 
-                print(
-                    f"[DEBUG] Grouped prerequisites: {len(prereqs)} course IDs have prereqs"
+                logger.debug(
+                    f"Grouped prerequisites: {len(prereqs)} course IDs have prereqs"
                 )
                 return prereqs
             else:
-                print("[DEBUG] Prerequisites API failed or no data")
+                logger.warning("Prerequisites API failed or no data")
                 return {}
         except Exception as e:
-            print(f"[DEBUG] Prerequisites API error: {str(e)}")
+            logger.error(f"Prerequisites API error: {str(e)}")
             return {}
 
     def _integrate_course_data(self, courses_data, course_details, prerequisites):
         """Integrate course data from multiple sources"""
-        print(
-            f"[DEBUG] Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups"
+        logger.info(
+            f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups"
         )
 
         courses_by_code = defaultdict(list)
@@ -195,8 +219,8 @@ class CourseSelCrawler:
 
             if prereq_info:
                 courses_with_prereqs += 1
-                print(
-                    f"[DEBUG] Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
+                logger.debug(
+                    f"Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
                 )
 
             course_data = self._build_course_record(
@@ -206,8 +230,8 @@ class CourseSelCrawler:
             if course_data:
                 integrated_courses.append(course_data)
 
-        print(
-            f"[DEBUG] Integration complete: {courses_with_prereqs} courses have prerequisites"
+        logger.info(
+            f"Integration complete: {courses_with_prereqs} courses have prerequisites"
         )
         return integrated_courses
 
@@ -299,21 +323,21 @@ class CourseSelCrawler:
         if not prereq_data:
             return ""
 
-        print(
-            f"[DEBUG] Building prerequisites for {course_code}, prereq_data has {len(prereq_data)} items"
+        logger.debug(
+            f"Building prerequisites for {course_code}, prereq_data has {len(prereq_data)} items"
         )
 
         prereq_codes = []
         for item in prereq_data:
             rule_desc = item.get("prerequisiteRuleDesc", "")
-            print(f"[DEBUG] Processing prerequisite rule: {rule_desc}")
+            logger.debug(f"Processing prerequisite rule: {rule_desc}")
 
             if rule_desc:
                 prereq_codes.append(rule_desc)
 
         if prereq_codes:
             prerequisites = " || ".join(prereq_codes)
-            print(f"[DEBUG] Final prerequisites for {course_code}: {prerequisites}")
+            logger.debug(f"Final prerequisites for {course_code}: {prerequisites}")
             return prerequisites
 
         return ""
