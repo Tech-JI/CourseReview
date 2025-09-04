@@ -1,6 +1,7 @@
 [project]
-name = ""
-version = "0.0.1"
+name = "coursereview"
+version = "1.0.0"
+description = "A course review platform"
 dependencies = [
     "beautifulsoup4>=4.13.3",
     "celery>=5.4.0",
@@ -12,17 +13,37 @@ dependencies = [
     "django-crispy-forms>=2.3",
     "django-debug-toolbar>=5.0.1",
     "django-pipeline>=4.0.0",
+    "httpx==0.28.1",
     "psycopg2-binary>=2.9.10",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.1",
     "pytz>=2025.1",
-    "redis>=5.2.1",
+    "redis==6.2.0",
     "requests>=2.32.3",
     "bpython>=0.25",
     "ptpython>=3.0.29",
     "djangorestframework>=3.16.0",
     "django-cors-headers>=4.7.0",
+    "django-redis",
 ]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = { find = { where = ["."], exclude = [
+    "frontend",
+    "docs", 
+    "scripts",
+    "**/__pycache__",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/*.egg-info",
+] } }
+
+[tool.setuptools.package-dir]
+apps = "apps"
+website = "website"
+lib = "lib"
+

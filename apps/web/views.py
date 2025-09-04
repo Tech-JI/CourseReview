@@ -1,5 +1,6 @@
 import datetime
 import uuid
+import traceback
 
 import dateutil.parser
 from django.contrib.auth import authenticate, login, logout
@@ -21,7 +22,7 @@ from rest_framework.decorators import (
     authentication_classes,
     permission_classes,
 )
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 
@@ -114,48 +115,6 @@ def signup(request):
 
     else:
         return render(request, "signup.html", {"form": SignupForm()})
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
-def auth_login_api(request):
-    email = request.data.get("email", "").lower()
-    password = request.data.get("password", "")
-    next_url = request.data.get("next", "/courses")
-
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=400)
-
-    username = email.split("@")[0]
-    user = authenticate(username=username, password=password)
-
-    if user is not None:
-        if user.is_active:
-            login(request, user)
-            if "user_id" in request.session:
-                try:
-                    student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-                except Student.DoesNotExist:
-                    student = Student.objects.create(
-                        user=user, unauth_session_ids=[request.session["user_id"]]
-                    )
-            request.session["user_id"] = user.username
-
-            return Response(
-                {"success": True, "next": next_url, "username": user.username}
-            )
-        else:
-            return Response(
-                {
-                    "error": "Please activate your account via the activation link first."
-                },
-                status=403,
-            )
-    else:
-        return Response({"error": "Invalid email or password"}, status=401)
 
 
 @api_view(["POST"])
@@ -317,6 +276,18 @@ def course_detail_api(request, course_id):
         return Response(form.errors, status=400)
 
 
+@api_view(["DELETE"])
+@permission_classes([AllowAny])
+def delete_review_api(request, course_id):
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+    course = Course.objects.get(id=course_id)
+    Review.objects.delete_reviews_for_user_course(user=request.user, course=course)
+    serializer = CourseSerializer(course, context={"request": request})
+    return Response(serializer.data, status=200)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def departments_api(request):
@@ -363,7 +334,7 @@ def course_search_api(request):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def course_review_search_api(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
@@ -374,10 +345,8 @@ def course_review_search_api(request, course_id):
     reviews = course.search_reviews(query)
     review_count = reviews.count()
 
-    if not request.user.is_authenticated:
-        reviews = reviews[: LIMITS["unauthenticated_review_search"]]
-
-    serializer = ReviewSerializer(reviews, many=True)
+    # Since we now require authentication, no need to limit reviews
+    serializer = ReviewSerializer(reviews, many=True, context={"request": request})
 
     return Response(
         {
@@ -385,11 +354,7 @@ def course_review_search_api(request, course_id):
             "course_id": course.id,
             "course_short_name": course.short_name(),
             "reviews_full_count": review_count,
-            "remaining": (
-                review_count - LIMITS["unauthenticated_review_search"]
-                if review_count > LIMITS["unauthenticated_review_search"]
-                else 0
-            ),
+            "remaining": 0,  # No remaining since user is authenticated
             "reviews": serializer.data,
         }
     )
@@ -497,3 +462,93 @@ def course_vote_api(request, course_id):
             "new_vote_count": new_vote_count,
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def review_vote_api(request, review_id):
+    """
+    API endpoint for voting on reviews (kudos/dislike).
+
+    URL: /api/review/{review_id}/vote/
+    POST data:
+    - is_kudos: boolean (True for kudos, False for dislike)
+
+    Returns:
+    - kudos_count: updated kudos count
+    - dislike_count: updated dislike count
+    - user_vote: user's current vote (True/False/None)
+    """
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+
+    try:
+        is_kudos = request.data.get("is_kudos")
+
+        if is_kudos is None:
+            return Response({"detail": "is_kudos field is required"}, status=400)
+
+        is_kudos = bool(is_kudos)
+
+        # Use the ReviewVoteManager's vote method
+        kudos_count, dislike_count, user_vote = ReviewVote.objects.vote(
+            review_id=review_id, user=request.user, is_kudos=is_kudos
+        )
+
+        if kudos_count is None or dislike_count is None:
+            # Review doesn't exist
+            return Response({"detail": "Review not found"}, status=404)
+
+        return Response(
+            {
+                "kudos_count": kudos_count,
+                "dislike_count": dislike_count,
+                "user_vote": user_vote,
+            }
+        )
+
+    except Exception:
+        return Response(
+            {"detail": "An error occurred processing your request"},
+            status=500,
+        )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_user_review_api(request, course_id):
+    """
+    API endpoint to get the authenticated user's review for a specific course.
+
+    Returns:
+    - Review data if the user has written a review for this course
+    - 404 if no review found
+    - 403 if user is not authenticated
+    """
+    if not request.user.is_authenticated:
+        return Response({"detail": "Authentication required"}, status=403)
+
+    try:
+        # Get the course
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({"detail": "Course not found"}, status=404)
+
+        # Get the user's review for this course
+        review = Review.objects.get_user_review_for_course(request.user, course)
+
+        if review is None:
+            return Response(
+                {"detail": "No user review found for this course"}, status=404
+            )
+
+        # Serialize and return the review
+        serializer = ReviewSerializer(review)
+        return Response(serializer.data)
+
+    except Exception:
+        return Response(
+            {"detail": "An error occurred processing your request"},
+            status=500,
+        )
