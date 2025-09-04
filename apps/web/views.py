@@ -121,48 +121,6 @@ def signup(request):
 @api_view(["POST"])
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
-def auth_login_api(request):
-    email = request.data.get("email", "").lower()
-    password = request.data.get("password", "")
-    next_url = request.data.get("next", "/courses")
-
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=400)
-
-    username = email.split("@")[0]
-    user = authenticate(username=username, password=password)
-
-    if user is not None:
-        if user.is_active:
-            login(request, user)
-            if "user_id" in request.session:
-                try:
-                    student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-                except Student.DoesNotExist:
-                    student = Student.objects.create(
-                        user=user, unauth_session_ids=[request.session["user_id"]]
-                    )
-            request.session["user_id"] = user.username
-
-            return Response(
-                {"success": True, "next": next_url, "username": user.username}
-            )
-        else:
-            return Response(
-                {
-                    "error": "Please activate your account via the activation link first."
-                },
-                status=403,
-            )
-    else:
-        return Response({"error": "Invalid email or password"}, status=401)
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
 def auth_logout_api(request):
     """
     API endpoint for user logout.

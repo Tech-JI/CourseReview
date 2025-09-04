@@ -1,23 +1,19 @@
-"""layup_list URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/dev/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Add an import:  from blog import urls as blog_urls
-    2. Import the include() function: from django.urls import path, include
-    3. Add a URL to urlpatterns:  path('blog/', include(blog_urls))
-"""
-
 import django.contrib.auth.views as authviews
 from django.contrib import admin
 from django.urls import re_path
+
+from django.urls import include
+from apps.verifier.views import webhook
+from django.shortcuts import redirect
+from django.conf import settings
+
+# --- 新增部分：处理网站根路径的视图 ---
+def home_redirect(request):
+    """
+    根路径重定向到 CourseReview 主页
+    """
+    return redirect('/api/landing/')
+# --- 新增部分结束 ---
 
 from apps.analytics import views as aviews
 from apps.recommendations import views as rviews
@@ -25,10 +21,14 @@ from apps.spider import views as spider_views
 from apps.web import views
 
 urlpatterns = [
+    # 处理网站根路径
+    re_path(r"^$", home_redirect, name="home"),
+    
+    re_path(r"^verify/", include('apps.verifier.urls')),
+    re_path(r"^webhook/?", webhook, name="webhook"),
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
-    re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
     re_path(r"^analytics/$", aviews.home, name="analytics_home"),
     re_path(
         r"^eligible_for_recommendations/$",
@@ -98,10 +98,7 @@ urlpatterns = [
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
-    # authentication
-    re_path(r"^accounts/signup$", views.signup, name="signup"),
     re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
-    re_path(r"^accounts/confirmation$", views.confirmation, name="confirmation"),
     # password resets
     re_path(
         r"^accounts/password/reset/$",
