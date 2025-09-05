@@ -7,12 +7,15 @@ from apps.verifier.views import webhook
 from django.shortcuts import redirect
 from django.conf import settings
 
+
 # --- 新增部分：处理网站根路径的视图 ---
 def home_redirect(request):
     """
     根路径重定向到 CourseReview 主页
     """
-    return redirect('/api/landing/')
+    return redirect("/api/landing/")
+
+
 # --- 新增部分结束 ---
 
 from apps.analytics import views as aviews
@@ -23,8 +26,7 @@ from apps.web import views
 urlpatterns = [
     # 处理网站根路径
     re_path(r"^$", home_redirect, name="home"),
-    
-    re_path(r"^verify/", include('apps.verifier.urls')),
+    re_path(r"^verify/", include("apps.verifier.urls")),
     re_path(r"^webhook/?", webhook, name="webhook"),
     # administrative
     re_path(r"^admin/", admin.site.urls),

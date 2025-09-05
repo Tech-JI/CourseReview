@@ -2,6 +2,7 @@ import os
 
 # Load environment variables from .env file FIRST
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Now we can safely get environment variables
@@ -9,7 +10,7 @@ TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
 VERIFICATION_QUESTION_ID = int(os.getenv("VERIFICATION_QUESTION_ID", "0"))
 SURVEY_URL = os.getenv("SURVEY_URL", "https://wj.sjtu.edu.cn/")
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -207,21 +208,21 @@ SESSION_COOKIE_SECURE = not DEBUG
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),  
+        "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 100}  
+            "CONNECTION_POOL_KWARGS": {"max_connections": 100},
         },
         "KEY_PREFIX": "coursereview",
     }
-} 
+}
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
 ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1', 
-    '0.0.0.0',
-    '032bb397fcfb.ngrok-free.app', 
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "032bb397fcfb.ngrok-free.app",
 ]
