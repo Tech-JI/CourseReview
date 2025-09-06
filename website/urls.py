@@ -28,6 +28,8 @@ urlpatterns = [
     re_path(r"^$", home_redirect, name="home"),
     re_path(r"^verify/", include("apps.verifier.urls")),
     re_path(r"^webhook/?", webhook, name="webhook"),
+    # old email+password login (only for admin use, not for students)
+    re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
