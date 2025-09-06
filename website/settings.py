@@ -10,7 +10,7 @@ TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
 VERIFICATION_QUESTION_ID = int(os.getenv("VERIFICATION_QUESTION_ID", "0"))
 SURVEY_URL = os.getenv("SURVEY_URL", "https://wj.sjtu.edu.cn/")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG") == "True"
 
 # Application definition
 
@@ -91,7 +91,7 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOWED_ORIGINS = [
-        os.getenv("FRONTEND_URL", "http://localhost:3000"),
+        FRONTEND_URL,
         "http://127.0.0.1:8080",
         "http://localhost:8080",
     ]
@@ -220,6 +220,7 @@ CACHES = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
+# should be derived from .env in production
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",

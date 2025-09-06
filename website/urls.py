@@ -4,19 +4,9 @@ from django.urls import re_path
 
 from django.urls import include
 from apps.verifier.views import webhook
+from apps.verifier import views as verifier_views
 from django.shortcuts import redirect
 from django.conf import settings
-
-
-# --- 新增部分：处理网站根路径的视图 ---
-def home_redirect(request):
-    """
-    根路径重定向到 CourseReview 主页
-    """
-    return redirect("/api/landing/")
-
-
-# --- 新增部分结束 ---
 
 from apps.analytics import views as aviews
 from apps.recommendations import views as rviews
@@ -24,9 +14,27 @@ from apps.spider import views as spider_views
 from apps.web import views
 
 urlpatterns = [
-    # 处理网站根路径
-    re_path(r"^$", home_redirect, name="home"),
-    re_path(r"^verify/", include("apps.verifier.urls")),
+    # Verification endpoints - RESTful API under /api/accounts/verify
+    re_path(r"^api/accounts/verify/$", verifier_views.verify_page, name="verify_page"),
+    re_path(
+        r"^api/accounts/verify/turnstile/$",
+        verifier_views.verify_turnstile,
+        name="verify_turnstile",
+    ),
+    re_path(
+        r"^api/accounts/verify/sse/$", verifier_views.sse_status, name="sse_status"
+    ),
+    re_path(
+        r"^api/accounts/verify/complete/$",
+        verifier_views.complete_login,
+        name="complete_login",
+    ),
+    re_path(
+        r"^api/accounts/verify/config/$",
+        verifier_views.verify_config,
+        name="verify_config",
+    ),
+    # Webhook endpoint (separate from API structure)
     re_path(r"^webhook/?", webhook, name="webhook"),
     # old email+password login (only for admin use, not for students)
     re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
@@ -50,6 +58,7 @@ urlpatterns = [
         name="crawled_data",
     ),
     # primary views
+    # homepage redirecting to this path will be handling by the frontend
     re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
