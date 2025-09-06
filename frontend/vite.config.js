@@ -11,12 +11,6 @@ export default defineConfig({
         changeOrigin: false,
         // rewrite: (path) => path.replace(/^\/api/, ''), //  Not needed if your Django URLs start with /api
       },
-      // Proxy for the new verification API endpoints
-      "/verify/": {
-        target: "http://localhost:8000",
-        changeOrigin: false,
-        // rewrite: (path) => path.replace(/^\/verify/, ''),
-      },
     },
   },
   build: {

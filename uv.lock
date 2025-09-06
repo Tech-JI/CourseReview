@@ -3,6 +3,69 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = ""
+version = "0.0.1"
+source = { virtual = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "bpython" },
+    { name = "celery" },
+    { name = "crispy-bootstrap4" },
+    { name = "dj-database-url" },
+    { name = "django" },
+    { name = "django-celery-beat" },
+    { name = "django-celery-results" },
+    { name = "django-cors-headers" },
+    { name = "django-crispy-forms" },
+    { name = "django-debug-toolbar" },
+    { name = "django-pipeline" },
+    { name = "django-redis" },
+    { name = "djangorestframework" },
+    { name = "httpx" },
+    { name = "psycopg2-binary" },
+    { name = "ptpython" },
+    { name = "python-dateutil" },
+    { name = "python-dotenv" },
+    { name = "pytz" },
+    { name = "redis" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pre-commit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.13.3" },
+    { name = "bpython", specifier = ">=0.25" },
+    { name = "celery", specifier = ">=5.4.0" },
+    { name = "crispy-bootstrap4", specifier = ">=2024.10" },
+    { name = "dj-database-url", specifier = ">=2.3.0" },
+    { name = "django", specifier = ">=5.1.6" },
+    { name = "django-celery-beat", specifier = ">=2.7.0" },
+    { name = "django-celery-results", specifier = ">=2.5.1" },
+    { name = "django-cors-headers", specifier = ">=4.7.0" },
+    { name = "django-crispy-forms", specifier = ">=2.3" },
+    { name = "django-debug-toolbar", specifier = ">=5.0.1" },
+    { name = "django-pipeline", specifier = ">=4.0.0" },
+    { name = "django-redis" },
+    { name = "djangorestframework", specifier = ">=3.16.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "ptpython", specifier = ">=3.0.29" },
+    { name = "python-dateutil", specifier = ">=2.9.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "pytz", specifier = ">=2025.1" },
+    { name = "redis", specifier = ">=5.2.1" },
+    { name = "requests", specifier = ">=2.32.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pre-commit", specifier = ">=4.3.0" }]
+
+[[package]]
 name = "amqp"
 version = "5.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -236,69 +299,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
 ]
-
-[[package]]
-name = "coursereview"
-version = "1.0.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "bpython" },
-    { name = "celery" },
-    { name = "crispy-bootstrap4" },
-    { name = "dj-database-url" },
-    { name = "django" },
-    { name = "django-celery-beat" },
-    { name = "django-celery-results" },
-    { name = "django-cors-headers" },
-    { name = "django-crispy-forms" },
-    { name = "django-debug-toolbar" },
-    { name = "django-pipeline" },
-    { name = "django-redis" },
-    { name = "djangorestframework" },
-    { name = "httpx" },
-    { name = "psycopg2-binary" },
-    { name = "ptpython" },
-    { name = "python-dateutil" },
-    { name = "python-dotenv" },
-    { name = "pytz" },
-    { name = "redis" },
-    { name = "requests" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pre-commit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.13.3" },
-    { name = "bpython", specifier = ">=0.25" },
-    { name = "celery", specifier = ">=5.4.0" },
-    { name = "crispy-bootstrap4", specifier = ">=2024.10" },
-    { name = "dj-database-url", specifier = ">=2.3.0" },
-    { name = "django", specifier = ">=5.1.6" },
-    { name = "django-celery-beat", specifier = ">=2.7.0" },
-    { name = "django-celery-results", specifier = ">=2.5.1" },
-    { name = "django-cors-headers", specifier = ">=4.7.0" },
-    { name = "django-crispy-forms", specifier = ">=2.3" },
-    { name = "django-debug-toolbar", specifier = ">=5.0.1" },
-    { name = "django-pipeline", specifier = ">=4.0.0" },
-    { name = "django-redis" },
-    { name = "djangorestframework", specifier = ">=3.16.0" },
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "psycopg2-binary", specifier = ">=2.9.10" },
-    { name = "ptpython", specifier = ">=3.0.29" },
-    { name = "python-dateutil", specifier = ">=2.9.0" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "pytz", specifier = ">=2025.1" },
-    { name = "redis", specifier = "==6.2.0" },
-    { name = "requests", specifier = ">=2.32.3" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pre-commit", specifier = ">=4.3.0" }]
 
 [[package]]
 name = "crispy-bootstrap4"
