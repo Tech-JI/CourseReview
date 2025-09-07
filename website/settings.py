@@ -8,7 +8,7 @@ load_dotenv()
 # Now we can safely get environment variables
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-VERIFICATION_QUESTION_ID = int(os.getenv("VERIFICATION_QUESTION_ID", "0"))
+WJ_API_KEY = os.getenv("WJ_API_KEY")
 SURVEY_URL = os.getenv("SURVEY_URL", "https://wj.sjtu.edu.cn/")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     "apps.recommendations",
     "apps.spider",
     "apps.web",
-    "apps.verifier",
+    "apps.auth",
 ]
 
 MIDDLEWARE = [
@@ -202,7 +202,7 @@ PIPELINE = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SESSION_COOKIE_AGE = 3153600000  # 100 years
+SESSION_COOKIE_AGE = 86400 * 30  # 30 days (more reasonable than 100 years)
 SESSION_COOKIE_SECURE = not DEBUG
 
 CACHES = {
