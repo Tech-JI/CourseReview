@@ -2,40 +2,21 @@ import django.contrib.auth.views as authviews
 from django.contrib import admin
 from django.urls import re_path
 
-from django.urls import include
-from apps.verifier.views import webhook
-from apps.verifier import views as verifier_views
-from django.shortcuts import redirect
-from django.conf import settings
 
+from apps.auth import views as auth_views
 from apps.analytics import views as aviews
 from apps.recommendations import views as rviews
 from apps.spider import views as spider_views
 from apps.web import views
 
 urlpatterns = [
-    # Verification endpoints - RESTful API under /api/accounts/verify
-    re_path(r"^api/accounts/verify/$", verifier_views.verify_page, name="verify_page"),
+    # OAuth
     re_path(
-        r"^api/accounts/verify/turnstile/$",
-        verifier_views.verify_turnstile,
-        name="verify_turnstile",
+        r"^api/auth/initiate/$",
+        auth_views.initiate_login_api,
+        name="initiate_login_api",
     ),
-    re_path(
-        r"^api/accounts/verify/sse/$", verifier_views.sse_status, name="sse_status"
-    ),
-    re_path(
-        r"^api/accounts/verify/complete/$",
-        verifier_views.complete_login,
-        name="complete_login",
-    ),
-    re_path(
-        r"^api/accounts/verify/config/$",
-        verifier_views.verify_config,
-        name="verify_config",
-    ),
-    # Webhook endpoint (separate from API structure)
-    re_path(r"^webhook/?", webhook, name="webhook"),
+    re_path(r"^api/auth/config/$", auth_views.auth_config_api, name="auth_config_api"),
     # old email+password login (only for admin use, not for students)
     re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
     # administrative
