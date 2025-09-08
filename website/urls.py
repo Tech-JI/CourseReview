@@ -17,6 +17,11 @@ urlpatterns = [
         name="initiate_login_api",
     ),
     re_path(r"^api/auth/config/$", auth_views.auth_config_api, name="auth_config_api"),
+    re_path(
+        r"^api/auth/verify/$",
+        auth_views.verify_callback_api,
+        name="verify_callback_api",
+    ),
     # old email+password login (only for admin use, not for students)
     re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
     # administrative
