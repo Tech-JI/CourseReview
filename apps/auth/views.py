@@ -7,8 +7,9 @@ import secrets
 import base64
 import dateutil.parser
 import hashlib
-from django.views.decorators.csrf import csrf_exempt
+import re
 from django.contrib.auth import login
+from django.contrib.auth.password_validation import validate_password
 from django_redis import get_redis_connection
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -93,14 +94,14 @@ def auth_initiate_api(request):
             return response.json()
 
     # Verify Turnstile token
-    # try:
-    #     result = asyncio.run(verify_turnstile())
-    #     if not result.get("success"):
-    #         logging.warning(f"Turnstile verification failed: {result}")
-    #         return Response({"error": "Turnstile verification failed"}, status=403)
-    # except Exception as e:
-    #     logging.error(f"Error verifying Turnstile token: {e}")
-    #     return Response({"error": "Turnstile verification error"}, status=500)
+    try:
+        result = asyncio.run(verify_turnstile())
+        if not result.get("success"):
+            logging.warning(f"Turnstile verification failed: {result}")
+            return Response({"error": "Turnstile verification failed"}, status=403)
+    except Exception as e:
+        logging.error(f"Error verifying Turnstile token: {e}")
+        return Response({"error": "Turnstile verification error"}, status=500)
 
     # Generate cryptographically secure OTP and temp_token
     otp_bytes = secrets.token_bytes(6)
@@ -371,7 +372,7 @@ def verify_callback_api(request):
     state_data.update(
         {
             "status": "verified",
-            "jaccount": account,
+            "account": account,
             "verified_at": time.time(),
             "answer_id": answer_id,
         }
@@ -393,8 +394,8 @@ def verify_callback_api(request):
     if action == "login":
         try:
             # Create user session immediately for login
-            session_response = create_user_session(request, account)
-            if session_response.status_code == 200:
+            ifsuccess = create_user_session(request, account)
+            if ifsuccess:
                 is_logged_in = True
                 # Delete temp_token_state after successful login
                 r.delete(state_key)
@@ -418,10 +419,11 @@ def verify_callback_api(request):
     return response
 
 
-def create_user_session(request, username):
+def create_user_session(request, username) -> bool:
     """
     Helper function to create authenticated session for verified user
     Includes session management and Student model integration similar to auth_login_api
+    but returns boolean success
     """
     try:
         # Ensure session exists - create one if it doesn't exist
@@ -438,10 +440,7 @@ def create_user_session(request, username):
         # Ensure user is active
         if not user.is_active:
             logging.warning(f"Inactive user attempted OAuth login: {username}")
-            return Response(
-                {"error": "The user is inactive."},
-                status=403,
-            )
+            return False
 
         # Create Django session
         login(request, user)
@@ -465,16 +464,182 @@ def create_user_session(request, username):
         request.session["user_id"] = user.username
 
         logging.info(f"Successfully created OAuth session for user: {username}")
-
-        return Response(
-            {
-                "message": "Authentication successful",
-                "username": username,
-                "redirect_url": "/courses",  # Match the next_url from traditional login
-            },
-            status=200,
-        )
+        return True
 
     except Exception as e:
         logging.error(f"Error creating user session: {e}")
-        return Response({"error": "Failed to create session"}, status=500)
+        return False
+
+
+def validate_password_strength(password) -> bool:
+    """
+    Helper function to validate password complexity and strength.
+    Custom requirements: More than 12 characters, at least one uppercase, lower case letter and numeric digit.
+    Also uses Django's built-in validators for additional security.
+
+    Returns: bool (True if valid, False if invalid)
+    """
+    # Quick length check first
+    if len(password) <= 12:
+        return False
+
+    # Single regex pattern to check all character requirements at once
+    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$"
+    if not re.match(pattern, password):
+        return False
+
+    # Use Django's built-in validators for additional checks
+    try:
+        validate_password(password)
+        return True
+    except:
+        return False
+
+
+def handle_signup_user(account, password, request) -> tuple:
+    """
+    Helper function to handle user creation and session creation for signup action.
+    Will return error if user already exists.
+    Returns: user or None,error_response or None.
+    """
+    User = get_user_model()
+    user, created = User.objects.get_or_create(
+        username=account, defaults={"email": f"{account}@sjtu.edu.cn"}
+    )
+    if not created:
+        return None, Response(
+            {"error": "User already exists with password. Please use reset password."},
+            status=409,
+        )
+
+    # Set password
+    user.set_password(password)
+    user.save()
+
+    # Create user session (log them in)
+    if not create_user_session(request, account):
+        return None, Response(
+            {"error": "user created but failed to log in"}, status=500
+        )
+    # no error
+    return user, None
+
+
+def handle_reset_password_user(account, password, request) -> tuple:
+    """
+    Helper function to handle password reset for reset_password action.
+    Ensures user is logged in and the account matches their username.
+    Returns: user or none, error_response or None
+    """
+    # Check if user is authenticated
+    if not request.user.is_authenticated:
+        return None, Response(
+            {"error": "User must be logged in to reset password"}, status=401
+        )
+
+    # Check if the account in temp_token matches the logged-in user
+    if request.user.username != account:
+        return None, Response(
+            {
+                "error": "Account mismatch: temp_token account does not match logged-in user"
+            },
+            status=403,
+        )
+
+    # Get the user object and update password
+    User = get_user_model()
+    try:
+        user = User.objects.get(username=account)
+        user.set_password(password)
+        user.save()
+        # no error
+        return user, None
+
+    except:
+        return None, Response({"error": "error when reseting password"}, status=500)
+
+
+@api_view(["POST"])
+def auth_password_api(request):
+    """
+    Set Password API (/api/auth/password)
+
+    Uses verified temp_token to set user password for signup or reset_password actions.
+    Should be called after verify_callback_api for signup/reset_password actions.
+    """
+    try:
+        # Get password from request data
+        password = request.data.get("password")
+        next_url = request.data.get("next", "/courses")
+        if not password:
+            return Response({"error": "Missing password"}, status=400)
+
+        # Validate password strength first (before any operations)
+        is_valid = validate_password_strength(password)
+        if not is_valid:
+            return Response({"error": "Password validation failed. "}, status=400)
+
+        # Get temp_token from HttpOnly cookie
+        temp_token = request.COOKIES.get("temp_token")
+        if not temp_token:
+            return Response({"error": "No temp_token found"}, status=401)
+
+        r = get_redis_connection("default")
+
+        # Look up temp_token state record
+        temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
+        state_key = f"temp_token_state:{temp_token_hash}"
+        state_data = r.get(state_key)
+
+        if not state_data:
+            return Response(
+                {"error": "Temp token state not found or expired"}, status=401
+            )
+
+        try:
+            state_data = json.loads(state_data)
+        except json.JSONDecodeError:
+            return Response({"error": "Invalid temp token state data"}, status=401)
+
+        # Verify status is verified
+        if state_data.get("status") != "verified":
+            return Response({"error": "Temp token not verified"}, status=401)
+
+        # Verify action is valid for password setting
+        action = state_data.get("action")
+        if action not in ["signup", "reset_password"]:
+            return Response(
+                {"error": "Invalid action for password setting"}, status=403
+            )
+
+        # Get account from verified state
+        account = state_data.get("account")
+        if not account:
+            return Response({"error": "No account in verified state"}, status=401)
+
+        # Handle user operations based on action using helper functions
+        user, error_response = (
+            handle_signup_user(account=account, password=password, request=request)
+            if action == "signup"
+            else handle_reset_password_user(
+                account=account, password=password, request=request
+            )
+        )
+        if error_response:
+            return error_response
+
+        # Delete temp_token_state after successful password setting and clear cookie
+        r.delete(state_key)
+        logging.info(
+            f"User {account} successfully set password for {action}, temp_token_state cleaned up"
+        )
+        response = Response(
+            {"success": True, "next": next_url, "username": user.username}, status=200
+        )
+        # Clear the temp_token cookie and return the action-specific response
+        response.delete_cookie("temp_token")
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in auth_password_api: {e}")
+        return Response({"error": "Failed to set password"}, status=500)
