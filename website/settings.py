@@ -227,9 +227,4 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
 # should be derived from .env in production
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "0.0.0.0",
-    "032bb397fcfb.ngrok-free.app",
-]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
