@@ -22,8 +22,13 @@ urlpatterns = [
         auth_views.verify_callback_api,
         name="verify_callback_api",
     ),
-    # old email+password login (only for admin use, not for students)
+    re_path(
+        r"^api/auth/password/$", auth_views.auth_password_api, name="auth_password_api"
+    ),
+    # email+password login(the path is not set to auth because it was used in many places)
     re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
+    # log out
+    re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
@@ -97,36 +102,34 @@ urlpatterns = [
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
-    # log out
-    re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
-    # password resets
-    re_path(
-        r"^accounts/password/reset/$",
-        authviews.PasswordResetView.as_view(
-            template_name="password_reset_form.html",
-            html_email_template_name="password_reset_email.html",
-            email_template_name="password_reset_email.html",
-        ),
-        {"post_reset_redirect": "/accounts/password/reset/done/"},
-        name="password_reset",
-    ),
-    re_path(
-        r"^accounts/password/reset/done/$",
-        authviews.PasswordResetDoneView.as_view(
-            template_name="password_reset_done.html"
-        ),
-    ),
-    re_path(
-        r"^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)-(?P<token>.+)/$",
-        authviews.PasswordResetConfirmView.as_view(
-            template_name="password_reset_confirm.html"
-        ),
-        name="password_reset_confirm",
-    ),
-    re_path(
-        r"^accounts/password/done/$",
-        authviews.PasswordResetCompleteView.as_view(
-            template_name="password_reset_complete.html"
-        ),
-    ),
+    # password resets(deprecated))
+    # re_path(
+    #     r"^accounts/password/reset/$",
+    #     authviews.PasswordResetView.as_view(
+    #         template_name="password_reset_form.html",
+    #         html_email_template_name="password_reset_email.html",
+    #         email_template_name="password_reset_email.html",
+    #     ),
+    #     {"post_reset_redirect": "/accounts/password/reset/done/"},
+    #     name="password_reset",
+    # ),
+    # re_path(
+    #     r"^accounts/password/reset/done/$",
+    #     authviews.PasswordResetDoneView.as_view(
+    #         template_name="password_reset_done.html"
+    #     ),
+    # ),
+    # re_path(
+    #     r"^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)-(?P<token>.+)/$",
+    #     authviews.PasswordResetConfirmView.as_view(
+    #         template_name="password_reset_confirm.html"
+    #     ),
+    #     name="password_reset_confirm",
+    # ),
+    # re_path(
+    #     r"^accounts/password/done/$",
+    #     authviews.PasswordResetCompleteView.as_view(
+    #         template_name="password_reset_complete.html"
+    #     ),
+    # ),
 ]
