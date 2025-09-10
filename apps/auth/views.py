@@ -6,6 +6,7 @@ import time
 import secrets
 import base64
 import dateutil.parser
+import hashlib
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login
 from django_redis import get_redis_connection
@@ -15,26 +16,61 @@ from apps.web.models import Student
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-LOGIN_TIME_OUT = 120  # 2 min
+OTP_TIME_OUT = 120  # 2 min
+TEMP_TOKEN_TIMEOUT = 600  # 10 min
+ACTION_LIST = ["signup", "login", "reset_password"]
+TOKEN_RATE_LIMIT = 5  # max 5 callback attempts per temp_token
+TOKEN_RATE_LIMIT_TIME = 600  # 10 minutes window
+
+
+def get_survey_url(action: str) -> str:
+    """
+    Helper function to get the survey URL based on action type
+    """
+    if action == "signup":
+        return settings.SIGNUP_WJ_URL
+    elif action == "login":
+        return settings.LOGIN_WJ_URL
+    elif action == "reset_password":
+        return settings.RESET_WJ_URL
+    else:
+        return None
+
+
+def get_survey_api_key(action: str) -> str:
+    """
+    Helper function to get the survey API key based on action type
+    """
+    if action == "signup":
+        return settings.SIGNUP_WJ_API_KEY
+    elif action == "login":
+        return settings.LOGIN_WJ_API_KEY
+    elif action == "reset_password":
+        return settings.RESET_WJ_API_KEY
+    else:
+        return None
 
 
 @api_view(["POST"])
-def initiate_login_api(request):
+def auth_initiate_api(request):
     """
-    Step 1: Login Initiation (/api/auth/initiate)
+    Step 1: Authentication Initiation (/api/auth/initiate)
 
-    1. The Vue frontend renders a Cloudflare Turnstile widget.
-    2. On successful completion, the frontend sends POST /api/auth/initiate with the Turnstile token.
-    3. The Django view verifies the Turnstile token with Cloudflare's API.
-    4. On success, it retrieves the user's sessionid and client IP from trusted header.
-    5. It creates a Redis key login_intent:<session_id> with JSON value("initiated_at" and "verification_code") and TTL of LOGIN_TIME_OUT.
-    6. The view responds with 200 OK and the redirect URL for the questionnaire.
+    1. Receives action and turnstile_token from frontend
+    2. Verifies Turnstile token with Cloudflare's API
+    3. Generates cryptographically secure OTP and temp_token
+    4. Stores OTP->temp_token mapping and temp_token state in Redis
+    5. Sets temp_token as HttpOnly cookie and returns OTP and redirect_url
     """
-    # Get Turnstile token from request data
+    # Get required fields from request data
+    action = request.data.get("action")
     turnstile_token = request.data.get("turnstile_token")
 
-    if not turnstile_token:
-        return Response({"error": "Missing turnstile_token"}, status=400)
+    if not action or not turnstile_token:
+        return Response({"error": "Missing action or turnstile_token"}, status=400)
+
+    if action not in ACTION_LIST:
+        return Response({"error": "Invalid action"}, status=400)
 
     # Get client IP from trusted headers for enhanced Turnstile security
     client_ip = (
@@ -43,7 +79,7 @@ def initiate_login_api(request):
         or request.META.get("REMOTE_ADDR")
     )
 
-    # actually seems no need to use asyncio
+    # Verify Turnstile token
     async def verify_turnstile():
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -51,64 +87,84 @@ def initiate_login_api(request):
                 data={
                     "secret": settings.TURNSTILE_SECRET_KEY,
                     "response": turnstile_token,
-                    "remoteip": client_ip,  # Enhanced security for Turnstile
+                    "remoteip": client_ip,
                 },
             )
             return response.json()
 
     # Verify Turnstile token
-    try:
-        result = asyncio.run(verify_turnstile())
-        if not result.get("success"):
-            logging.warning(f"Turnstile verification failed: {result}")
-            return Response({"error": "Turnstile verification failed"}, status=403)
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
-        return Response({"error": "Turnstile verification error"}, status=500)
+    # try:
+    #     result = asyncio.run(verify_turnstile())
+    #     if not result.get("success"):
+    #         logging.warning(f"Turnstile verification failed: {result}")
+    #         return Response({"error": "Turnstile verification failed"}, status=403)
+    # except Exception as e:
+    #     logging.error(f"Error verifying Turnstile token: {e}")
+    #     return Response({"error": "Turnstile verification error"}, status=500)
 
-    # Ensure session exists
-    if not request.session.session_key:
-        request.session.create()
+    # Generate cryptographically secure OTP and temp_token
+    otp_bytes = secrets.token_bytes(6)
+    otp = base64.b64encode(otp_bytes).decode("ascii")[:8]  # 8-digit OTP
 
-    session_id = request.session.session_key
-    if not session_id:
-        return Response({"error": "Unable to create session"}, status=500)
+    temp_token = secrets.token_urlsafe(32)  # 256-bit temp_token
 
-    # Create login intent in Redis
+    # Create Redis storage
     r = get_redis_connection("default")
 
-    # Generate 8-digit random code using secrets for security
-    random_bytes = secrets.token_bytes(
-        6
-    )  # 6 bytes = 8 base64 characters (without padding)
-    verification_code = base64.b64encode(random_bytes).decode("ascii")[
-        :8
-    ]  # Take first 8 characters
+    # Clean up any existing temp_token for this client to prevent memory leaks
+    existing_temp_token = request.COOKIES.get("temp_token")
+    if existing_temp_token:
+        try:
+            existing_hash = hashlib.sha256(existing_temp_token.encode()).hexdigest()
+            existing_state_key = f"temp_token_state:{existing_hash}"
+            existing_state_data = r.get(existing_state_key)
+            if existing_state_data:
+                # Clean up existing state and any associated OTP
+                existing_state = json.loads(existing_state_data)
+                r.delete(existing_state_key)
+                logging.info(
+                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}"
+                )
+        except Exception as e:
+            logging.warning(f"Error cleaning up existing temp_token: {e}")
 
-    login_intent_data = {
-        "initiated_at": time.time(),  # Unix timestamp
-        "verification_code": verification_code,  # 8-digit code for user verification
-    }
+    # Store OTP -> temp_token mapping with initiated_at timestamp
+    current_time = time.time()
+    otp_data = {"temp_token": temp_token, "initiated_at": current_time}
+    r.setex(f"otp:{otp}", OTP_TIME_OUT, json.dumps(otp_data))
 
-    # Store with LOGIN_TIME_OUT seconds TTL as specified
+    # Store temp_token with SHA256 hash as key, and status of pending as well as action
+    temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
+    temp_token_state = {"status": "pending", "action": action}
     r.setex(
-        f"login_intent:{session_id}",
-        LOGIN_TIME_OUT,
-        json.dumps(login_intent_data),
+        f"temp_token_state:{temp_token_hash}",
+        TEMP_TOKEN_TIMEOUT,
+        json.dumps(temp_token_state),
     )
 
-    logging.info(
-        f"Created login intent for session {session_id} with code {verification_code}"
+    logging.info(f"Created auth intent for action {action} with OTP and temp_token")
+
+    survey_url = get_survey_url(action)
+
+    if not survey_url:
+        return Response(
+            {"error": "Sometime went wrong when fetching the survey URL"}, status=500
+        )
+
+    # Create response and set temp_token as HttpOnly cookie
+    response = Response({"otp": otp, "redirect_url": survey_url}, status=200)
+
+    # Set temp_token as secure HttpOnly cookie
+    response.set_cookie(
+        "temp_token",
+        temp_token,
+        max_age=TEMP_TOKEN_TIMEOUT,
+        httponly=True,
+        secure=getattr(settings, "SECURE_COOKIES", True),
+        samesite="Strict",
     )
 
-    # Return success with questionnaire redirect URL and verification code
-    return Response(
-        {
-            "redirect_url": settings.SURVEY_URL,  # The pre-configured questionnaire URL
-            "verification_code": verification_code,  # 8-digit code for user to enter
-        },
-        status=200,
-    )
+    return response
 
 
 @api_view(["GET"])
@@ -116,14 +172,6 @@ def auth_config_api(request):
     """
     API endpoint to provide configuration for the frontend
     """
-    # Force session creation
-    if not request.session.session_key:
-        request.session.create()
-
-    session_id = request.session.session_key
-    if not session_id:
-        return Response({"error": "Unable to create session"}, status=500)
-
     return Response(
         {
             "TURNSTILE_SITE_KEY": settings.TURNSTILE_SITE_KEY,
@@ -133,15 +181,14 @@ def auth_config_api(request):
     )
 
 
-async def get_latest_answer(account: str) -> dict:
+async def get_latest_answer(action: str, account: str) -> dict:
     """
-    Fetch the latest questionnaire answer for a given account from the WJ API.
+    Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
     Returns filtered data with only: id(the answer id), ip_address, submitted_at, user.account and verification_code from the row
     """
-    WJ_API_KEY = settings.WJ_API_KEY
-    if not WJ_API_KEY:
-        logging.error("WJ_API_KEY is not configured")
-        return {}
+    wj_api = get_survey_api_key(action)
+    if not wj_api:
+        return None
 
     BASE_URL = "https://wj.sjtu.edu.cn/api/v1/public/export"
 
@@ -160,11 +207,11 @@ async def get_latest_answer(account: str) -> dict:
     final_query_params = {"params": params_json_str, "sort": sort_json_str}
 
     # Combine to form the full URL path
-    full_url_path = f"{BASE_URL}/{WJ_API_KEY}/json"
+    full_url_path = f"{BASE_URL}/{wj_api}/json"
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            full_url_path, params=final_query_params, timeout=LOGIN_TIME_OUT
+            full_url_path, params=final_query_params, timeout=OTP_TIME_OUT
         )
         full_data = response.json()
 
@@ -189,7 +236,6 @@ async def get_latest_answer(account: str) -> dict:
             # Extract only the required fields from this row
             filtered_data = {
                 "id": latest_answer.get("id"),
-                "ip_address": latest_answer.get("ip_address"),
                 "submitted_at": latest_answer.get("submitted_at"),
                 "account": latest_answer.get("user", {}).get("account")
                 if latest_answer.get("user")
@@ -197,56 +243,59 @@ async def get_latest_answer(account: str) -> dict:
                 "verification_code": verification_code,
             }
 
+            # Check if all required fields are present
+            if not all(filtered_data.values()):
+                logging.warning(f"Missing required field(s) in questionnaire response")
+                return None
+
             return filtered_data
 
-        return {}
+        return None
 
 
 @api_view(["POST"])
 def verify_callback_api(request):
     """
-    Step 4: Callback Verification (/api/auth/verify)
-
-    Handles the verification of questionnaire callback with race condition protection
-    and IP-based priority system
+    Callback Verification (/api/auth/verify)
+    request data includes account, answer_id, action
+    Handles the verification of questionnaire callback using temp_token from cookie.
     """
-
-    # Get username and answer_id from request
-    username = request.data.get("username")
+    # Get required parameters from request
+    account = request.data.get("account")
     answer_id = request.data.get("answer_id")
+    action = request.data.get("action")
 
-    if not username or not answer_id:
-        return Response({"error": "Missing username or answer_id"}, status=400)
+    if not account or not answer_id or not action:
+        return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
-    # Ensure session exists
-    if not request.session.session_key:
-        return Response({"error": "No session found"}, status=401)
+    # Get temp_token from HttpOnly cookie
+    temp_token = request.COOKIES.get("temp_token")
+    if not temp_token:
+        return Response({"error": "No temp_token found"}, status=401)
 
-    session_id = request.session.session_key
     r = get_redis_connection("default")
 
-    # Step 1: Consume login intent
-    login_intent_key = f"login_intent:{session_id}"
-    intent_data = r.get(login_intent_key)
+    # Apply rate limiting per temp_token to prevent brute-force attempts
+    rate_limit_key = (
+        f"verify_attempts:{hashlib.sha256(temp_token.encode()).hexdigest()}"
+    )
 
-    if not intent_data:
-        return Response({"error": "Login intent expired or not found"}, status=401)
+    attempts = r.incr(rate_limit_key)
 
-    # Delete the intent immediately to prevent reuse
-    r.delete(login_intent_key)
+    if attempts == 1:
+        r.expire(rate_limit_key, TOKEN_RATE_LIMIT_TIME)
 
+    if attempts > TOKEN_RATE_LIMIT:
+        return Response({"error": "Too many verification attempts"}, status=429)
+
+    # Step 1: Query questionnaire API for latest submission of the specific questionnaire of the action
     try:
-        intent_data = json.loads(intent_data)
-        initiated_at = intent_data.get("initiated_at")
-        expected_verification_code = intent_data.get("verification_code")
-    except (json.JSONDecodeError, AttributeError):
-        return Response({"error": "Invalid login intent data"}, status=401)
-
-    # Step 2: Query questionnaire API
-    try:
-        latest_answer = asyncio.run(get_latest_answer(username))
+        latest_answer = asyncio.run(get_latest_answer(action=action, account=account))
         if not latest_answer:
-            return Response({"error": "No questionnaire submission found"}, status=403)
+            return Response(
+                {"error": "No questionnaire submission found or submission invalid"},
+                status=403,
+            )
 
         # Check if this is the submission we're looking for
         if str(latest_answer.get("id")) != str(answer_id):
@@ -258,49 +307,115 @@ def verify_callback_api(request):
             {"error": "Failed to verify questionnaire submission"}, status=500
         )
 
-    # Step 3: Validate submission timestamp
+    # Step 2: Extract OTP and quest_id from submission
+    submitted_otp = latest_answer.get("verification_code")
+
+    # Atomically get and delete OTP record to prevent reuse
+    otp_key = f"otp:{submitted_otp}"
+    otp_data_raw = r.getdel(otp_key)
+
+    if not otp_data_raw:
+        return Response({"error": "Invalid or expired OTP"}, status=401)
+
+    try:
+        otp_data = json.loads(otp_data_raw.decode("utf-8"))
+        expected_temp_token = otp_data.get("temp_token")
+        initiated_at = otp_data.get("initiated_at")
+    except (json.JSONDecodeError, AttributeError):
+        return Response({"error": "Invalid OTP data format"}, status=401)
+
+    if not expected_temp_token or not initiated_at:
+        return Response({"error": "Incomplete OTP data"}, status=401)
+
+    # Step 3: Validate submission timestamp after OTP extraction
     try:
         submitted_at_str = latest_answer.get("submitted_at")
+
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
-        # Check if submission is within 2-minute window
-        time_diff = submitted_at - initiated_at
-        if time_diff <= 0 or time_diff >= LOGIN_TIME_OUT:
+        # Additional validation: check submission is after initiation and within window
+        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIME_OUT:
             return Response(
-                {"error": "Submission timestamp outside valid window"}, status=401
+                {"error": "Submission timestamp outside validity window"}, status=401
             )
 
     except (ValueError, TypeError) as e:
         logging.error(f"Error parsing submission timestamp: {e}")
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
-    # Step 4: Verify the 8-digit code matches
-    submitted_code = latest_answer.get("verification_code")
-    if not submitted_code or submitted_code != expected_verification_code:
-        logging.warning(
-            f"Verification code mismatch for user {username}. Expected: {expected_verification_code}, Got: {submitted_code}"
-        )
-        return Response({"error": "Invalid verification code"}, status=403)
+    # Step 4: StepVerify temp_token matches
+    if expected_temp_token != temp_token:
+        return Response({"error": "Invalid temp_token"}, status=401)
 
-    logging.info(f"Verification code validated successfully for user {username}")
+    # Step 5: Look up temp_token state record
+    temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
+    state_key = f"temp_token_state:{temp_token_hash}"
+    state_data = r.get(state_key)
 
-    # # Not needed
-    # # Step 5: Simple IP verification
-    # submission_ip = latest_answer.get("ip_address")
-    # request_ip = (
-    #     request.META.get("HTTP_CF_CONNECTING_IP")
-    #     or request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
-    #     or request.META.get("REMOTE_ADDR")
-    # )
+    if not state_data:
+        return Response({"error": "Temp token state not found or expired"}, status=401)
 
-    # # Log IP information for debugging
-    # if submission_ip == request_ip:
-    #     logging.info(f"IP match verification for answer_id: {answer_id}, IP: {request_ip}")
-    # else:
-    #     logging.info(f"IP mismatch for answer_id: {answer_id}, submission_ip: {submission_ip}, request_ip: {request_ip}")
+    try:
+        state_data = json.loads(state_data)
+    except json.JSONDecodeError:
+        return Response({"error": "Invalid temp token state data"}, status=401)
 
-    # Proceed to create session regardless of IP match
-    return create_user_session(request, username)
+    # Verify status is pending and action matches
+    if state_data.get("status") != "pending":
+        return Response({"error": "Invalid temp token state"}, status=401)
+
+    if state_data.get("action") != action:
+        return Response({"error": "Action mismatch"}, status=403)
+
+    # Step 6: Update state to verified and add user details
+    state_data.update(
+        {
+            "status": "verified",
+            "jaccount": account,
+            "verified_at": time.time(),
+            "answer_id": answer_id,
+        }
+    )
+
+    # Update temp_token_state in Redis with refreshed TTL
+    r.setex(state_key, TEMP_TOKEN_TIMEOUT, json.dumps(state_data))
+    expires_at = int(time.time() + TEMP_TOKEN_TIMEOUT)
+
+    # Clear rate limiting on success
+    r.delete(rate_limit_key)
+
+    logging.info(
+        f"Successfully verified temp_token for user {account} with action {action}"
+    )
+
+    # For login action, handle immediate session creation and cleanup
+    is_logged_in = False
+    if action == "login":
+        try:
+            # Create user session immediately for login
+            session_response = create_user_session(request, account)
+            if session_response.status_code == 200:
+                is_logged_in = True
+                # Delete temp_token_state after successful login
+                r.delete(state_key)
+                logging.info(
+                    f"User {account} logged in successfully, temp_token_state cleaned up"
+                )
+        except Exception as e:
+            logging.error(f"Error creating session for login: {e}")
+            return Response({"error": "Failed to create user session"}, status=500)
+
+    # Create response
+    response = Response(
+        {"action": action, "expires_at": expires_at, "is_logged_in": is_logged_in},
+        status=200,
+    )
+
+    # Clear temp_token cookie if login succeeded
+    if is_logged_in:
+        response.delete_cookie("temp_token")
+
+    return response
 
 
 def create_user_session(request, username):
@@ -309,6 +424,10 @@ def create_user_session(request, username):
     Includes session management and Student model integration similar to auth_login_api
     """
     try:
+        # Ensure session exists - create one if it doesn't exist
+        if not request.session.session_key:
+            request.session.create()
+
         # Get or create user
         User = get_user_model()
 

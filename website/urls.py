@@ -13,8 +13,8 @@ urlpatterns = [
     # OAuth
     re_path(
         r"^api/auth/initiate/$",
-        auth_views.initiate_login_api,
-        name="initiate_login_api",
+        auth_views.auth_initiate_api,
+        name="auth_initiate_api",
     ),
     re_path(r"^api/auth/config/$", auth_views.auth_config_api, name="auth_config_api"),
     re_path(
@@ -97,6 +97,7 @@ urlpatterns = [
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
+    # log out
     re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
     # password resets
     re_path(

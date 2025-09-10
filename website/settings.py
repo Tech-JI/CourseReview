@@ -5,11 +5,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Now we can safely get environment variables
+# get environment variables
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-WJ_API_KEY = os.getenv("WJ_API_KEY")
-SURVEY_URL = os.getenv("SURVEY_URL", "https://wj.sjtu.edu.cn/")
+# url and api for wj platform
+SIGNUP_WJ_API_KEY = os.getenv("SIGNUP_WJ_API_KEY")
+SIGNUP_WJ_URL = os.getenv("SIGNUP_WJ_URL")
+LOGIN_WJ_API_KEY = os.getenv("LOGIN_WJ_API_KEY")
+LOGIN_WJ_URL = os.getenv("LOGIN_WJ_URL")
+RESET_WJ_API_KEY = os.getenv("RESET_WJ_API_KEY")
+RESET_WJ_URL = os.getenv("RESET_WJ_URL")
+
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
