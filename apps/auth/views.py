@@ -149,7 +149,7 @@ def auth_initiate_api(request):
 
     if not survey_url:
         return Response(
-            {"error": "Sometime went wrong when fetching the survey URL"}, status=500
+            {"error": "Something went wrong when fetching the survey URL"}, status=500
         )
 
     # Create response and set temp_token as HttpOnly cookie
@@ -577,7 +577,7 @@ def auth_password_api(request):
         # Validate password strength first (before any operations)
         is_valid = validate_password_strength(password)
         if not is_valid:
-            return Response({"error": "Password validation failed. "}, status=400)
+            return Response({"error": "Password validation failed."}, status=400)
 
         # Get temp_token from HttpOnly cookie
         temp_token = request.COOKIES.get("temp_token")
