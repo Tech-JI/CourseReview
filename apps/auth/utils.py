@@ -7,9 +7,9 @@ import json
 import httpx
 import logging
 
-PASSWORD_LENGTH_MIN = 12
-OTP_TIME_OUT = 120  # 2 min
-BASE_URL = "https://wj.sjtu.edu.cn/api/v1/public/export"
+PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
+OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
+QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
 
 
 def get_survey_url(action: str) -> str:
@@ -96,7 +96,7 @@ async def get_latest_answer(
     final_query_params = {"params": params_json_str, "sort": sort_json_str}
 
     # Combine to form the full URL path
-    full_url_path = f"{BASE_URL}/{quest_api}/json"
+    full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
         async with httpx.AsyncClient() as client:

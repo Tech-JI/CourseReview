@@ -22,7 +22,7 @@ Environment:
 
 6. Make directory for builds of static files: `mkdir staticfiles`
 
-7. Create .env file for storing secrets. The contents should be like:
+7. cp .env.example and rename it .env at root dir. The contents of PostgreSQL should be like:
 
    ```ini
    # PostgreSQL
@@ -35,6 +35,7 @@ Environment:
    DEBUG=True
    OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
    ```
+   Also cp .env.example in frontend/ and rename it .env.
 
 8. Build static files: `make collect`
 

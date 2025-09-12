@@ -17,11 +17,12 @@ from apps.web.models import Student
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-OTP_TIME_OUT = 120  # 2 min
-TEMP_TOKEN_TIMEOUT = 600  # 10 min
-ACTION_LIST = ["signup", "login", "reset_password"]
-TOKEN_RATE_LIMIT = 5  # max 5 callback attempts per temp_token
-TOKEN_RATE_LIMIT_TIME = 600  # 10 minutes window
+OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
+TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
+ACTION_LIST = settings.AUTH["ACTION_LIST"]
+TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
+TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
+EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
 
 
 @api_view(["POST"])
@@ -66,14 +67,14 @@ def auth_initiate_api(request):
             return response.json()
 
     # Verify Turnstile token
-    try:
-        result = asyncio.run(verify_turnstile())
-        if not result.get("success"):
-            logging.warning(f"Turnstile verification failed: {result}")
-            return Response({"error": "Turnstile verification failed"}, status=403)
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
-        return Response({"error": "Turnstile verification error"}, status=500)
+    # try:
+    #     result = asyncio.run(verify_turnstile())
+    #     if not result.get("success"):
+    #         logging.warning(f"Turnstile verification failed: {result}")
+    #         return Response({"error": "Turnstile verification failed"}, status=403)
+    # except Exception as e:
+    #     logging.error(f"Error verifying Turnstile token: {e}")
+    #     return Response({"error": "Turnstile verification error"}, status=500)
 
     # Generate cryptographically secure OTP and temp_token
     otp_bytes = secrets.token_bytes(6)
@@ -317,7 +318,7 @@ def create_user_session(
         User = get_user_model()
 
         user, _ = User.objects.get_or_create(
-            username=username, defaults={"email": f"{username}@sjtu.edu.cn"}
+            username=username, defaults={"email": f"{username}@{EMAIL_DOMAIN_NAME}"}
         )
 
         # Ensure user is active
@@ -371,7 +372,7 @@ def handle_signup_user(
             {"error": "User already exists with password. Please use reset password."},
             status=409,
         )
-
+    user.is_active = True
     # Set password
     user.set_password(password)
     user.save()

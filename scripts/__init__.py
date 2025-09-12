@@ -97,7 +97,7 @@ def crawl_and_save_instructors():
                     break
 
             if not instructor_names:
-                print(f"  No instructors found")
+                print("No instructors found")
                 continue
 
             print(f"  Found instructors: {', '.join(instructor_names)}")

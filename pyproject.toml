@@ -24,6 +24,7 @@ dependencies = [
     "djangorestframework>=3.16.0",
     "django-cors-headers>=4.7.0",
     "django-redis",
+    "pyyaml>=6.0.2",
 ]
 
 [tool.uv]
