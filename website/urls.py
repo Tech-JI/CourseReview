@@ -16,7 +16,6 @@ urlpatterns = [
         auth_views.auth_initiate_api,
         name="auth_initiate_api",
     ),
-    re_path(r"^api/auth/config/$", auth_views.auth_config_api, name="auth_config_api"),
     re_path(
         r"^api/auth/verify/$",
         auth_views.verify_callback_api,
@@ -49,7 +48,6 @@ urlpatterns = [
         name="crawled_data",
     ),
     # primary views
-    # homepage redirecting to this path will be handling by the frontend
     re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
@@ -102,34 +100,4 @@ urlpatterns = [
     ),
     # recommendations
     re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
-    # password resets(deprecated))
-    # re_path(
-    #     r"^accounts/password/reset/$",
-    #     authviews.PasswordResetView.as_view(
-    #         template_name="password_reset_form.html",
-    #         html_email_template_name="password_reset_email.html",
-    #         email_template_name="password_reset_email.html",
-    #     ),
-    #     {"post_reset_redirect": "/accounts/password/reset/done/"},
-    #     name="password_reset",
-    # ),
-    # re_path(
-    #     r"^accounts/password/reset/done/$",
-    #     authviews.PasswordResetDoneView.as_view(
-    #         template_name="password_reset_done.html"
-    #     ),
-    # ),
-    # re_path(
-    #     r"^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)-(?P<token>.+)/$",
-    #     authviews.PasswordResetConfirmView.as_view(
-    #         template_name="password_reset_confirm.html"
-    #     ),
-    #     name="password_reset_confirm",
-    # ),
-    # re_path(
-    #     r"^accounts/password/done/$",
-    #     authviews.PasswordResetCompleteView.as_view(
-    #         template_name="password_reset_complete.html"
-    #     ),
-    # ),
 ]

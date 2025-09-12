@@ -7,12 +7,12 @@ import secrets
 import base64
 import dateutil.parser
 import hashlib
-import re
+from apps.auth import utils
 from django.contrib.auth import login
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django_redis import get_redis_connection
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from apps.web.models import Student
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -22,34 +22,6 @@ TEMP_TOKEN_TIMEOUT = 600  # 10 min
 ACTION_LIST = ["signup", "login", "reset_password"]
 TOKEN_RATE_LIMIT = 5  # max 5 callback attempts per temp_token
 TOKEN_RATE_LIMIT_TIME = 600  # 10 minutes window
-
-
-def get_survey_url(action: str) -> str:
-    """
-    Helper function to get the survey URL based on action type
-    """
-    if action == "signup":
-        return settings.SIGNUP_WJ_URL
-    elif action == "login":
-        return settings.LOGIN_WJ_URL
-    elif action == "reset_password":
-        return settings.RESET_WJ_URL
-    else:
-        return None
-
-
-def get_survey_api_key(action: str) -> str:
-    """
-    Helper function to get the survey API key based on action type
-    """
-    if action == "signup":
-        return settings.SIGNUP_WJ_API_KEY
-    elif action == "login":
-        return settings.LOGIN_WJ_API_KEY
-    elif action == "reset_password":
-        return settings.RESET_WJ_API_KEY
-    else:
-        return None
 
 
 @api_view(["POST"])
@@ -145,7 +117,7 @@ def auth_initiate_api(request):
 
     logging.info(f"Created auth intent for action {action} with OTP and temp_token")
 
-    survey_url = get_survey_url(action)
+    survey_url = utils.get_survey_url(action)
 
     if not survey_url:
         return Response(
@@ -162,96 +134,9 @@ def auth_initiate_api(request):
         max_age=TEMP_TOKEN_TIMEOUT,
         httponly=True,
         secure=getattr(settings, "SECURE_COOKIES", True),
-        samesite="Strict",
     )
 
     return response
-
-
-@api_view(["GET"])
-def auth_config_api(request):
-    """
-    API endpoint to provide configuration for the frontend
-    """
-    return Response(
-        {
-            "TURNSTILE_SITE_KEY": settings.TURNSTILE_SITE_KEY,
-            "SURVEY_URL": settings.SURVEY_URL,
-        },
-        status=200,
-    )
-
-
-async def get_latest_answer(action: str, account: str) -> dict:
-    """
-    Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
-    Returns filtered data with only: id(the answer id), ip_address, submitted_at, user.account and verification_code from the row
-    """
-    wj_api = get_survey_api_key(action)
-    if not wj_api:
-        return None
-
-    BASE_URL = "https://wj.sjtu.edu.cn/api/v1/public/export"
-
-    # Build the 'params' and 'sort' dictionaries
-    params_dict = {
-        "account": account,
-        "current": 1,
-        "pageSize": 1,
-    }
-    sort_dict = {"id": "desc"}
-
-    params_json_str = json.dumps(params_dict, ensure_ascii=False)
-    sort_json_str = json.dumps(sort_dict)
-
-    # Prepare the final query parameters
-    final_query_params = {"params": params_json_str, "sort": sort_json_str}
-
-    # Combine to form the full URL path
-    full_url_path = f"{BASE_URL}/{wj_api}/json"
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            full_url_path, params=final_query_params, timeout=OTP_TIME_OUT
-        )
-        full_data = response.json()
-
-        # Filter and return only the required fields from the first row
-        if (
-            full_data.get("success")
-            and full_data.get("data")
-            and full_data["data"].get("rows")
-            and len(full_data["data"]["rows"]) > 0
-        ):
-            latest_answer = full_data["data"]["rows"][0]  # Get the first (latest) row
-
-            # Extract the 8-digit verification code from the first answer
-            verification_code = None
-            if (
-                latest_answer.get("answers")
-                and len(latest_answer["answers"]) > 0
-                and latest_answer["answers"][0].get("answer")
-            ):
-                verification_code = latest_answer["answers"][0]["answer"]
-
-            # Extract only the required fields from this row
-            filtered_data = {
-                "id": latest_answer.get("id"),
-                "submitted_at": latest_answer.get("submitted_at"),
-                "account": latest_answer.get("user", {}).get("account")
-                if latest_answer.get("user")
-                else None,
-                "verification_code": verification_code,
-            }
-
-            # Check if all required fields are present
-            if not all(filtered_data.values()):
-                logging.warning(f"Missing required field(s) in questionnaire response")
-                return None
-
-            return filtered_data
-
-        return None
 
 
 @api_view(["POST"])
@@ -290,23 +175,15 @@ def verify_callback_api(request):
         return Response({"error": "Too many verification attempts"}, status=429)
 
     # Step 1: Query questionnaire API for latest submission of the specific questionnaire of the action
-    try:
-        latest_answer = asyncio.run(get_latest_answer(action=action, account=account))
-        if not latest_answer:
-            return Response(
-                {"error": "No questionnaire submission found or submission invalid"},
-                status=403,
-            )
+    latest_answer, error_response = asyncio.run(
+        utils.get_latest_answer(action=action, account=account)
+    )
+    if error_response:
+        return error_response
 
-        # Check if this is the submission we're looking for
-        if str(latest_answer.get("id")) != str(answer_id):
-            return Response({"error": "Answer ID mismatch"}, status=403)
-
-    except Exception as e:
-        logging.error(f"Error querying questionnaire API: {e}")
-        return Response(
-            {"error": "Failed to verify questionnaire submission"}, status=500
-        )
+    # Check if this is the submission we're looking for
+    if str(latest_answer.get("id")) != str(answer_id):
+        return Response({"error": "Answer ID mismatch"}, status=403)
 
     # Step 2: Extract OTP and quest_id from submission
     submitted_otp = latest_answer.get("verification_code")
@@ -392,19 +269,21 @@ def verify_callback_api(request):
     # For login action, handle immediate session creation and cleanup
     is_logged_in = False
     if action == "login":
-        try:
-            # Create user session immediately for login
-            ifsuccess = create_user_session(request, account)
-            if ifsuccess:
-                is_logged_in = True
-                # Delete temp_token_state after successful login
-                r.delete(state_key)
-                logging.info(
-                    f"User {account} logged in successfully, temp_token_state cleaned up"
-                )
-        except Exception as e:
-            logging.error(f"Error creating session for login: {e}")
-            return Response({"error": "Failed to create user session"}, status=500)
+        user, error_response = create_user_session(request, account)
+        if error_response:
+            # Log the error and return the response from the helper
+            logging.error(
+                f"Failed to create session for login: {error_response.data['error']}"
+            )
+            return error_response
+
+        if user:
+            is_logged_in = True
+            # Delete temp_token_state after successful login
+            r.delete(state_key)
+            logging.info(
+                f"User {account} logged in successfully, temp_token_state cleaned up"
+            )
 
     # Create response
     response = Response(
@@ -419,11 +298,15 @@ def verify_callback_api(request):
     return response
 
 
-def create_user_session(request, username) -> bool:
+def create_user_session(
+    request, username
+) -> tuple[AbstractUser | None, Response | None]:
     """
-    Helper function to create authenticated session for verified user
-    Includes session management and Student model integration similar to auth_login_api
-    but returns boolean success
+    Helper function to create authenticated session for verified user.
+    Includes session management and Student model integration.
+    Returns a tuple of (user, error_response).
+    `user` is the user object on success, otherwise None.
+    `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
     try:
         # Ensure session exists - create one if it doesn't exist
@@ -440,7 +323,7 @@ def create_user_session(request, username) -> bool:
         # Ensure user is active
         if not user.is_active:
             logging.warning(f"Inactive user attempted OAuth login: {username}")
-            return False
+            return None, Response({"error": "User account is inactive"}, status=403)
 
         # Create Django session
         login(request, user)
@@ -464,39 +347,16 @@ def create_user_session(request, username) -> bool:
         request.session["user_id"] = user.username
 
         logging.info(f"Successfully created OAuth session for user: {username}")
-        return True
+        return user, None
 
     except Exception as e:
         logging.error(f"Error creating user session: {e}")
-        return False
+        return None, Response({"error": "Failed to create user session"}, status=500)
 
 
-def validate_password_strength(password) -> bool:
-    """
-    Helper function to validate password complexity and strength.
-    Custom requirements: More than 12 characters, at least one uppercase, lower case letter and numeric digit.
-    Also uses Django's built-in validators for additional security.
-
-    Returns: bool (True if valid, False if invalid)
-    """
-    # Quick length check first
-    if len(password) <= 12:
-        return False
-
-    # Single regex pattern to check all character requirements at once
-    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$"
-    if not re.match(pattern, password):
-        return False
-
-    # Use Django's built-in validators for additional checks
-    try:
-        validate_password(password)
-        return True
-    except:
-        return False
-
-
-def handle_signup_user(account, password, request) -> tuple:
+def handle_signup_user(
+    account, password, request
+) -> tuple[AbstractUser | None, Response | None]:
     """
     Helper function to handle user creation and session creation for signup action.
     Will return error if user already exists.
@@ -517,15 +377,16 @@ def handle_signup_user(account, password, request) -> tuple:
     user.save()
 
     # Create user session (log them in)
-    if not create_user_session(request, account):
-        return None, Response(
-            {"error": "user created but failed to log in"}, status=500
-        )
+    user, error_response = create_user_session(request, account)
+    if error_response:
+        return None, error_response
     # no error
     return user, None
 
 
-def handle_reset_password_user(account, password, request) -> tuple:
+def handle_reset_password_user(
+    account, password, request
+) -> tuple[AbstractUser | None, Response | None]:
     """
     Helper function to handle password reset for reset_password action.
     Ensures user is logged in and the account matches their username.
@@ -555,7 +416,7 @@ def handle_reset_password_user(account, password, request) -> tuple:
         # no error
         return user, None
 
-    except:
+    except Exception:
         return None, Response({"error": "error when reseting password"}, status=500)
 
 
@@ -570,14 +431,13 @@ def auth_password_api(request):
     try:
         # Get password from request data
         password = request.data.get("password")
-        next_url = request.data.get("next", "/courses")
         if not password:
             return Response({"error": "Missing password"}, status=400)
 
         # Validate password strength first (before any operations)
-        is_valid = validate_password_strength(password)
+        is_valid, error_response = utils.validate_password_strength(password)
         if not is_valid:
-            return Response({"error": "Password validation failed."}, status=400)
+            return Response(error_response, status=400)
 
         # Get temp_token from HttpOnly cookie
         temp_token = request.COOKIES.get("temp_token")
@@ -633,9 +493,7 @@ def auth_password_api(request):
         logging.info(
             f"User {account} successfully set password for {action}, temp_token_state cleaned up"
         )
-        response = Response(
-            {"success": True, "next": next_url, "username": user.username}, status=200
-        )
+        response = Response({"success": True, "username": user.username}, status=200)
         # Clear the temp_token cookie and return the action-specific response
         response.delete_cookie("temp_token")
         return response

@@ -1,6 +1,6 @@
 import os
 
-# Load environment variables from .env file FIRST
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,12 +9,15 @@ load_dotenv()
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
 # url and api for wj platform
-SIGNUP_WJ_API_KEY = os.getenv("SIGNUP_WJ_API_KEY")
-SIGNUP_WJ_URL = os.getenv("SIGNUP_WJ_URL")
-LOGIN_WJ_API_KEY = os.getenv("LOGIN_WJ_API_KEY")
-LOGIN_WJ_URL = os.getenv("LOGIN_WJ_URL")
-RESET_WJ_API_KEY = os.getenv("RESET_WJ_API_KEY")
-RESET_WJ_URL = os.getenv("RESET_WJ_URL")
+SIGNUP_QUEST_API_KEY = os.getenv("SIGNUP_QUEST_API_KEY")
+SIGNUP_QUEST_URL = os.getenv("SIGNUP_QUEST_URL")
+SIGNUP_QUEST_QUESTIONID = os.getenv("SIGNUP_QUEST_QUESTIONID")
+LOGIN_QUEST_API_KEY = os.getenv("LOGIN_QUEST_API_KEY")
+LOGIN_QUEST_URL = os.getenv("LOGIN_QUEST_URL")
+LOGIN_QUEST_QUESTIONID = os.getenv("LOGIN_QUEST_QUESTIONID")
+RESET_QUEST_API_KEY = os.getenv("RESET_QUEST_API_KEY")
+RESET_QUEST_URL = os.getenv("RESET_QUEST_URL")
+RESET_QUEST_QUESTIONID = os.getenv("RESET_QUEST_QUESTIONID")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -208,7 +211,7 @@ PIPELINE = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SESSION_COOKIE_AGE = 86400 * 30  # 30 days (more reasonable than 100 years)
+SESSION_COOKIE_AGE = 86400 * 30  # 30 days
 SESSION_COOKIE_SECURE = not DEBUG
 
 CACHES = {
