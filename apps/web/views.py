@@ -1,20 +1,33 @@
+from apps.web.models import (
+    Course,
+    CourseMedian,
+    Instructor,
+    Review,
+    ReviewVote,
+    Student,
+    Vote,
+)
+
+from apps.web.models.forms import ReviewForm
+
+from apps.web.serializers import (
+    CourseSearchSerializer,
+    CourseSerializer,
+    ReviewSerializer,
+)
+
+from lib import constants
+from lib.departments import get_department_name
+from lib.grades import numeric_value_for_grade
+from lib.terms import numeric_value_of_term
+
 import datetime
 import uuid
-
 import dateutil.parser
+
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
-from django.http import (
-    HttpResponseBadRequest,
-    HttpResponseForbidden,
-    HttpResponseRedirect,
-    JsonResponse,
-)
-from django.shortcuts import redirect, render
-from django.urls import reverse
-from django.views.decorators.http import require_POST, require_safe
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
@@ -29,27 +42,6 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return
 
-
-from apps.web.models import (
-    Course,
-    CourseMedian,
-    DistributiveRequirement,
-    Instructor,
-    Review,
-    ReviewVote,
-    Student,
-    Vote,
-)
-from apps.web.models.forms import ReviewForm, SignupForm
-from apps.web.serializers import (
-    CourseSearchSerializer,
-    CourseSerializer,
-    ReviewSerializer,
-)
-from lib import constants
-from lib.departments import get_department_name
-from lib.grades import numeric_value_for_grade
-from lib.terms import numeric_value_of_term
 
 LIMITS = {
     "courses": 20,
@@ -110,7 +102,6 @@ def get_prior_course_id(request, current_course_id):
 def auth_login_api(request):
     email = request.data.get("email", "").lower()
     password = request.data.get("password", "")
-    next_url = request.data.get("next", "/courses")
 
     if not email or not password:
         return Response({"error": "Email and password are required"}, status=400)
@@ -132,9 +123,7 @@ def auth_login_api(request):
                     )
             request.session["user_id"] = user.username
 
-            return Response(
-                {"success": True, "next": next_url, "username": user.username}
-            )
+            return Response({"success": True, "username": user.username})
         else:
             return Response(
                 {
@@ -360,7 +349,7 @@ def course_review_search_api(request, course_id):
     )
 
 
-@require_safe
+@api_view(["GET"])
 def medians(request, course_id):
     # retrieve course medians for term, and group by term for averaging
     medians_by_term = {}
@@ -377,7 +366,7 @@ def medians(request, course_id):
             }
         )
 
-    return JsonResponse(
+    return Response(
         {
             "medians": sorted(
                 [
@@ -394,13 +383,14 @@ def medians(request, course_id):
                 key=lambda x: numeric_value_of_term(x["term"]),
                 reverse=True,
             )
-        }
+        },
+        status=200,
     )
 
 
-@require_safe
+@api_view(["GET"])
 def course_professors(request, course_id):
-    return JsonResponse(
+    return Response(
         {
             "professors": sorted(
                 set(
@@ -416,20 +406,21 @@ def course_professors(request, course_id):
                     .distinct()
                 )
             )
-        }
+        },
+        status=200,
     )
 
 
-@require_safe
+@api_view(["GET"])
 def course_instructors(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
         instructors = course.get_instructors()
-        return JsonResponse(
-            {"instructors": [instructor.name for instructor in instructors]}
+        return Response(
+            {"instructors": [instructor.name for instructor in instructors]}, status=200
         )
     except Course.DoesNotExist:
-        return JsonResponse({"error": "Course not found"}, status=404)
+        return Response({"error": "Course not found"}, status=404)
 
 
 @api_view(["POST"])

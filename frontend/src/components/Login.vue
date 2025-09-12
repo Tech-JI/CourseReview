@@ -165,7 +165,6 @@ const handleLogin = async () => {
       body: JSON.stringify({
         email: email.value,
         password: password.value,
-        next: route.query.next || "/courses",
       }),
     });
 
@@ -175,7 +174,7 @@ const handleLogin = async () => {
       throw new Error(data.error || "Login failed");
     }
 
-    window.location.href = data.next || "/courses";
+    router.replace("/courses");
   } catch (err) {
     error.value = err.message;
   } finally {
