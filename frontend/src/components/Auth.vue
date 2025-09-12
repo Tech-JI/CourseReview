@@ -139,40 +139,7 @@ const loading = ref(true);
 const error = ref(null);
 const initiating = ref(false);
 
-// Configuration from backend
-const config = ref({
-  turnstile_site_key: null,
-  survey_url: null,
-});
-
 let turnstileWidget = null;
-
-// Fetch configuration from backend
-const fetchConfig = async () => {
-  try {
-    const response = await fetch("/api/auth/config/", {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    config.value = {
-      turnstile_site_key: data.TURNSTILE_SITE_KEY,
-      survey_url: data.SURVEY_URL,
-    };
-
-    return true;
-  } catch (err) {
-    console.error("Failed to fetch configuration:", err);
-    error.value =
-      "Failed to load authentication configuration. Please refresh the page and try again.";
-    return false;
-  }
-};
 
 // Load Cloudflare Turnstile script
 const loadTurnstile = () => {
@@ -204,12 +171,6 @@ const loadTurnstile = () => {
 // Initialize Turnstile widget
 const initializeTurnstile = async () => {
   try {
-    // First fetch configuration
-    const configLoaded = await fetchConfig();
-    if (!configLoaded || !config.value.turnstile_site_key) {
-      return;
-    }
-
     // Set loading to false so the Turnstile container is rendered in DOM
     loading.value = false;
 
@@ -234,7 +195,7 @@ const initializeTurnstile = async () => {
     }
 
     turnstileWidget = window.turnstile.render("#turnstile-widget", {
-      sitekey: config.value.turnstile_site_key,
+      sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
       callback: (token) => {
         turnstileToken.value = token;
       },
