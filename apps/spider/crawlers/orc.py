@@ -6,16 +6,28 @@ import json
 import requests
 import time
 from collections import defaultdict
+from urllib.parse import urljoin
 
+from apps.spider.utils import retrieve_soup
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
-# API endpoints
+# API endpoints for course selection system
 BASE_URL = "https://coursesel.umji.sjtu.edu.cn"
 COURSE_DETAIL_URL_PREFIX = urllib.parse.urljoin(BASE_URL, "/course/")
+
+# Official website endpoints for detailed course info
+OFFICIAL_BASE_URL = "https://www.ji.sjtu.edu.cn/"
+OFFICIAL_ORC_BASE_URL = urljoin(
+    OFFICIAL_BASE_URL, "/academics/courses/courses-by-number/"
+)
+OFFICIAL_COURSE_DETAIL_URL_PREFIX = (
+    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
+)
+OFFICIAL_UNDERGRAD_URL = OFFICIAL_ORC_BASE_URL
 
 
 class CourseSelCrawler:
@@ -65,18 +77,24 @@ class CourseSelCrawler:
 
     def get_all_courses(self):
         """
-        Get all course data from multiple APIs
+        Get all course data from multiple APIs and official website
 
         Returns:
             list: Course data with prerequisites, descriptions, and instructors
         """
         self._ensure_initialized()  # Make sure crawler is initialized
 
+        # Get data from course selection APIs
         courses_data = self._get_lesson_tasks()
         course_details = self._get_course_catalog()
         prerequisites = self._get_prerequisites()
 
-        return self._integrate_course_data(courses_data, course_details, prerequisites)
+        # Get official website data for enhanced descriptions
+        official_data = self._get_official_website_data()
+
+        return self._integrate_course_data(
+            courses_data, course_details, prerequisites, official_data
+        )
 
     def _get_current_elect_turn_id(self):
         """Get current election turn ID dynamically"""
@@ -200,10 +218,116 @@ class CourseSelCrawler:
             logger.error(f"Prerequisites API error: {str(e)}")
             return {}
 
-    def _integrate_course_data(self, courses_data, course_details, prerequisites):
+    def _get_official_website_data(self):
+        """Get course data from official JI website for enhanced descriptions"""
+        logger.info("Fetching course data from official website")
+
+        try:
+            # Get all course URLs from official website
+            official_urls = self._get_official_course_urls()
+            official_data = {}
+
+            for url in official_urls:
+                course_data = self._crawl_official_course_data(url)
+                if course_data and course_data.get("course_code"):
+                    official_data[course_data["course_code"]] = course_data
+
+            logger.info(f"Fetched official data for {len(official_data)} courses")
+            return official_data
+
+        except Exception as e:
+            logger.error(f"Error fetching official website data: {str(e)}")
+            return {}
+
+    def _get_official_course_urls(self):
+        """Get all course URLs from official website"""
+        try:
+            soup = retrieve_soup(OFFICIAL_UNDERGRAD_URL)
+            linked_urls = [
+                urljoin(OFFICIAL_BASE_URL, a["href"])
+                for a in soup.find_all("a", href=True)
+            ]
+            return set(
+                linked_url
+                for linked_url in linked_urls
+                if self._is_official_course_url(linked_url)
+            )
+        except Exception as e:
+            logger.error(f"Error getting official course URLs: {str(e)}")
+            return set()
+
+    def _is_official_course_url(self, candidate_url):
+        """Check if URL is a valid official course detail URL"""
+        return candidate_url.startswith(OFFICIAL_COURSE_DETAIL_URL_PREFIX)
+
+    def _crawl_official_course_data(self, course_url):
+        """Crawl single course data from official website"""
+        try:
+            soup = retrieve_soup(course_url)
+            course_heading = soup.find("h2")
+            if not course_heading:
+                return None
+
+            course_heading_text = course_heading.get_text()
+            if not course_heading_text:
+                return None
+
+            split_course_heading = course_heading_text.split(" – ")
+            if len(split_course_heading) < 2:
+                return None
+
+            children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
+
+            course_code = split_course_heading[0]
+            course_title = split_course_heading[1]
+
+            description = ""
+            course_topics = []
+            official_url = course_url
+
+            for i, child in enumerate(children):
+                text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
+                if "Description:" in text:
+                    description = (
+                        children[i + 2].get_text(strip=True)
+                        if i + 2 < len(children)
+                        else ""
+                    )
+                    if description == "\n" or "Course Topics" in description:
+                        description = ""
+                elif "Course Topics:" in text:
+                    course_topics = (
+                        [
+                            li.get_text(strip=True)
+                            for li in children[i + 2].find_all("li")
+                        ]
+                        if i + 2 < len(children)
+                        else []
+                    )
+
+            return {
+                "course_code": course_code,
+                "course_title": course_title,
+                "description": description,
+                "course_topics": course_topics,
+                "official_url": official_url,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error crawling official course data from {course_url}: {str(e)}"
+            )
+            return None
+
+    def _integrate_course_data(
+        self, courses_data, course_details, prerequisites, official_data=None
+    ):
         """Integrate course data from multiple sources"""
+        if official_data is None:
+            official_data = {}
+
         logger.info(
-            f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups"
+            f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups, {len(official_data)} official records"
         )
 
         courses_by_code = defaultdict(list)
@@ -223,6 +347,7 @@ class CourseSelCrawler:
             course_id = merged.get("courseId")
             catalog_info = course_details.get(course_id, {})
             prereq_info = prerequisites.get(course_id, [])
+            official_info = official_data.get(course_code, {})
 
             if prereq_info:
                 courses_with_prereqs += 1
@@ -231,7 +356,7 @@ class CourseSelCrawler:
                 )
 
             course_data = self._build_course_record(
-                course_code, merged, catalog_info, prereq_info
+                course_code, merged, catalog_info, prereq_info, official_info
             )
 
             if course_data:
@@ -260,18 +385,30 @@ class CourseSelCrawler:
         merged["all_instructors"] = list(all_instructors)
         return merged
 
-    def _build_course_record(self, course_code, main_data, catalog_data, prereq_data):
-        """Build standardized course record"""
-        course_title = self._extract_course_title(main_data, catalog_data)
+    def _build_course_record(
+        self, course_code, main_data, catalog_data, prereq_data, official_data=None
+    ):
+        """Build standardized course record with official website data integration"""
+        if official_data is None:
+            official_data = {}
+
+        course_title = self._extract_course_title(
+            main_data, catalog_data, official_data
+        )
         if not course_title:
             return None
 
         department, number = self._parse_course_code(course_code)
         course_credits = self._extract_course_credits(main_data, catalog_data)
         prerequisites = self._build_prerequisites_string(course_code, prereq_data)
-        description = self._extract_description(main_data, catalog_data)
+        description = self._extract_description(official_data)
         instructors = self._extract_instructors(main_data, catalog_data)
-        course_url = self._build_course_url(main_data)
+        # Get course topics and official URL from official website data
+        course_topics = official_data.get("course_topics", [])
+        official_url = official_data.get("official_url", "")
+
+        # Use official URL as primary URL, fallback to API URL if not available
+        course_url = official_url or self._build_course_url(main_data)
 
         return {
             "course_code": course_code,
@@ -281,15 +418,20 @@ class CourseSelCrawler:
             "course_credits": course_credits,
             "pre_requisites": prerequisites,
             "description": description,
-            "course_topics": [],
+            "course_topics": course_topics,
             "instructors": instructors,
             "url": course_url,
+            "official_url": official_url,
         }
 
-    def _extract_course_title(self, main_data, catalog_data):
+    def _extract_course_title(self, main_data, catalog_data, official_data=None):
         """Extract course title (prefer English name)"""
+        if official_data is None:
+            official_data = {}
+
         return (
-            main_data.get("courseNameEn", "")
+            official_data.get("course_title", "")
+            or main_data.get("courseNameEn", "")
             or main_data.get("courseName", "")
             or catalog_data.get("courseNameEn", "")
             or catalog_data.get("courseName", "")
@@ -369,14 +511,12 @@ class CourseSelCrawler:
 
         return normalized
 
-    def _extract_description(self, main_data, catalog_data):
-        """Extract course description"""
-        return (
-            main_data.get("description", "")
-            or catalog_data.get("description", "")
-            or main_data.get("memo", "")
-            or catalog_data.get("memo", "")
-        ).strip()
+    def _extract_description(self, official_data=None):
+        """Extract course description (only from official website)"""
+        if official_data is None:
+            official_data = {}
+
+        return official_data.get("description", "").strip()
 
     def _extract_instructors(self, main_data, catalog_data):
         """Extract and merge instructor information"""
@@ -440,18 +580,25 @@ def _crawl_course_data(course_url):
 def import_department(department_data):
     """Import course data to database"""
     for course_data in department_data:
+        # Prepare defaults dict with all available fields
+        defaults = {
+            "course_title": course_data["course_title"],
+            "department": course_data["department"],
+            "number": course_data["number"],
+            "course_credits": course_data["course_credits"],
+            "pre_requisites": course_data["pre_requisites"],
+            "description": course_data["description"],
+            "course_topics": course_data["course_topics"],
+            "url": course_data["url"],
+        }
+
+        # Add official_url if available
+        if "official_url" in course_data:
+            defaults["official_url"] = course_data["official_url"]
+
         course, _ = Course.objects.update_or_create(
             course_code=course_data["course_code"],
-            defaults={
-                "course_title": course_data["course_title"],
-                "department": course_data["department"],
-                "number": course_data["number"],
-                "course_credits": course_data["course_credits"],
-                "pre_requisites": course_data["pre_requisites"],
-                "description": course_data["description"],
-                "course_topics": course_data["course_topics"],
-                "url": course_data["url"],
-            },
+            defaults=defaults,
         )
 
         if "instructors" in course_data and course_data["instructors"]:
