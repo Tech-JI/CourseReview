@@ -1,34 +1,50 @@
-import json
-import httpx
 import asyncio
-import logging
-import time
-import secrets
 import base64
-import dateutil.parser
 import hashlib
-from apps.auth import utils
-from django.contrib.auth import login
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AbstractUser
-from django_redis import get_redis_connection
+import json
+import logging
+import secrets
+import time
+
+import dateutil.parser
+import httpx
 from django.conf import settings
-from apps.web.models import Student
-from rest_framework.decorators import api_view
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django_redis import get_redis_connection
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from apps.auth import utils
+from apps.web.models import Student
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return
+
+
+LIMITS = {
+    "courses": 20,
+    "reviews": 5,
+    "unauthenticated_review_search": 3,
+}
 
 OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
 TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
 ACTION_LIST = settings.AUTH["ACTION_LIST"]
 TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
-EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
 
 
 @api_view(["POST"])
 def auth_initiate_api(request):
-    """
-    Step 1: Authentication Initiation (/api/auth/initiate)
+    """Step 1: Authentication Initiation (/api/auth/initiate)
 
     1. Receives action and turnstile_token from frontend
     2. Verifies Turnstile token with Cloudflare's API
@@ -97,7 +113,7 @@ def auth_initiate_api(request):
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logging.info(
-                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}"
+                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}",
                 )
         except Exception as e:
             logging.warning(f"Error cleaning up existing temp_token: {e}")
@@ -122,7 +138,8 @@ def auth_initiate_api(request):
 
     if not survey_url:
         return Response(
-            {"error": "Something went wrong when fetching the survey URL"}, status=500
+            {"error": "Something went wrong when fetching the survey URL"},
+            status=500,
         )
 
     # Create response and set temp_token as HttpOnly cookie
@@ -142,8 +159,7 @@ def auth_initiate_api(request):
 
 @api_view(["POST"])
 def verify_callback_api(request):
-    """
-    Callback Verification (/api/auth/verify)
+    """Callback Verification (/api/auth/verify)
     request data includes account, answer_id, action
     Handles the verification of questionnaire callback using temp_token from cookie.
     """
@@ -162,71 +178,7 @@ def verify_callback_api(request):
 
     r = get_redis_connection("default")
 
-    # Apply rate limiting per temp_token to prevent brute-force attempts
-    rate_limit_key = (
-        f"verify_attempts:{hashlib.sha256(temp_token.encode()).hexdigest()}"
-    )
-
-    attempts = r.incr(rate_limit_key)
-
-    if attempts == 1:
-        r.expire(rate_limit_key, TOKEN_RATE_LIMIT_TIME)
-
-    if attempts > TOKEN_RATE_LIMIT:
-        return Response({"error": "Too many verification attempts"}, status=429)
-
-    # Step 1: Query questionnaire API for latest submission of the specific questionnaire of the action
-    latest_answer, error_response = asyncio.run(
-        utils.get_latest_answer(action=action, account=account)
-    )
-    if error_response:
-        return error_response
-
-    # Check if this is the submission we're looking for
-    if str(latest_answer.get("id")) != str(answer_id):
-        return Response({"error": "Answer ID mismatch"}, status=403)
-
-    # Step 2: Extract OTP and quest_id from submission
-    submitted_otp = latest_answer.get("verification_code")
-
-    # Atomically get and delete OTP record to prevent reuse
-    otp_key = f"otp:{submitted_otp}"
-    otp_data_raw = r.getdel(otp_key)
-
-    if not otp_data_raw:
-        return Response({"error": "Invalid or expired OTP"}, status=401)
-
-    try:
-        otp_data = json.loads(otp_data_raw.decode("utf-8"))
-        expected_temp_token = otp_data.get("temp_token")
-        initiated_at = otp_data.get("initiated_at")
-    except (json.JSONDecodeError, AttributeError):
-        return Response({"error": "Invalid OTP data format"}, status=401)
-
-    if not expected_temp_token or not initiated_at:
-        return Response({"error": "Incomplete OTP data"}, status=401)
-
-    # Step 3: Validate submission timestamp after OTP extraction
-    try:
-        submitted_at_str = latest_answer.get("submitted_at")
-
-        submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
-
-        # Additional validation: check submission is after initiation and within window
-        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIME_OUT:
-            return Response(
-                {"error": "Submission timestamp outside validity window"}, status=401
-            )
-
-    except (ValueError, TypeError) as e:
-        logging.error(f"Error parsing submission timestamp: {e}")
-        return Response({"error": "Invalid submission timestamp"}, status=401)
-
-    # Step 4: StepVerify temp_token matches
-    if expected_temp_token != temp_token:
-        return Response({"error": "Invalid temp_token"}, status=401)
-
-    # Step 5: Look up temp_token state record
+    # Step 1: Look up temp_token state record
     temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
     state_key = f"temp_token_state:{temp_token_hash}"
     state_data = r.get(state_key)
@@ -246,14 +198,77 @@ def verify_callback_api(request):
     if state_data.get("action") != action:
         return Response({"error": "Action mismatch"}, status=403)
 
-    # Step 6: Update state to verified and add user details
+    # Step 2: Apply rate limiting per temp_token to prevent brute-force attempts
+    rate_limit_key = (
+        f"verify_attempts:{hashlib.sha256(temp_token.encode()).hexdigest()}"
+    )
+
+    attempts = r.incr(rate_limit_key)
+
+    if attempts == 1:
+        r.expire(rate_limit_key, TOKEN_RATE_LIMIT_TIME)
+
+    if attempts > TOKEN_RATE_LIMIT:
+        return Response({"error": "Too many verification attempts"}, status=429)
+
+    # Step 3: Query questionnaire API for latest submission of the specific questionnaire of the action
+    latest_answer, error_response = asyncio.run(
+        utils.get_latest_answer(action=action, account=account),
+    )
+    if error_response:
+        return error_response
+
+    # Check if this is the submission we're looking for
+    if str(latest_answer.get("id")) != str(answer_id):
+        return Response({"error": "Answer ID mismatch"}, status=403)
+
+    # Extract OTP and quest_id from submission
+    submitted_otp = latest_answer.get("verification_code")
+
+    # Atomically get and delete OTP record to prevent reuse
+    otp_key = f"otp:{submitted_otp}"
+    otp_data_raw = r.getdel(otp_key)
+
+    if not otp_data_raw:
+        return Response({"error": "Invalid or expired OTP"}, status=401)
+
+    try:
+        otp_data = json.loads(otp_data_raw.decode("utf-8"))
+        expected_temp_token = otp_data.get("temp_token")
+        initiated_at = otp_data.get("initiated_at")
+    except (json.JSONDecodeError, AttributeError):
+        return Response({"error": "Invalid OTP data format"}, status=401)
+
+    if not expected_temp_token or not initiated_at:
+        return Response({"error": "Incomplete OTP data"}, status=401)
+
+    # Step 5: StepVerify temp_token matches
+    if expected_temp_token != temp_token:
+        return Response({"error": "Invalid temp_token"}, status=401)
+
+    # Step 6: Validate submission timestamp after OTP extraction
+    try:
+        submitted_at_str = latest_answer.get("submitted_at")
+
+        submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
+
+        # Additional validation: check submission is after initiation and within window
+        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIME_OUT:
+            return Response(
+                {"error": "Submission timestamp outside validity window"},
+                status=401,
+            )
+
+    except (ValueError, TypeError) as e:
+        logging.exception(f"Error parsing submission timestamp: {e}")
+        return Response({"error": "Invalid submission timestamp"}, status=401)
+
+    # Step 7: Update state to verified and add user details
     state_data.update(
         {
             "status": "verified",
             "account": account,
-            "verified_at": time.time(),
-            "answer_id": answer_id,
-        }
+        },
     )
 
     # Update temp_token_state in Redis with refreshed TTL
@@ -264,27 +279,32 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logging.info(
-        f"Successfully verified temp_token for user {account} with action {action}"
+        f"Successfully verified temp_token for user {account} with action {action}",
     )
 
     # For login action, handle immediate session creation and cleanup
     is_logged_in = False
     if action == "login":
-        user, error_response = create_user_session(request, account)
-        if error_response:
-            # Log the error and return the response from the helper
+        user, error_response = utils.create_user_session(request, account)
+        if user is None or error_response:
             logging.error(
-                f"Failed to create session for login: {error_response.data['error']}"
+                f"Failed to create session for login: {error_response.data['error']}",
             )
             return error_response
-
-        if user:
+        if not user.is_active:
+            logging.warning(f"Inactive user attempted OAuth login: {account}")
+            return Response({"error": "User account is inactive"}, status=403)
+        try:
+            # Create Django session
+            login(request, user)
             is_logged_in = True
             # Delete temp_token_state after successful login
             r.delete(state_key)
-            logging.info(
-                f"User {account} logged in successfully, temp_token_state cleaned up"
+        except Exception as e:
+            logging.exception(
+                f"Error during login session creation or cleanup for user {account}: {e}",
             )
+            return Response({"error": "Failed to finalize login process"}, status=500)
 
     # Create response
     response = Response(
@@ -299,206 +319,161 @@ def verify_callback_api(request):
     return response
 
 
-def create_user_session(
-    request, username
-) -> tuple[AbstractUser | None, Response | None]:
-    """
-    Helper function to create authenticated session for verified user.
-    Includes session management and Student model integration.
-    Returns a tuple of (user, error_response).
-    `user` is the user object on success, otherwise None.
-    `error_response` is a DRF Response object if an error occurs, otherwise None.
-    """
+def verify_psd_checker(request, action: str) -> tuple[dict | None, Response | None]:
+    # Get temp_token from HttpOnly cookie
+    temp_token = request.COOKIES.get("temp_token")
+    if not temp_token:
+        return None, Response({"error": "No temp_token found"}, status=401)
+
+    r = get_redis_connection("default")
+
+    # Look up temp_token state record
+    temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
+    state_key = f"temp_token_state:{temp_token_hash}"
+    state_data = r.get(state_key)
+
+    if not state_data:
+        return None, Response(
+            {"error": "Temp token state not found or expired"},
+            status=401,
+        )
+
     try:
-        # Ensure session exists - create one if it doesn't exist
-        if not request.session.session_key:
-            request.session.create()
+        state_data = json.loads(state_data)
+    except json.JSONDecodeError:
+        return None, Response({"error": "Invalid temp token state data"}, status=401)
 
-        # Get or create user
-        User = get_user_model()
+    # Verify status is verified and action is signup
+    if state_data.get("status") != "verified" or state_data.get("action") != action:
+        return None, Response({"error": "Invalid temp token state"}, status=403)
 
-        user, _ = User.objects.get_or_create(
-            username=username, defaults={"email": f"{username}@{EMAIL_DOMAIN_NAME}"}
-        )
+    # Get password from request data
+    password = request.data.get("password")
+    if not password:
+        return None, Response({"error": "Missing password"}, status=400)
 
-        # Ensure user is active
-        if not user.is_active:
-            logging.warning(f"Inactive user attempted OAuth login: {username}")
-            return None, Response({"error": "User account is inactive"}, status=403)
-
-        # Create Django session
-        login(request, user)
-
-        # Handle Student model integration and session tracking
-        # This preserves anonymous session data by linking it to the authenticated user
-        if "user_id" in request.session:
-            try:
-                student = Student.objects.get(user=user)
-                # Append the anonymous session ID to track previous unauth activity
-                if request.session["user_id"] not in student.unauth_session_ids:
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-            except Student.DoesNotExist:
-                # Create new Student record with the anonymous session ID
-                student = Student.objects.create(
-                    user=user, unauth_session_ids=[request.session["user_id"]]
-                )
-
-        # Update session to use authenticated username
-        request.session["user_id"] = user.username
-
-        logging.info(f"Successfully created OAuth session for user: {username}")
-        return user, None
-
-    except Exception as e:
-        logging.error(f"Error creating user session: {e}")
-        return None, Response({"error": "Failed to create user session"}, status=500)
-
-
-def handle_signup_user(
-    account, password, request
-) -> tuple[AbstractUser | None, Response | None]:
-    """
-    Helper function to handle user creation and session creation for signup action.
-    Will return error if user already exists.
-    Returns: user or None,error_response or None.
-    """
-    User = get_user_model()
-    user, created = User.objects.get_or_create(
-        username=account, defaults={"email": f"{account}@sjtu.edu.cn"}
-    )
-    if not created:
-        return None, Response(
-            {"error": "User already exists with password. Please use reset password."},
-            status=409,
-        )
-    user.is_active = True
-    # Set password
-    user.set_password(password)
-    user.save()
-
-    # Create user session (log them in)
-    user, error_response = create_user_session(request, account)
-    if error_response:
-        return None, error_response
-    # no error
-    return user, None
-
-
-def handle_reset_password_user(
-    account, password, request
-) -> tuple[AbstractUser | None, Response | None]:
-    """
-    Helper function to handle password reset for reset_password action.
-    Ensures user is logged in and the account matches their username.
-    Returns: user or none, error_response or None
-    """
-    # Check if user is authenticated
-    if not request.user.is_authenticated:
-        return None, Response(
-            {"error": "User must be logged in to reset password"}, status=401
-        )
-
-    # Check if the account in temp_token matches the logged-in user
-    if request.user.username != account:
-        return None, Response(
-            {
-                "error": "Account mismatch: temp_token account does not match logged-in user"
-            },
-            status=403,
-        )
-
-    # Get the user object and update password
-    User = get_user_model()
-    try:
-        user = User.objects.get(username=account)
-        user.set_password(password)
-        user.save()
-        # no error
-        return user, None
-
-    except Exception:
-        return None, Response({"error": "error when reseting password"}, status=500)
+    # Validate password strength
+    is_valid, error_response = utils.validate_password_strength(password)
+    if not is_valid:
+        return None, Response(error_response, status=400)
+    # Get account from verified state
+    account = state_data.get("account")
+    if not account:
+        return None, Response({"error": "No account in verified state"}, status=401)
+    return {"account": account, "password": password, "state_key": state_key}, None
 
 
 @api_view(["POST"])
-def auth_password_api(request):
-    """
-    Set Password API (/api/auth/password)
+def auth_signup_api(request) -> Response:
+    """Signup API (/api/auth/signup)
 
-    Uses verified temp_token to set user password for signup or reset_password actions.
-    Should be called after verify_callback_api for signup/reset_password actions.
+    Handles user signup using verified temp_token.
     """
     try:
-        # Get password from request data
-        password = request.data.get("password")
-        if not password:
-            return Response({"error": "Missing password"}, status=400)
-
-        # Validate password strength first (before any operations)
-        is_valid, error_response = utils.validate_password_strength(password)
-        if not is_valid:
-            return Response(error_response, status=400)
-
-        # Get temp_token from HttpOnly cookie
-        temp_token = request.COOKIES.get("temp_token")
-        if not temp_token:
-            return Response({"error": "No temp_token found"}, status=401)
-
-        r = get_redis_connection("default")
-
-        # Look up temp_token state record
-        temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
-        state_key = f"temp_token_state:{temp_token_hash}"
-        state_data = r.get(state_key)
-
-        if not state_data:
-            return Response(
-                {"error": "Temp token state not found or expired"}, status=401
-            )
-
-        try:
-            state_data = json.loads(state_data)
-        except json.JSONDecodeError:
-            return Response({"error": "Invalid temp token state data"}, status=401)
-
-        # Verify status is verified
-        if state_data.get("status") != "verified":
-            return Response({"error": "Temp token not verified"}, status=401)
-
-        # Verify action is valid for password setting
-        action = state_data.get("action")
-        if action not in ["signup", "reset_password"]:
-            return Response(
-                {"error": "Invalid action for password setting"}, status=403
-            )
-
-        # Get account from verified state
-        account = state_data.get("account")
-        if not account:
-            return Response({"error": "No account in verified state"}, status=401)
-
-        # Handle user operations based on action using helper functions
-        user, error_response = (
-            handle_signup_user(account=account, password=password, request=request)
-            if action == "signup"
-            else handle_reset_password_user(
-                account=account, password=password, request=request
-            )
-        )
-        if error_response:
+        verification_data, error_response = verify_psd_checker(request, action="signup")
+        if verification_data is None or error_response:
             return error_response
 
-        # Delete temp_token_state after successful password setting and clear cookie
+        account = verification_data.get("account")
+        password = verification_data.get("password")
+        state_key = verification_data.get("state_key")
+
+        # Create user session
+        user, error_response = utils.create_user_session(request, account)
+        if user is None or error_response:
+            return error_response
+        if user.password:
+            return Response({"error": "User already exists with password."}, status=409)
+
+        user.is_active = True
+        # Set password
+        user.set_password(password)
+        user.save()
+
+        # Cleanup: Delete temp_token_state and clear cookie
+        r = get_redis_connection("default")
         r.delete(state_key)
-        logging.info(
-            f"User {account} successfully set password for {action}, temp_token_state cleaned up"
-        )
         response = Response({"success": True, "username": user.username}, status=200)
-        # Clear the temp_token cookie and return the action-specific response
         response.delete_cookie("temp_token")
         return response
 
     except Exception as e:
-        logging.error(f"Error in auth_password_api: {e}")
-        return Response({"error": "Failed to set password"}, status=500)
+        logging.error(f"Error in auth_signup_api: {e}")
+        return Response({"error": "Failed to complete signup"}, status=500)
+
+
+@api_view(["POST"])
+def auth_reset_password_api(request) -> Response:
+    """Reset Password API (/api/auth/password)
+
+    Handles password reset using verified temp_token.
+    """
+    try:
+        verification_data, error_response = verify_psd_checker(
+            request,
+            action="reset_password",
+        )
+        if verification_data is None or error_response:
+            return error_response
+        account = verification_data.get("account")
+        password = verification_data.get("password")
+        state_key = verification_data.get("state_key")
+
+        # Get the user object and update password
+        User = get_user_model()
+        try:
+            user = User.objects.get(username=account)
+            user.set_password(password)
+            user.save()
+        except User.DoesNotExist:
+            return Response({"error": "User does not exist"}, status=404)
+
+        # Cleanup: Delete temp_token_state and clear cookie
+        r = get_redis_connection("default")
+        r.delete(state_key)
+        response = Response({"success": True, "username": user.username}, status=200)
+        response.delete_cookie("temp_token")
+        return response
+
+    except Exception as e:
+        logging.error(f"Error in auth_reset_password_api: {e}")
+        return Response({"error": "Failed to reset password"}, status=500)
+
+
+@api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def auth_login_api(request) -> Response:
+    email = request.data.get("email", "").lower()
+    password = request.data.get("password", "")
+
+    if not email or not password:
+        return Response({"error": "Email and password are required"}, status=400)
+
+    username = email.split("@")[0]
+    user = authenticate(username=username, password=password)
+
+    if user is not None:
+        if user.is_active:
+            login(request, user)
+            # Link user to a student profile
+            Student.objects.get_or_create(user=user)
+            request.session["user_id"] = user.username
+
+            return Response({"success": True, "username": user.username})
+        return Response(
+            {
+                "error": "Please activate your account via the activation link first.",
+            },
+            status=403,
+        )
+    return Response({"error": "Invalid email or password"}, status=401)
+
+
+@api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
+def auth_logout_api(request) -> Response:
+    """Logout a user."""
+    logout(request)
+    return Response({"message": "Logged out successfully"}, status=200)

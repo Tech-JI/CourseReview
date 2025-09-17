@@ -4,7 +4,6 @@ from apps.web.models import (
     Instructor,
     Review,
     ReviewVote,
-    Student,
     Vote,
 )
 
@@ -25,13 +24,11 @@ import datetime
 import uuid
 import dateutil.parser
 
-from django.contrib.auth import authenticate, login, logout
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
-    authentication_classes,
     permission_classes,
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -94,71 +91,6 @@ def get_prior_course_id(request, current_course_id):
     request.session["prior_course_id"] = current_course_id
     request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
     return prior_course_id
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
-def auth_login_api(request):
-    email = request.data.get("email", "").lower()
-    password = request.data.get("password", "")
-
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=400)
-
-    username = email.split("@")[0]
-    user = authenticate(username=username, password=password)
-
-    if user is not None:
-        if user.is_active:
-            login(request, user)
-            if "user_id" in request.session:
-                try:
-                    student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-                except Student.DoesNotExist:
-                    student = Student.objects.create(
-                        user=user, unauth_session_ids=[request.session["user_id"]]
-                    )
-            request.session["user_id"] = user.username
-
-            return Response({"success": True, "username": user.username})
-        else:
-            return Response(
-                {
-                    "error": "Please activate your account via the activation link first."
-                },
-                status=403,
-            )
-    else:
-        return Response({"error": "Invalid email or password"}, status=401)
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
-def auth_logout_api(request):
-    """
-    API endpoint for user logout.
-    """
-    if request.user.is_authenticated:
-        try:
-            student = Student.objects.get(user=request.user)
-            if "user_id" in request.session:
-                if request.session["user_id"] in student.unauth_session_ids:
-                    student.unauth_session_ids.remove(request.session["user_id"])
-                    student.save()
-        except Student.DoesNotExist:
-            pass
-
-        logout(request)
-        request.session["userID"] = uuid.uuid4().hex
-        return Response({"success": True, "message": "Logged out successfully"})
-    else:
-        return Response(
-            {"success": False, "message": "User not authenticated"}, status=400
-        )
 
 
 @api_view(["GET"])
