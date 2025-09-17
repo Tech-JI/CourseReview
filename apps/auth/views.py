@@ -43,6 +43,8 @@ TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
 
 
 @api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
 def auth_initiate_api(request):
     """Step 1: Authentication Initiation (/api/auth/initiate)
 
@@ -158,6 +160,8 @@ def auth_initiate_api(request):
 
 
 @api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([AllowAny])
 def verify_callback_api(request):
     """Callback Verification (/api/auth/verify)
     request data includes account, answer_id, action
@@ -170,6 +174,21 @@ def verify_callback_api(request):
 
     if not account or not answer_id or not action:
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
+
+    # Map old action values from external questionnaire platform to new action values
+    action_mapping = {
+        "reset": "reset_password",  # Map old "reset" to new "reset_password"
+        "signup": "signup",  # Keep "signup" as is
+        "login": "login",  # Keep "login" as is
+        "reset_password": "reset_password",  # Keep "reset_password" as is for forward compatibility
+    }
+
+    # Use mapped action if available, otherwise use original
+    mapped_action = action_mapping.get(action, action)
+
+    # Validate mapped action
+    if not mapped_action or mapped_action not in ACTION_LIST:
+        return Response({"error": "Invalid action"}, status=400)
 
     # Get temp_token from HttpOnly cookie
     temp_token = request.COOKIES.get("temp_token")
@@ -195,7 +214,7 @@ def verify_callback_api(request):
     if state_data.get("status") != "pending":
         return Response({"error": "Invalid temp token state"}, status=401)
 
-    if state_data.get("action") != action:
+    if state_data.get("action") != mapped_action:
         return Response({"error": "Action mismatch"}, status=403)
 
     # Step 2: Apply rate limiting per temp_token to prevent brute-force attempts
@@ -213,10 +232,13 @@ def verify_callback_api(request):
 
     # Step 3: Query questionnaire API for latest submission of the specific questionnaire of the action
     latest_answer, error_response = asyncio.run(
-        utils.get_latest_answer(action=action, account=account),
+        utils.get_latest_answer(action=mapped_action, account=account),
     )
     if error_response:
         return error_response
+
+    if latest_answer is None:
+        return Response({"error": "No questionnaire submission found"}, status=404)
 
     # Check if this is the submission we're looking for
     if str(latest_answer.get("id")) != str(answer_id):
@@ -249,6 +271,8 @@ def verify_callback_api(request):
     # Step 6: Validate submission timestamp after OTP extraction
     try:
         submitted_at_str = latest_answer.get("submitted_at")
+        if submitted_at_str is None:
+            return Response({"error": "Missing submission timestamp"}, status=400)
 
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
@@ -279,18 +303,21 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logging.info(
-        f"Successfully verified temp_token for user {account} with action {action}",
+        f"Successfully verified temp_token for user {account} with action {mapped_action}",
     )
 
     # For login action, handle immediate session creation and cleanup
     is_logged_in = False
-    if action == "login":
+    if mapped_action == "login":
         user, error_response = utils.create_user_session(request, account)
-        if user is None or error_response:
-            logging.error(
-                f"Failed to create session for login: {error_response.data['error']}",
-            )
-            return error_response
+        if user is None:
+            if error_response:
+                logging.error(
+                    f"Failed to create session for login: {getattr(error_response, 'data', {}).get('error', 'Unknown error')}",
+                )
+                return error_response
+            else:
+                return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
             logging.warning(f"Inactive user attempted OAuth login: {account}")
             return Response({"error": "User account is inactive"}, status=403)
@@ -371,8 +398,10 @@ def auth_signup_api(request) -> Response:
     """
     try:
         verification_data, error_response = verify_psd_checker(request, action="signup")
-        if verification_data is None or error_response:
-            return error_response
+        if verification_data is None:
+            return error_response or Response(
+                {"error": "Verification failed"}, status=400
+            )
 
         account = verification_data.get("account")
         password = verification_data.get("password")
@@ -380,8 +409,10 @@ def auth_signup_api(request) -> Response:
 
         # Create user session
         user, error_response = utils.create_user_session(request, account)
-        if user is None or error_response:
-            return error_response
+        if user is None:
+            return error_response or Response(
+                {"error": "Failed to create user session"}, status=500
+            )
         if user.password:
             return Response({"error": "User already exists with password."}, status=409)
 
@@ -413,19 +444,21 @@ def auth_reset_password_api(request) -> Response:
             request,
             action="reset_password",
         )
-        if verification_data is None or error_response:
-            return error_response
+        if verification_data is None:
+            return error_response or Response(
+                {"error": "Verification failed"}, status=400
+            )
         account = verification_data.get("account")
         password = verification_data.get("password")
         state_key = verification_data.get("state_key")
 
         # Get the user object and update password
-        User = get_user_model()
+        user_model = get_user_model()
         try:
-            user = User.objects.get(username=account)
+            user = user_model.objects.get(username=account)
             user.set_password(password)
             user.save()
-        except User.DoesNotExist:
+        except user_model.DoesNotExist:
             return Response({"error": "User does not exist"}, status=404)
 
         # Cleanup: Delete temp_token_state and clear cookie
