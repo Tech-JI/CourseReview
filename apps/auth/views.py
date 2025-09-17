@@ -175,19 +175,7 @@ def verify_callback_api(request):
     if not account or not answer_id or not action:
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
-    # Map old action values from external questionnaire platform to new action values
-    action_mapping = {
-        "reset": "reset_password",  # Map old "reset" to new "reset_password"
-        "signup": "signup",  # Keep "signup" as is
-        "login": "login",  # Keep "login" as is
-        "reset_password": "reset_password",  # Keep "reset_password" as is for forward compatibility
-    }
-
-    # Use mapped action if available, otherwise use original
-    mapped_action = action_mapping.get(action, action)
-
-    # Validate mapped action
-    if not mapped_action or mapped_action not in ACTION_LIST:
+    if action not in ACTION_LIST:
         return Response({"error": "Invalid action"}, status=400)
 
     # Get temp_token from HttpOnly cookie
@@ -214,7 +202,7 @@ def verify_callback_api(request):
     if state_data.get("status") != "pending":
         return Response({"error": "Invalid temp token state"}, status=401)
 
-    if state_data.get("action") != mapped_action:
+    if state_data.get("action") != action:
         return Response({"error": "Action mismatch"}, status=403)
 
     # Step 2: Apply rate limiting per temp_token to prevent brute-force attempts
@@ -232,7 +220,7 @@ def verify_callback_api(request):
 
     # Step 3: Query questionnaire API for latest submission of the specific questionnaire of the action
     latest_answer, error_response = asyncio.run(
-        utils.get_latest_answer(action=mapped_action, account=account),
+        utils.get_latest_answer(action=action, account=account),
     )
     if error_response:
         return error_response
@@ -303,12 +291,12 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logging.info(
-        f"Successfully verified temp_token for user {account} with action {mapped_action}",
+        f"Successfully verified temp_token for user {account} with action {action}",
     )
 
     # For login action, handle immediate session creation and cleanup
     is_logged_in = False
-    if mapped_action == "login":
+    if action == "login":
         user, error_response = utils.create_user_session(request, account)
         if user is None:
             if error_response:

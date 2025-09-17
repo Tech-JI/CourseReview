@@ -93,8 +93,8 @@ const parseUrlParams = () => {
     return null;
   }
 
-  // Validate action parameter
-  const validActions = ["signup", "login", "reset_password", "reset"]; // Accept both old and new reset actions
+  // Validate action parameter - only allow the three valid actions
+  const validActions = ["signup", "login", "reset_password"];
   if (!validActions.includes(action)) {
     error.value =
       "Invalid action parameter. Please try the authentication process again.";
@@ -102,17 +102,7 @@ const parseUrlParams = () => {
     return null;
   }
 
-  // Map old action values to new action values for consistency with backend
-  const actionMapping = {
-    reset: "reset_password", // Map old "reset" to new "reset_password"
-    signup: "signup",
-    login: "login",
-    reset_password: "reset_password",
-  };
-
-  const mappedAction = actionMapping[action] || action;
-
-  return { account, answer_id, action: mappedAction };
+  return { account, answer_id, action };
 };
 
 // Call backend verification API
