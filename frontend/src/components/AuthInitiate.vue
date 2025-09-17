@@ -1,0 +1,480 @@
+<template>
+  <div class="auth-initiate">
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center">
+      <div
+        class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"
+      ></div>
+      <p class="mt-2 text-sm/6 text-gray-500">Loading authentication...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="rounded-lg bg-red-50 p-4 mb-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm/6 font-medium text-red-800">
+            Authentication Error
+          </h3>
+          <div class="mt-2 text-sm/6 text-red-700">
+            <p>{{ error }}</p>
+          </div>
+          <div class="mt-4">
+            <button
+              @click="resetAuth"
+              type="button"
+              class="rounded-md bg-red-50 px-2 py-1.5 text-sm/6 font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OTP Display and Copy -->
+    <div v-else-if="otpData" class="space-y-4">
+      <div class="rounded-lg bg-indigo-50 p-4">
+        <div class="text-center">
+          <h3 class="text-lg/7 font-medium text-indigo-800 mb-2">
+            Your Verification Code
+          </h3>
+          <div class="text-3xl font-mono font-bold text-indigo-900 mb-4">
+            {{ otpData.otp }}
+          </div>
+          <p class="text-sm/6 text-indigo-700 mb-4">
+            Copy this code and click continue to proceed to SJTU authentication
+          </p>
+          <div class="space-y-2">
+            <button
+              @click="copyOTPAndRedirect"
+              :disabled="redirecting"
+              type="button"
+              class="w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span v-if="!redirecting">{{ copyButtonText }}</span>
+              <span v-else class="flex items-center justify-center">
+                <svg
+                  class="animate-spin -ml-1 mr-3 size-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Redirecting in {{ countdown }}s...
+              </span>
+            </button>
+            <p class="text-xs/5 text-indigo-600">
+              Expires in {{ formatTime(otpData.expires_at) }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Turnstile Widget -->
+    <div
+      v-else-if="!turnstileToken"
+      class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10"
+    >
+      <div class="space-y-4">
+        <div class="text-center">
+          <h3 class="text-lg/7 font-medium text-gray-900 mb-2">
+            Verify you're human
+          </h3>
+          <p class="text-sm/6 text-gray-500 mb-4">
+            Complete the security check below to continue
+          </p>
+        </div>
+        <div class="flex justify-center">
+          <div id="turnstile-widget"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ready to Initiate -->
+    <div v-else class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10">
+      <div class="space-y-4">
+        <div class="rounded-lg bg-green-50 p-4">
+          <div class="flex">
+            <div class="ml-3">
+              <h3 class="text-sm/6 font-medium text-green-800">
+                Security Check Complete
+              </h3>
+              <div class="mt-2 text-sm/6 text-green-700">
+                <p>
+                  Ready to initiate {{ action }} process with SJTU
+                  authentication.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button
+          @click="initiateAuth"
+          :disabled="initiating"
+          type="button"
+          class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span v-if="!initiating">Continue with SJTU Authentication</span>
+          <span v-else class="flex items-center">
+            <svg
+              class="animate-spin -ml-1 mr-3 size-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Initializing...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted, nextTick } from "vue";
+
+// Props
+const props = defineProps({
+  action: {
+    type: String,
+    required: true,
+    validator: (value) => ["signup", "login", "reset_password"].includes(value),
+  },
+});
+
+// Reactive state
+const loading = ref(true);
+const error = ref(null);
+const turnstileToken = ref(null);
+const otpData = ref(null);
+const initiating = ref(false);
+const redirecting = ref(false);
+const copyButtonText = ref("Copy Code & Continue");
+const countdown = ref(0);
+const redirectUrl = ref(null);
+
+let turnstileWidget = null;
+let countdownInterval = null;
+
+// Check for existing OTP data in localStorage
+const checkExistingOTP = () => {
+  const storedOTP = localStorage.getItem("auth_otp");
+  const storedFlow = localStorage.getItem("auth_flow");
+
+  if (storedOTP) {
+    try {
+      const otpInfo = JSON.parse(storedOTP);
+      const flowInfo = storedFlow ? JSON.parse(storedFlow) : null;
+
+      // Check if OTP is still valid and matches current action
+      if (
+        otpInfo.expires_at > Date.now() &&
+        flowInfo &&
+        flowInfo.action === props.action &&
+        flowInfo.status === "pending"
+      ) {
+        otpData.value = otpInfo;
+        loading.value = false;
+        return true;
+      } else {
+        // Clean up expired data
+        clearAuthData();
+      }
+    } catch (e) {
+      console.error("Error parsing stored OTP data:", e);
+      clearAuthData();
+    }
+  }
+  return false;
+};
+
+// Clear authentication data from localStorage
+const clearAuthData = () => {
+  localStorage.removeItem("auth_otp");
+  localStorage.removeItem("auth_flow");
+};
+
+// Load Turnstile script
+const loadTurnstile = () => {
+  return new Promise((resolve, reject) => {
+    if (window.turnstile) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+    if (existingScript) {
+      existingScript.onload = resolve;
+      existingScript.onerror = reject;
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+};
+
+// Initialize Turnstile widget
+const initializeTurnstile = async () => {
+  try {
+    console.log(
+      "🔧 Debug: VITE_TURNSTILE_SITE_KEY =",
+      import.meta.env.VITE_TURNSTILE_SITE_KEY,
+    );
+    console.log("🔧 Debug: All env vars =", import.meta.env);
+
+    await loadTurnstile();
+    await nextTick();
+
+    // Wait for DOM element to be available with timeout
+    let widgetContainer = null;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (!widgetContainer && attempts < maxAttempts) {
+      widgetContainer = document.getElementById("turnstile-widget");
+      if (!widgetContainer) {
+        console.log(
+          `🔧 Debug: Waiting for turnstile-widget container (attempt ${attempts + 1}/${maxAttempts})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
+
+    if (!widgetContainer) {
+      console.error("Turnstile widget container not found after waiting");
+      error.value =
+        "Failed to initialize security verification. Please refresh the page.";
+      return;
+    }
+
+    const siteKey =
+      import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAABVPBtNKmaBqXhw";
+    console.log("🔧 Debug: Using site key =", siteKey);
+
+    turnstileWidget = window.turnstile.render(widgetContainer, {
+      sitekey: siteKey,
+      callback: (token) => {
+        turnstileToken.value = token;
+        loading.value = false;
+      },
+      "error-callback": (errorCode) => {
+        console.error("Turnstile error:", errorCode);
+        error.value =
+          "Security verification failed. Please refresh the page and try again.";
+        loading.value = false;
+      },
+      "expired-callback": () => {
+        turnstileToken.value = null;
+        error.value =
+          "Security verification expired. Please complete the check again.";
+      },
+      theme: "light",
+      size: "normal",
+    });
+  } catch (err) {
+    console.error("Failed to load Turnstile:", err);
+    error.value =
+      "Failed to load security verification. Please check your internet connection and refresh the page.";
+  }
+};
+
+// Initiate authentication
+const initiateAuth = async () => {
+  if (!turnstileToken.value) {
+    error.value = "Please complete the security verification first.";
+    return;
+  }
+
+  initiating.value = true;
+  error.value = null;
+
+  try {
+    const response = await fetch("/api/auth/initiate/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        action: props.action,
+        turnstile_token: turnstileToken.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      const expiresAt = Date.now() + 2 * 60 * 1000; // 2 minutes from now
+      const otpInfo = {
+        otp: data.otp,
+        expires_at: expiresAt,
+      };
+      const flowInfo = {
+        status: "pending",
+        action: props.action,
+        expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes from now
+      };
+
+      // Store in localStorage
+      localStorage.setItem("auth_otp", JSON.stringify(otpInfo));
+      localStorage.setItem("auth_flow", JSON.stringify(flowInfo));
+
+      otpData.value = otpInfo;
+      redirectUrl.value = data.redirect_url;
+    } else {
+      error.value =
+        data.error || "Authentication initialization failed. Please try again.";
+    }
+  } catch (err) {
+    console.error("API call failed:", err);
+    error.value = "Network error. Please check your connection and try again.";
+  } finally {
+    initiating.value = false;
+  }
+};
+
+// Copy OTP and redirect
+const copyOTPAndRedirect = async () => {
+  if (!otpData.value || !redirectUrl.value) return;
+
+  try {
+    // Copy to clipboard
+    await navigator.clipboard.writeText(otpData.value.otp);
+    copyButtonText.value = "Copied! ✓";
+
+    // Start countdown and redirect
+    redirecting.value = true;
+    countdown.value = 3;
+
+    countdownInterval = setInterval(() => {
+      countdown.value--;
+      if (countdown.value <= 0) {
+        clearInterval(countdownInterval);
+        // Append OTP as hint parameter
+        const url = new URL(redirectUrl.value);
+        url.searchParams.set("otp_hint", otpData.value.otp);
+        window.location.href = url.toString();
+      }
+    }, 1000);
+  } catch (err) {
+    console.error("Failed to copy to clipboard:", err);
+    // Fallback: just redirect without clipboard
+    setTimeout(() => {
+      const url = new URL(redirectUrl.value);
+      url.searchParams.set("otp_hint", otpData.value.otp);
+      window.location.href = url.toString();
+    }, 1000);
+  }
+};
+
+// Format time remaining
+const formatTime = (expiresAt) => {
+  const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
+
+// Get cookie value
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === name + "=") {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
+// Reset authentication state
+const resetAuth = () => {
+  error.value = null;
+  turnstileToken.value = null;
+  otpData.value = null;
+  redirecting.value = false;
+  copyButtonText.value = "Copy Code & Continue";
+
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
+  clearAuthData();
+
+  // Reset turnstile widget
+  if (turnstileWidget && window.turnstile) {
+    window.turnstile.reset(turnstileWidget);
+  }
+
+  loading.value = true;
+  setTimeout(() => {
+    initializeTurnstile();
+  }, 100);
+};
+
+// Component lifecycle
+onMounted(async () => {
+  // Check for existing valid OTP first
+  if (!checkExistingOTP()) {
+    // No valid OTP, set loading to false first to render the turnstile container
+    loading.value = false;
+    await nextTick();
+    await initializeTurnstile();
+  }
+});
+
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+  if (turnstileWidget && window.turnstile) {
+    window.turnstile.remove(turnstileWidget);
+  }
+});
+</script>
+
+<style scoped>
+.auth-initiate {
+  max-width: 100%;
+}
+</style>

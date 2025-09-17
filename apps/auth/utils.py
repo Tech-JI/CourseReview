@@ -18,7 +18,7 @@ QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
 EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
 
 
-def get_survey_url(action: str) -> str:
+def get_survey_url(action: str) -> str | None:
     """Helper function to get the survey URL based on action type"""
     if action == "signup":
         return settings.SIGNUP_QUEST_URL
@@ -29,7 +29,7 @@ def get_survey_url(action: str) -> str:
     return None
 
 
-def get_survey_api_key(action: str) -> str:
+def get_survey_api_key(action: str) -> str | None:
     """Helper function to get the survey API key based on action type"""
     if action == "signup":
         return settings.SIGNUP_QUEST_API_KEY
@@ -40,7 +40,7 @@ def get_survey_api_key(action: str) -> str:
     return None
 
 
-def get_survey_questionid(action: str) -> int:
+def get_survey_questionid(action: str) -> int | None:
     """Helper function to get the survey question ID for the verification code based on action type"""
     question_id_str = None
     if action == "signup":
@@ -186,7 +186,7 @@ def validate_password_strength(password) -> tuple[bool, dict | None]:
         validate_password(password)
         return True, None
     except ValidationError as e:
-        return False, Response({"error": list(e.messages)}, status=400)
+        return False, {"error": list(e.messages)}
 
 
 def create_user_session(
@@ -204,9 +204,9 @@ def create_user_session(
             request.session.create()
 
         # Get or create user
-        User = get_user_model()
+        user_model = get_user_model()
 
-        user, _ = User.objects.get_or_create(
+        user, _ = user_model.objects.get_or_create(
             username=account,
             defaults={"email": f"{account}@{EMAIL_DOMAIN_NAME}"},
         )
