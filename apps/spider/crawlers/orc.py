@@ -82,19 +82,52 @@ class CourseSelCrawler:
         Returns:
             list: Course data with prerequisites, descriptions, and instructors
         """
-        self._ensure_initialized()  # Make sure crawler is initialized
+        # Ask user which data sources to use
+        use_coursesel = self._ask_user_choice(
+            "Crawl course selection system data? (y/n): ", default="y"
+        )
+        use_official = self._ask_user_choice(
+            "Crawl official website data? (y/n): ", default="y"
+        )
 
-        # Get data from course selection APIs
-        courses_data = self._get_lesson_tasks()
-        course_details = self._get_course_catalog()
-        prerequisites = self._get_prerequisites()
+        courses_data = []
+        course_details = {}
+        prerequisites = {}
+        official_data = {}
 
-        # Get official website data for enhanced descriptions
-        official_data = self._get_official_website_data()
+        if use_coursesel:
+            self._ensure_initialized()  # Make sure crawler is initialized
+            print("Crawling course selection system data...")
+            # Get data from course selection APIs
+            courses_data = self._get_lesson_tasks()
+            course_details = self._get_course_catalog()
+            prerequisites = self._get_prerequisites()
+        else:
+            print("Skipping course selection system data")
+
+        if use_official:
+            print("Crawling official website data...")
+            # Get official website data for enhanced descriptions
+            official_data = self._get_official_website_data()
+        else:
+            print("Skipping official website data")
 
         return self._integrate_course_data(
             courses_data, course_details, prerequisites, official_data
         )
+
+    def _ask_user_choice(self, prompt, default="y"):
+        """Ask user for yes/no choice with default value"""
+        while True:
+            response = input(prompt).strip().lower()
+            if not response:
+                response = default.lower()
+            if response in ["y", "yes", "true"]:
+                return True
+            elif response in ["n", "no", "false"]:
+                return False
+            else:
+                print("Please enter y/yes or n/no")
 
     def _get_current_elect_turn_id(self):
         """Get current election turn ID dynamically"""
@@ -330,40 +363,62 @@ class CourseSelCrawler:
             f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups, {len(official_data)} official records"
         )
 
-        courses_by_code = defaultdict(list)
-        for course in courses_data:
-            course_code = course.get("courseCode")
-            if course_code:
-                courses_by_code[course_code].append(course)
-
         integrated_courses = []
         courses_with_prereqs = 0
 
-        for course_code, course_list in courses_by_code.items():
-            merged = self._merge_course_sections(course_list)
-            if not merged:
-                continue
+        # If we have course selection data, process it
+        if courses_data:
+            courses_by_code = defaultdict(list)
+            for course in courses_data:
+                course_code = course.get("courseCode")
+                if course_code:
+                    courses_by_code[course_code].append(course)
 
-            course_id = merged.get("courseId")
-            catalog_info = course_details.get(course_id, {})
-            prereq_info = prerequisites.get(course_id, [])
-            official_info = official_data.get(course_code, {})
+            for course_code, course_list in courses_by_code.items():
+                merged = self._merge_course_sections(course_list)
+                if not merged:
+                    continue
 
-            if prereq_info:
-                courses_with_prereqs += 1
-                logger.debug(
-                    f"Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
+                course_id = merged.get("courseId")
+                catalog_info = course_details.get(course_id, {})
+                prereq_info = prerequisites.get(course_id, [])
+                official_info = official_data.get(course_code, {})
+
+                if prereq_info:
+                    courses_with_prereqs += 1
+                    logger.debug(
+                        f"Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
+                    )
+
+                course_data = self._build_course_record(
+                    course_code, merged, catalog_info, prereq_info, official_info
                 )
 
-            course_data = self._build_course_record(
-                course_code, merged, catalog_info, prereq_info, official_info
-            )
+                if course_data:
+                    integrated_courses.append(course_data)
 
-            if course_data:
-                integrated_courses.append(course_data)
+        # If we only have official data (no course selection data), create courses from official data
+        elif official_data:
+            logger.info("Creating courses from official website data only")
+            for course_code, official_info in official_data.items():
+                # Create empty main_data for courses that only exist in official website
+                empty_main_data = {}
+                empty_catalog_data = {}
+                empty_prereq_data = []
+
+                course_data = self._build_course_record(
+                    course_code,
+                    empty_main_data,
+                    empty_catalog_data,
+                    empty_prereq_data,
+                    official_info,
+                )
+
+                if course_data:
+                    integrated_courses.append(course_data)
 
         logger.info(
-            f"Integration complete: {courses_with_prereqs} courses have prerequisites"
+            f"Integration complete: {courses_with_prereqs} courses have prerequisites, {len(integrated_courses)} total courses"
         )
         return integrated_courses
 
@@ -428,6 +483,10 @@ class CourseSelCrawler:
         """Extract course title (prefer English name)"""
         if official_data is None:
             official_data = {}
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
 
         return (
             official_data.get("course_title", "")
@@ -442,8 +501,8 @@ class CourseSelCrawler:
         number = 0
 
         if course_code:
-            # Match DEPT####J? (J is optional)
-            match = re.match(r"^([A-Z]{2,4})(\d{4})J?$", course_code)
+            # Match DEPT###(#)?J? (3 or 4 digits, J is optional)
+            match = re.match(r"^([A-Z]{2,4})(\d{3,4})J?$", course_code)
             if match:
                 department = match.group(1)
                 number = int(match.group(2))
@@ -452,6 +511,11 @@ class CourseSelCrawler:
 
     def _extract_course_credits(self, main_data, catalog_data):
         """Extract course credits"""
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
+
         course_credits = main_data.get("totalCredit", 0) or catalog_data.get(
             "credit", 0
         )
@@ -520,6 +584,11 @@ class CourseSelCrawler:
 
     def _extract_instructors(self, main_data, catalog_data):
         """Extract and merge instructor information"""
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
+
         instructors = main_data.get("all_instructors", [])
         teacher_name = catalog_data.get("teacherName", "")
 
@@ -532,6 +601,8 @@ class CourseSelCrawler:
 
     def _build_course_url(self, main_data):
         """Build course detail page URL"""
+        if main_data is None:
+            main_data = {}
         course_id = main_data.get("courseId")
         return f"{COURSE_DETAIL_URL_PREFIX}{course_id}" if course_id else ""
 
