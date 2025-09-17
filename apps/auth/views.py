@@ -83,14 +83,14 @@ def auth_initiate_api(request):
             return response.json()
 
     # Verify Turnstile token
-    # try:
-    #     result = asyncio.run(verify_turnstile())
-    #     if not result.get("success"):
-    #         logging.warning(f"Turnstile verification failed: {result}")
-    #         return Response({"error": "Turnstile verification failed"}, status=403)
-    # except Exception as e:
-    #     logging.error(f"Error verifying Turnstile token: {e}")
-    #     return Response({"error": "Turnstile verification error"}, status=500)
+    try:
+        result = asyncio.run(verify_turnstile())
+        if not result.get("success"):
+            logging.warning(f"Turnstile verification failed: {result}")
+            return Response({"error": "Turnstile verification failed"}, status=403)
+    except Exception as e:
+        logging.error(f"Error verifying Turnstile token: {e}")
+        return Response({"error": "Turnstile verification error"}, status=500)
 
     # Generate cryptographically secure OTP and temp_token
     otp_bytes = secrets.token_bytes(6)
