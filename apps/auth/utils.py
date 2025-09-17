@@ -1,49 +1,47 @@
+import json
+import logging
+import re
+
+import httpx
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from django.conf import settings
-import re
-import json
-import httpx
-import logging
+
+from apps.web.models import Student
 
 PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
 OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
 QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
+EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
 
 
 def get_survey_url(action: str) -> str:
-    """
-    Helper function to get the survey URL based on action type
-    """
+    """Helper function to get the survey URL based on action type"""
     if action == "signup":
         return settings.SIGNUP_QUEST_URL
-    elif action == "login":
+    if action == "login":
         return settings.LOGIN_QUEST_URL
-    elif action == "reset_password":
+    if action == "reset_password":
         return settings.RESET_QUEST_URL
-    else:
-        return None
+    return None
 
 
 def get_survey_api_key(action: str) -> str:
-    """
-    Helper function to get the survey API key based on action type
-    """
+    """Helper function to get the survey API key based on action type"""
     if action == "signup":
         return settings.SIGNUP_QUEST_API_KEY
-    elif action == "login":
+    if action == "login":
         return settings.LOGIN_QUEST_API_KEY
-    elif action == "reset_password":
+    if action == "reset_password":
         return settings.RESET_QUEST_API_KEY
-    else:
-        return None
+    return None
 
 
 def get_survey_questionid(action: str) -> int:
-    """
-    Helper function to get the survey question ID for the verification code based on action type
-    """
+    """Helper function to get the survey question ID for the verification code based on action type"""
     question_id_str = None
     if action == "signup":
         question_id_str = settings.SIGNUP_QUEST_QUESTIONID
@@ -61,10 +59,10 @@ def get_survey_questionid(action: str) -> int:
 
 
 async def get_latest_answer(
-    action: str, account: str
+    action: str,
+    account: str,
 ) -> tuple[dict | None, Response | None]:
-    """
-    Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
+    """Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
     Returns a tuple of (filtered_data, error_response).
     `filtered_data` contains: id, submitted_at, user.account, and verification_code.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
@@ -101,17 +99,20 @@ async def get_latest_answer(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                full_url_path, params=final_query_params, timeout=OTP_TIME_OUT
+                full_url_path,
+                params=final_query_params,
+                timeout=OTP_TIME_OUT,
             )
             response.raise_for_status()  # Raise an exception for bad status codes
             full_data = response.json()
     except httpx.RequestError as e:
-        logging.error(f"Error querying questionnaire API: {e}")
+        logging.exception(f"Error querying questionnaire API: {e}")
         return None, Response(
-            {"error": "Failed to query questionnaire API"}, status=500
+            {"error": "Failed to query questionnaire API"},
+            status=500,
         )
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+        logging.exception(f"An unexpected error occurred: {e}")
         return None, Response({"error": "An unexpected error occurred"}, status=500)
 
     # Filter and return only the required fields from the first row
@@ -161,8 +162,7 @@ async def get_latest_answer(
 
 
 def validate_password_strength(password) -> tuple[bool, dict | None]:
-    """
-    Helper function to validate password complexity and strength.
+    """Helper function to validate password complexity and strength.
 
     Returns: A tuple of (is_valid, error_response).
     `is_valid` is True if the password is valid, otherwise False.
@@ -171,14 +171,14 @@ def validate_password_strength(password) -> tuple[bool, dict | None]:
     # Quick length check first
     if len(password) <= PASSWORD_LENGTH_MIN:
         return False, {
-            "error": f"Password must be more than {PASSWORD_LENGTH_MIN} characters long."
+            "error": f"Password must be more than {PASSWORD_LENGTH_MIN} characters long.",
         }
 
     # Single regex pattern to check all character requirements at once
     pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$"
     if not re.match(pattern, password):
         return False, {
-            "error": "Password must contain at least one uppercase letter, one lowercase letter, and one numeric digit."
+            "error": "Password must contain at least one uppercase letter, one lowercase letter, and one numeric digit.",
         }
 
     # Use Django's built-in validators for additional checks
@@ -187,3 +187,41 @@ def validate_password_strength(password) -> tuple[bool, dict | None]:
         return True, None
     except ValidationError as e:
         return False, Response({"error": list(e.messages)}, status=400)
+
+
+def create_user_session(
+    request,
+    account,
+) -> tuple[AbstractUser | None, Response | None]:
+    """Helper function includes session management, user creation and Student model integration.
+    Returns a tuple of (user, error_response).
+    `user` is the user object on success, otherwise None.
+    `error_response` is a DRF Response object if an error occurs, otherwise None.
+    """
+    try:
+        # Ensure session exists - create one if it doesn't exist
+        if not request.session.session_key:
+            request.session.create()
+
+        # Get or create user
+        User = get_user_model()
+
+        user, _ = User.objects.get_or_create(
+            username=account,
+            defaults={"email": f"{account}@{EMAIL_DOMAIN_NAME}"},
+        )
+
+        if not user:
+            return None, Response(
+                {"error": "Failed to retrieve or create user"}, status=500
+            )
+
+        # Handle Student model integration
+        Student.objects.get_or_create(user=user)
+
+        # Update session to use authenticated username
+        request.session["user_id"] = user.username
+        return user, None
+
+    except Exception:
+        return None, Response({"error": "Failed to create user session"}, status=500)

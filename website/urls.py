@@ -22,12 +22,15 @@ urlpatterns = [
         name="verify_callback_api",
     ),
     re_path(
-        r"^api/auth/password/$", auth_views.auth_password_api, name="auth_password_api"
+        r"^api/auth/password/$",
+        auth_views.auth_reset_password_api,
+        name="auth_reset_password_api",
     ),
-    # email+password login(the path is not set to auth because it was used in many places)
-    re_path(r"^api/accounts/login/$", views.auth_login_api, name="auth_login_api"),
+    re_path(r"^api/auth/signup/$", auth_views.auth_signup_api, name="auth_signup_api"),
+    # email+password login
+    re_path(r"^api/auth/login/$", auth_views.auth_login_api, name="auth_login_api"),
     # log out
-    re_path(r"^api/auth/logout/?$", views.auth_logout_api, name="auth_logout_api"),
+    re_path(r"^api/auth/logout/?$", auth_views.auth_logout_api, name="auth_logout_api"),
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
