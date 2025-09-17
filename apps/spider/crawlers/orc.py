@@ -1,159 +1,681 @@
 import re
+import urllib.parse
+import logging
+
+import json
+import requests
+import time
+from collections import defaultdict
 from urllib.parse import urljoin
 
-from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
+from apps.spider.utils import retrieve_soup
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
-BASE_URL = "https://www.ji.sjtu.edu.cn/"
-ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
-# ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
-# ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
-COURSE_DETAIL_URL_PREFIX = (
+# Set up logger
+logger = logging.getLogger(__name__)
+
+# API endpoints for course selection system
+BASE_URL = "https://coursesel.umji.sjtu.edu.cn"
+COURSE_DETAIL_URL_PREFIX = urllib.parse.urljoin(BASE_URL, "/course/")
+
+# Official website endpoints for detailed course info
+OFFICIAL_BASE_URL = "https://www.ji.sjtu.edu.cn/"
+OFFICIAL_ORC_BASE_URL = urljoin(
+    OFFICIAL_BASE_URL, "/academics/courses/courses-by-number/"
+)
+OFFICIAL_COURSE_DETAIL_URL_PREFIX = (
     "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
-UNDERGRAD_URL = ORC_BASE_URL
-INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
-
-# SUPPLEMENT_URL = "http://dartmouth.smartcatalogiq.com/en/2016s/Supplement/Courses"
-
-# COURSE_HEADING_CORRECTIONS = {
-#     "COLT": {"7 First Year Seminars": "COLT 7 First Year Seminars"},
-#     "GRK": {"GRK 1.02-3.02 Intensive Greek": "GRK 1.02 Intensive Greek"},
-#     "INTS": {
-#         "INTS INTS 17.04 Migration Stories": "INTS 17.04 Migration Stories",
-#     },
-#     "MALS": {
-#         "MALS MALS 368 Seeing and Feeling in Early Modern Europe": (
-#             "MALS 368 Seeing and Feeling in Early Modern Europe"
-#         ),
-#     },
-#     "PSYC": {"$name": None},
-#     "QBS": {
-#         "Quantitative Biomedical Sciences 132-2 Molecular Markers in Human "
-#         "Health Studies Lab": (
-#             "QBS 132.02 Molecular Markers in Human Health Studies Lab"
-#         ),
-#     },
-# }
+OFFICIAL_UNDERGRAD_URL = OFFICIAL_ORC_BASE_URL
 
 
-def crawl_program_urls():
-    for orc_url in [UNDERGRAD_URL]:
-        program_urls = _get_department_urls_from_url(orc_url)
-    return program_urls
+class CourseSelCrawler:
+    """
+    JI SJTU Course Selection System Crawler
 
+    Crawls course data from three APIs:
+    1. Lesson tasks API: course offerings and basic info
+    2. Course catalog API: detailed descriptions
+    3. Prerequisites API: prerequisite rules
+    """
 
-def _get_department_urls_from_url(url):
-    soup = retrieve_soup(url)
-    linked_urls = [urljoin(BASE_URL, a["href"]) for a in soup.find_all("a", href=True)]
-    return set(
-        linked_url for linked_url in linked_urls if _is_department_url(linked_url)
-    )
+    def __init__(self, jsessionid=None):
+        """Initialize crawler with session and authentication"""
+        self.session = requests.Session()
+        self.jsessionid = jsessionid
+        self._initialized = False
 
+        logger.info("Crawler created (not yet initialized)")
 
-def _is_department_url(candidate_url):
-    return candidate_url.startswith(COURSE_DETAIL_URL_PREFIX)
+    def _ensure_initialized(self):
+        """Ensure crawler is properly initialized with authentication"""
+        if self._initialized:
+            return
 
+        if not self.jsessionid:
+            print("Please enter your JSESSIONID cookie:")
+            print("(Found in browser dev tools under Network or Application tabs)")
+            self.jsessionid = input("JSESSIONID: ").strip()
 
-def _crawl_course_data(course_url):
-    soup = retrieve_soup(course_url)
-    course_heading = soup.find("h2").get_text()
-    if course_heading:
-        split_course_heading = course_heading.split(" – ")
-        children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
+        if not self.jsessionid:
+            raise ValueError("JSESSIONID cannot be empty")
 
-        course_code = split_course_heading[0]
-        department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
-        number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
-        course_title = split_course_heading[1]
+        cookies = {"JSESSIONID": self.jsessionid}
+        self.session.cookies.update(cookies)
 
-        course_credits = 0
-        pre_requisites = ""
-        description = ""
-        course_topics = []
-        instructors = []
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": BASE_URL,
+            "X-Requested-With": "XMLHttpRequest",
+        }
+        self.session.headers.update(headers)
 
-        for i, child in enumerate(children):
-            text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
-            if "Credits:" in text:
-                course_credits = int(re.findall(r"\d+", text)[0])
-            elif "Pre-requisites:" in text:
-                pre_requisites = extract_prerequisites(text)
-            elif "Description:" in text:
-                description = (
-                    children[i + 2].get_text(strip=True)
-                    if i + 2 < len(children)
-                    else ""
+        self._initialized = True
+        logger.info("Crawler initialized successfully!")
+
+    def get_all_courses(self):
+        """
+        Get all course data from multiple APIs and official website
+
+        Returns:
+            list: Course data with prerequisites, descriptions, and instructors
+        """
+        # Ask user which data sources to use
+        use_coursesel = self._ask_user_choice(
+            "Crawl course selection system data? (y/n): ", default="y"
+        )
+        use_official = self._ask_user_choice(
+            "Crawl official website data? (y/n): ", default="y"
+        )
+
+        courses_data = []
+        course_details = {}
+        prerequisites = {}
+        official_data = {}
+
+        if use_coursesel:
+            self._ensure_initialized()  # Make sure crawler is initialized
+            print("Crawling course selection system data...")
+            # Get data from course selection APIs
+            courses_data = self._get_lesson_tasks()
+            course_details = self._get_course_catalog()
+            prerequisites = self._get_prerequisites()
+        else:
+            print("Skipping course selection system data")
+
+        if use_official:
+            print("Crawling official website data...")
+            # Get official website data for enhanced descriptions
+            official_data = self._get_official_website_data()
+        else:
+            print("Skipping official website data")
+
+        return self._integrate_course_data(
+            courses_data, course_details, prerequisites, official_data
+        )
+
+    def _ask_user_choice(self, prompt, default="y"):
+        """Ask user for yes/no choice with default value"""
+        while True:
+            response = input(prompt).strip().lower()
+            if not response:
+                response = default.lower()
+            if response in ["y", "yes", "true"]:
+                return True
+            elif response in ["n", "no", "false"]:
+                return False
+            else:
+                print("Please enter y/yes or n/no")
+
+    def _get_current_elect_turn_id(self):
+        """Get current election turn ID dynamically"""
+        url = f"{BASE_URL}/tpm/findStudentElectTurns_ElectTurn.action"
+
+        try:
+            response = self.session.get(url, params={"_t": int(time.time() * 1000)})
+            response.raise_for_status()
+            data = response.json()
+
+            if data and isinstance(data, list) and len(data) > 0:
+                # Get the first (current) election turn
+                current_turn = data[0]
+                elect_turn_id = current_turn.get("electTurnId")
+                if elect_turn_id:
+                    logger.debug(f"Found current electTurnId: {elect_turn_id}")
+                    return elect_turn_id
+
+            logger.error("Could not find current electTurnId in API response")
+            raise ValueError(
+                "Unable to get current electTurnId - API returned no valid election turns"
+            )
+        except Exception as e:
+            logger.error(f"Error getting electTurnId: {e}")
+            raise RuntimeError(f"Failed to retrieve electTurnId from API: {e}") from e
+
+    def _get_lesson_tasks(self):
+        """Get lesson task data from course selection API"""
+        url = f"{BASE_URL}/tpm/findLessonTasksPreview_ElectTurn.action"
+
+        # Get current election turn ID dynamically
+        elect_turn_id = self._get_current_elect_turn_id()
+
+        json_params = {
+            "isToTheTime": True,
+            "electTurnId": elect_turn_id,
+            "loadCourseGroup": True,
+            "loadElectTurn": True,
+            "loadCourseType": True,
+            "loadCourseTypeCredit": True,
+            "loadElectTurnResult": True,
+            "loadStudentLessonTask": True,
+            "loadPrerequisiteCourse": True,
+            "loadLessonCalendarWeek": True,
+            "loadLessonCalendarConflict": True,
+            "loadTermCredit": True,
+            "loadLessonTask": True,
+            "loadDropApprove": True,
+            "loadElectApprove": True,
+        }
+
+        json_string = json.dumps(json_params, separators=(",", ":"))
+        encoded_json = urllib.parse.quote(json_string)
+        full_url = f"{url}?jsonString={encoded_json}"
+
+        try:
+            response = self.session.get(full_url, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("success") and "data" in data and "lessonTasks" in data["data"]:
+                return data["data"]["lessonTasks"]
+            return []
+        except Exception:
+            return []
+
+    def _get_course_catalog(self):
+        """Get course catalog data with detailed descriptions"""
+        url = f"{BASE_URL}/jdji/tpm/findOwnCollegeCourse_JiCourse.action"
+
+        try:
+            response = self.session.post(url, json={})
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("success") and "data" in data:
+                if isinstance(data["data"], list):
+                    courses = data["data"]
+                else:
+                    return {}
+                return {course.get("courseId"): course for course in courses}
+            return {}
+        except Exception:
+            return {}
+
+    def _get_prerequisites(self):
+        """Get prerequisite data with course requirements and logic"""
+        url = f"{BASE_URL}/tpm/findAll_PrerequisiteCourse.action"
+
+        try:
+            response = self.session.post(url, params={"_t": int(time.time() * 1000)})
+            response.raise_for_status()
+            data = response.json()
+
+            logger.debug(f"Prerequisites API response: success={data.get('success')}")
+            logger.debug(
+                f"Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not dict'}"
+            )
+
+            if data.get("success") and "data" in data:
+                raw_prereqs = data["data"]
+                logger.debug(f"Raw prerequisites data: {len(raw_prereqs)} items")
+
+                if raw_prereqs and len(raw_prereqs) > 0:
+                    logger.debug(f"First prerequisite item: {raw_prereqs[0]}")
+
+                prereqs = defaultdict(list)
+                for item in raw_prereqs:
+                    course_id = item.get("courseId")
+                    if course_id:
+                        prereqs[course_id].append(item)
+
+                logger.debug(
+                    f"Grouped prerequisites: {len(prereqs)} course IDs have prereqs"
                 )
-                if description == "\n" or "Course Topics" in description:
-                    description = ""
-            elif "Course Topics:" in text:
-                course_topics = (
-                    [li.get_text(strip=True) for li in children[i + 2].find_all("li")]
-                    if i + 2 < len(children)
-                    else []
-                )
-            elif "Instructors:" in text:
-                instructors_text = (
-                    children[i + 2].get_text(strip=True)
-                    if i + 2 < len(children)
-                    else ""
-                )
-                instructors = [
-                    name.strip() for name in instructors_text.split(";") if name.strip()
-                ]
+                return prereqs
+            else:
+                logger.warning("Prerequisites API failed or no data")
+                return {}
+        except Exception as e:
+            logger.error(f"Prerequisites API error: {str(e)}")
+            return {}
 
-        result = {
+    def _get_official_website_data(self):
+        """Get course data from official JI website for enhanced descriptions"""
+        logger.info("Fetching course data from official website")
+
+        try:
+            # Get all course URLs from official website
+            official_urls = self._get_official_course_urls()
+            official_data = {}
+
+            for url in official_urls:
+                course_data = self._crawl_official_course_data(url)
+                if course_data and course_data.get("course_code"):
+                    official_data[course_data["course_code"]] = course_data
+
+            logger.info(f"Fetched official data for {len(official_data)} courses")
+            return official_data
+
+        except Exception as e:
+            logger.error(f"Error fetching official website data: {str(e)}")
+            return {}
+
+    def _get_official_course_urls(self):
+        """Get all course URLs from official website"""
+        try:
+            soup = retrieve_soup(OFFICIAL_UNDERGRAD_URL)
+            linked_urls = [
+                urljoin(OFFICIAL_BASE_URL, a["href"])
+                for a in soup.find_all("a", href=True)
+            ]
+            return set(
+                linked_url
+                for linked_url in linked_urls
+                if self._is_official_course_url(linked_url)
+            )
+        except Exception as e:
+            logger.error(f"Error getting official course URLs: {str(e)}")
+            return set()
+
+    def _is_official_course_url(self, candidate_url):
+        """Check if URL is a valid official course detail URL"""
+        return candidate_url.startswith(OFFICIAL_COURSE_DETAIL_URL_PREFIX)
+
+    def _crawl_official_course_data(self, course_url):
+        """Crawl single course data from official website"""
+        try:
+            soup = retrieve_soup(course_url)
+            course_heading = soup.find("h2")
+            if not course_heading:
+                return None
+
+            course_heading_text = course_heading.get_text()
+            if not course_heading_text:
+                return None
+
+            split_course_heading = course_heading_text.split(" – ")
+            if len(split_course_heading) < 2:
+                return None
+
+            children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
+
+            course_code = split_course_heading[0]
+            course_title = split_course_heading[1]
+
+            description = ""
+            course_topics = []
+            official_url = course_url
+
+            for i, child in enumerate(children):
+                text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
+                if "Description:" in text:
+                    description = (
+                        children[i + 2].get_text(strip=True)
+                        if i + 2 < len(children)
+                        else ""
+                    )
+                    if description == "\n" or "Course Topics" in description:
+                        description = ""
+                elif "Course Topics:" in text:
+                    course_topics = (
+                        [
+                            li.get_text(strip=True)
+                            for li in children[i + 2].find_all("li")
+                        ]
+                        if i + 2 < len(children)
+                        else []
+                    )
+
+            return {
+                "course_code": course_code,
+                "course_title": course_title,
+                "description": description,
+                "course_topics": course_topics,
+                "official_url": official_url,
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error crawling official course data from {course_url}: {str(e)}"
+            )
+            return None
+
+    def _integrate_course_data(
+        self, courses_data, course_details, prerequisites, official_data=None
+    ):
+        """Integrate course data from multiple sources"""
+        if official_data is None:
+            official_data = {}
+
+        logger.info(
+            f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups, {len(official_data)} official records"
+        )
+
+        integrated_courses = []
+        courses_with_prereqs = 0
+
+        # If we have course selection data, process it
+        if courses_data:
+            courses_by_code = defaultdict(list)
+            for course in courses_data:
+                course_code = course.get("courseCode")
+                if course_code:
+                    courses_by_code[course_code].append(course)
+
+            for course_code, course_list in courses_by_code.items():
+                merged = self._merge_course_sections(course_list)
+                if not merged:
+                    continue
+
+                course_id = merged.get("courseId")
+                catalog_info = course_details.get(course_id, {})
+                prereq_info = prerequisites.get(course_id, [])
+                official_info = official_data.get(course_code, {})
+
+                if prereq_info:
+                    courses_with_prereqs += 1
+                    logger.debug(
+                        f"Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
+                    )
+
+                course_data = self._build_course_record(
+                    course_code, merged, catalog_info, prereq_info, official_info
+                )
+
+                if course_data:
+                    integrated_courses.append(course_data)
+
+        # If we only have official data (no course selection data), create courses from official data
+        elif official_data:
+            logger.info("Creating courses from official website data only")
+            for course_code, official_info in official_data.items():
+                # Create empty main_data for courses that only exist in official website
+                empty_main_data = {}
+                empty_catalog_data = {}
+                empty_prereq_data = []
+
+                course_data = self._build_course_record(
+                    course_code,
+                    empty_main_data,
+                    empty_catalog_data,
+                    empty_prereq_data,
+                    official_info,
+                )
+
+                if course_data:
+                    integrated_courses.append(course_data)
+
+        logger.info(
+            f"Integration complete: {courses_with_prereqs} courses have prerequisites, {len(integrated_courses)} total courses"
+        )
+        return integrated_courses
+
+    def _merge_course_sections(self, course_list):
+        """Merge sections of the same course"""
+        if not course_list:
+            return {}
+
+        merged = course_list[0].copy()
+        all_instructors = set()
+
+        for course in course_list:
+            teachers = course.get("lessonTaskTeam", "")
+            if teachers:
+                for teacher in re.split(r"[,;，；、]", teachers):
+                    if teacher.strip():
+                        all_instructors.add(teacher.strip())
+
+        merged["all_instructors"] = list(all_instructors)
+        return merged
+
+    def _build_course_record(
+        self, course_code, main_data, catalog_data, prereq_data, official_data=None
+    ):
+        """Build standardized course record with official website data integration"""
+        if official_data is None:
+            official_data = {}
+
+        course_title = self._extract_course_title(
+            main_data, catalog_data, official_data
+        )
+        if not course_title:
+            return None
+
+        department, number = self._parse_course_code(course_code)
+        course_credits = self._extract_course_credits(main_data, catalog_data)
+        prerequisites = self._build_prerequisites_string(course_code, prereq_data)
+        description = self._extract_description(official_data)
+        instructors = self._extract_instructors(main_data, catalog_data)
+        # Get course topics and official URL from official website data
+        course_topics = official_data.get("course_topics", [])
+        official_url = official_data.get("official_url", "")
+
+        # Use official URL as primary URL, fallback to API URL if not available
+        course_url = official_url or self._build_course_url(main_data)
+
+        return {
             "course_code": course_code,
             "course_title": course_title,
             "department": department,
             "number": number,
             "course_credits": course_credits,
-            "pre_requisites": pre_requisites,
+            "pre_requisites": prerequisites,
             "description": description,
             "course_topics": course_topics,
             "instructors": instructors,
             "url": course_url,
+            "official_url": official_url,
         }
-        return result
-        # return {
-        #     "course_code": "QWER1234J",
-        #     "course_title": "Test Course",
-        #     "department": "QWER",
-        #     "number": 1234,
-        #     "course_credits": 4,
-        #     "pre_requisites": None,
-        #     "description": "This is a test course",
-        #     "course_topics": ["Test Topic"],
-        #     "instructors": ["Test Instructor"],
-        #     "url": course_url,
-        # }
+
+    def _extract_course_title(self, main_data, catalog_data, official_data=None):
+        """Extract course title (prefer English name)"""
+        if official_data is None:
+            official_data = {}
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
+
+        return (
+            official_data.get("course_title", "")
+            or main_data.get("courseNameEn", "")
+            or main_data.get("courseName", "")
+            or catalog_data.get("courseNameEn", "")
+            or catalog_data.get("courseName", "")
+        ).strip()
+
+    def _parse_course_code(self, course_code):
+        department = ""
+        number = 0
+
+        if course_code:
+            # Match DEPT###(#)?J? (3 or 4 digits, J is optional)
+            match = re.match(r"^([A-Z]{2,4})(\d{3,4})J?$", course_code)
+            if match:
+                department = match.group(1)
+                number = int(match.group(2))
+
+        return department, number
+
+    def _extract_course_credits(self, main_data, catalog_data):
+        """Extract course credits"""
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
+
+        course_credits = main_data.get("totalCredit", 0) or catalog_data.get(
+            "credit", 0
+        )
+
+        if isinstance(course_credits, str):
+            try:
+                course_credits = int(float(course_credits))
+            except (ValueError, TypeError):
+                course_credits = 0
+
+        return course_credits
+
+    def _build_prerequisites_string(self, course_code, prereq_data):
+        """Build prerequisites string from API data"""
+        if not prereq_data:
+            return ""
+
+        logger.debug(
+            f"Building prerequisites for {course_code}, prereq_data has {len(prereq_data)} items"
+        )
+
+        prereq_codes = []
+        for item in prereq_data:
+            rule_desc = item.get("prerequisiteRuleDesc", "")
+            logger.debug(f"Processing prerequisite rule: {rule_desc}")
+
+            if rule_desc:
+                prereq_codes.append(rule_desc)
+
+        if prereq_codes:
+            prerequisites = " || ".join(prereq_codes)
+            # Convert Chinese terms to English
+            prerequisites = self._normalize_prerequisites_to_english(prerequisites)
+            logger.debug(f"Final prerequisites for {course_code}: {prerequisites}")
+            return prerequisites
+
+        return ""
+
+    def _normalize_prerequisites_to_english(self, prerequisites_text):
+        """Convert Chinese prerequisite terms to English"""
+        if not prerequisites_text:
+            return ""
+
+        # Define translation mapping
+        translations = {
+            "已获学分": "Obtained Credit",
+            "已提交学分": "Credits Submitted",
+            "获得学分": "Obtained Credit",
+            "提交学分": "Credits Submitted",
+            "学分": "Credit",
+        }
+
+        # Apply translations
+        normalized = prerequisites_text
+        for chinese, english in translations.items():
+            normalized = normalized.replace(chinese, english)
+
+        return normalized
+
+    def _extract_description(self, official_data=None):
+        """Extract course description (only from official website)"""
+        if official_data is None:
+            official_data = {}
+
+        return official_data.get("description", "").strip()
+
+    def _extract_instructors(self, main_data, catalog_data):
+        """Extract and merge instructor information"""
+        if main_data is None:
+            main_data = {}
+        if catalog_data is None:
+            catalog_data = {}
+
+        instructors = main_data.get("all_instructors", [])
+        teacher_name = catalog_data.get("teacherName", "")
+
+        if teacher_name:
+            for teacher in re.split(r"[,;，；、]", teacher_name):
+                if teacher.strip() and teacher.strip() not in instructors:
+                    instructors.append(teacher.strip())
+
+        return instructors
+
+    def _build_course_url(self, main_data):
+        """Build course detail page URL"""
+        if main_data is None:
+            main_data = {}
+        course_id = main_data.get("courseId")
+        return f"{COURSE_DETAIL_URL_PREFIX}{course_id}" if course_id else ""
+
+
+_crawler = None
+
+
+def _get_crawler():
+    """Get crawler instance (singleton pattern)"""
+    global _crawler
+    if _crawler is None:
+        _crawler = CourseSelCrawler()
+    return _crawler
+
+
+def crawl_program_urls():
+    """Get all course URLs (legacy interface)"""
+    crawler = _get_crawler()
+    courses = crawler.get_all_courses()
+
+    course_urls = []
+    for course in courses:
+        if course.get("url"):
+            course_urls.append(course["url"])
+
+    if not hasattr(crawl_program_urls, "_course_data_cache"):
+        crawl_program_urls._course_data_cache = {}
+
+    for course in courses:
+        if course.get("url"):
+            crawl_program_urls._course_data_cache[course["url"]] = course
+
+    return course_urls
+
+
+def _crawl_course_data(course_url):
+    """Crawl single course data (legacy interface)"""
+    if hasattr(crawl_program_urls, "_course_data_cache"):
+        course_data = crawl_program_urls._course_data_cache.get(course_url)
+        if course_data:
+            return course_data
+
+    return {}
 
 
 def import_department(department_data):
+    """Import course data to database"""
     for course_data in department_data:
-        course, created = Course.objects.update_or_create(
+        # Prepare defaults dict with all available fields
+        defaults = {
+            "course_title": course_data["course_title"],
+            "department": course_data["department"],
+            "number": course_data["number"],
+            "course_credits": course_data["course_credits"],
+            "pre_requisites": course_data["pre_requisites"],
+            "description": course_data["description"],
+            "course_topics": course_data["course_topics"],
+            "url": course_data["url"],
+        }
+
+        # Add official_url if available
+        if "official_url" in course_data:
+            defaults["official_url"] = course_data["official_url"]
+
+        course, _ = Course.objects.update_or_create(
             course_code=course_data["course_code"],
-            defaults={
-                "course_title": course_data["course_title"],
-                "department": course_data["department"],
-                "number": course_data["number"],
-                "course_credits": course_data["course_credits"],
-                "pre_requisites": course_data["pre_requisites"],
-                "description": course_data["description"],
-                "course_topics": course_data["course_topics"],
-                "url": course_data["url"],
-                # FIXME: invalid field source in course
-                # "source": Course.SOURCES.ORC,
-            },
+            defaults=defaults,
         )
 
-        # Handle instructors
         if "instructors" in course_data and course_data["instructors"]:
             for instructor_name in course_data["instructors"]:
                 instructor, _ = Instructor.objects.get_or_create(name=instructor_name)
-                # Create a course offering for the current term if it doesn't exist
+
                 offering, _ = CourseOffering.objects.get_or_create(
                     course=course,
                     term=CURRENT_TERM,
@@ -163,13 +685,12 @@ def import_department(department_data):
 
 
 def extract_prerequisites(pre_requisites):
+    """Process prerequisite string format (legacy function)"""
     result = pre_requisites
 
     result = result.replace("Pre-requisites:", "").strip()
-
     result = result.replace("Obtained Credit", "obtained_credit").strip()
     result = result.replace("Credits Submitted", "credits_submitted").strip()
-
     result = result.replace("&&", " && ").strip()
     result = result.replace("||", " || ").strip()
 
