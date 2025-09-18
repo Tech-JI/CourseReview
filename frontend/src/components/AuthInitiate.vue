@@ -515,17 +515,25 @@ onMounted(async () => {
     referrer.includes("sjtu") ||
     hasOtpHint;
 
-  // If user is on signup page and has stored auth data, restart verification flow
+  // If user is on signup or reset_password page and has stored auth data, restart verification flow
   const isOnSignupWithStoredAuth =
     props.action === "signup" && localStorage.getItem("auth_otp");
+  const isOnResetPasswordWithStoredAuth =
+    props.action === "reset_password" && localStorage.getItem("auth_otp");
 
-  // If user returned from signup or questionnaire, always restart verification flow
-  if (isFromQuestionnaire || isOnSignupWithStoredAuth) {
+  // If user returned from signup/reset_password/questionnaire, always restart verification flow
+  if (
+    isFromQuestionnaire ||
+    isOnSignupWithStoredAuth ||
+    isOnResetPasswordWithStoredAuth
+  ) {
     console.log(
       "🔧 Debug: Detected",
       isOnSignupWithStoredAuth
         ? "signup page with stored auth data"
-        : "return from questionnaire",
+        : isOnResetPasswordWithStoredAuth
+          ? "reset_password page with stored auth data"
+          : "return from questionnaire",
       "- restarting verification flow",
     );
     clearAuthData();
