@@ -207,11 +207,7 @@ const performVerification = async () => {
 
     parsedParams.value = params;
 
-    console.log("🔧 Debug: Verifying authentication with params:", params);
-
     const result = await verifyAuthentication(params);
-
-    console.log("🔧 Debug: Verification successful:", result);
 
     // Store the verification result
     storeVerificationResult(result.action, result.expires_at);
@@ -221,8 +217,6 @@ const performVerification = async () => {
 
     // Redirect based on action
     const redirectPath = getRedirectPath(result.action);
-
-    console.log("🔧 Debug: Redirecting to:", redirectPath);
 
     // Small delay to show success state, then redirect
     setTimeout(() => {
@@ -238,7 +232,6 @@ const performVerification = async () => {
 
 // Component lifecycle
 onMounted(() => {
-  console.log("🔧 Debug: Verify page mounted with query:", route.query);
   performVerification();
 });
 </script>

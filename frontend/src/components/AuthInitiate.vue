@@ -191,7 +191,6 @@ let isInitializingTurnstile = false; // Prevent concurrent initialization
 const cleanupTurnstile = () => {
   if (turnstileWidget && window.turnstile) {
     try {
-      console.log("🔧 Debug: Removing existing turnstile widget");
       window.turnstile.remove(turnstileWidget);
     } catch (e) {
       console.warn("Error removing turnstile widget:", e);
@@ -203,7 +202,6 @@ const cleanupTurnstile = () => {
   const widgetContainer = document.getElementById("turnstile-widget");
   if (widgetContainer) {
     widgetContainer.innerHTML = "";
-    console.log("🔧 Debug: Cleared turnstile widget container");
   }
 };
 let countdownInterval = null;
@@ -337,7 +335,6 @@ const initializeTurnstile = async () => {
           otpData.value ||
           error.value
         ) {
-          console.log("🔧 Debug: State changed during wait, resetting state");
           loading.value = false;
           turnstileToken.value = null;
           otpData.value = null;
@@ -359,14 +356,11 @@ const initializeTurnstile = async () => {
     // Clear container content to ensure clean state
     widgetContainer.innerHTML = "";
 
-    const siteKey =
-      import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAABVPBtNKmaBqXhw";
-    console.log("🔧 Debug: Using site key =", siteKey);
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
     turnstileWidget = window.turnstile.render(widgetContainer, {
       sitekey: siteKey,
       callback: (token) => {
-        console.log("🔧 Debug: Turnstile callback received");
         turnstileToken.value = token;
         loading.value = false;
       },
@@ -378,7 +372,6 @@ const initializeTurnstile = async () => {
         loading.value = false;
       },
       "expired-callback": () => {
-        console.log("🔧 Debug: Turnstile expired");
         // Reset initialization flag so retry can work
         isInitializingTurnstile = false;
         turnstileToken.value = null;
@@ -387,8 +380,6 @@ const initializeTurnstile = async () => {
       theme: "light",
       size: "normal",
     });
-
-    console.log("🔧 Debug: Turnstile widget created with ID:", turnstileWidget);
   } catch (err) {
     console.error("Failed to load Turnstile:", err);
     error.value = "Failed to load security verification. Please try again.";
@@ -519,8 +510,6 @@ const getCookie = (name) => {
 
 // Reset authentication state
 const resetAuth = () => {
-  console.log("🔧 Debug: Resetting auth state (try again)");
-
   // Clear all state
   error.value = null;
   turnstileToken.value = null;
