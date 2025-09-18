@@ -21,6 +21,36 @@
 
     <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
       <div class="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+        <!-- Login Method Tabs -->
+        <div class="mb-8">
+          <nav class="flex space-x-8" aria-label="Tabs">
+            <button
+              type="button"
+              @click="showQuestionnaireLogin = false"
+              :class="[
+                'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                !showQuestionnaireLogin
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ]"
+            >
+              Password Login
+            </button>
+            <button
+              type="button"
+              @click="showQuestionnaireLogin = true"
+              :class="[
+                'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                showQuestionnaireLogin
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ]"
+            >
+              SJTU Authentication
+            </button>
+          </nav>
+        </div>
+
         <!-- Error Alert -->
         <div v-if="error" class="rounded-md bg-red-50 p-4 mb-6">
           <div class="flex">
@@ -35,7 +65,12 @@
           </div>
         </div>
 
-        <form class="space-y-6" @submit.prevent="handleLogin">
+        <!-- Password Login Form -->
+        <form
+          v-if="!showQuestionnaireLogin"
+          class="space-y-6"
+          @submit.prevent="handleLogin"
+        >
           <div>
             <label
               for="email"
@@ -51,7 +86,7 @@
                 autocomplete="email"
                 required
                 v-model="email"
-                placeholder="Enter your UM-SJTU email"
+                placeholder="Enter your SJTU email"
                 class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
               />
             </div>
@@ -119,6 +154,11 @@
             </button>
           </div>
         </form>
+
+        <!-- SJTU Authentication -->
+        <div v-else>
+          <AuthInitiate action="login" />
+        </div>
       </div>
 
       <p class="mt-10 text-center text-sm/6 text-gray-500">
@@ -138,6 +178,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
+import AuthInitiate from "./AuthInitiate.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -145,6 +186,7 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 const loading = ref(false);
+const showQuestionnaireLogin = ref(false);
 
 onMounted(async () => {
   try {

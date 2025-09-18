@@ -4,9 +4,6 @@
   >
     <div class="max-w-md w-full space-y-8">
       <div>
-        <div class="mx-auto h-12 w-auto flex justify-center">
-          <img class="h-12 w-auto" src="/vite.svg" alt="Logo" />
-        </div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Verifying Authentication
         </h2>
@@ -32,22 +29,20 @@
             <div class="mt-2 text-sm text-red-700">
               <p>{{ error }}</p>
             </div>
-            <div class="mt-4 space-y-2">
+            <div class="mt-4 flex space-x-3">
               <button
                 @click="retryVerification"
                 type="button"
-                class="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+                class="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
               >
                 Retry Verification
               </button>
-              <div>
-                <router-link
-                  :to="getReturnPath()"
-                  class="text-sm text-red-600 hover:text-red-500"
-                >
-                  Return to {{ getActionDisplayName() }}
-                </router-link>
-              </div>
+              <router-link
+                :to="getReturnPath()"
+                class="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 inline-block"
+              >
+                Return to {{ getActionDisplayName() }}
+              </router-link>
             </div>
           </div>
         </div>
