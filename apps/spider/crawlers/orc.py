@@ -41,7 +41,7 @@ INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
 def crawl_program_urls():
     program_urls = set()  # Initialize to empty set
     for orc_url in [UNDERGRAD_URL]:
-        program_urls = _get_department_urls_from_url(orc_url)
+        program_urls.update(_get_department_urls_from_url(orc_url))
     return program_urls
 
 

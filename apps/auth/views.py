@@ -42,6 +42,32 @@ TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
 
 
+def _verify_turnstile_token(turnstile_token, client_ip):
+    """Helper function to verify Turnstile token with Cloudflare's API"""
+
+    async def verify_turnstile():
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={
+                    "secret": settings.TURNSTILE_SECRET_KEY,
+                    "response": turnstile_token,
+                    "remoteip": client_ip,
+                },
+            )
+            return response.json()
+
+    try:
+        result = asyncio.run(verify_turnstile())
+        if not result.get("success"):
+            logging.warning(f"Turnstile verification failed: {result}")
+            return False, "Turnstile verification failed"
+        return True, None
+    except Exception as e:
+        logging.error(f"Error verifying Turnstile token: {e}")
+        return False, "Turnstile verification error"
+
+
 @api_view(["POST"])
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
@@ -72,35 +98,19 @@ def auth_initiate_api(request):
     )
 
     # Verify Turnstile token
-    async def verify_turnstile():
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                data={
-                    "secret": settings.TURNSTILE_SECRET_KEY,
-                    "response": turnstile_token,
-                    "remoteip": client_ip,
-                },
-            )
-            return response.json()
-
-    # Verify Turnstile token
-    try:
-        result = asyncio.run(verify_turnstile())
-        if not result.get("success"):
-            logging.warning(f"Turnstile verification failed: {result}")
-            return Response({"error": "Turnstile verification failed"}, status=403)
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
-        return Response({"error": "Turnstile verification error"}, status=500)
+    success, error_message = _verify_turnstile_token(turnstile_token, client_ip)
+    if not success:
+        status_code = (
+            403 if error_message and "verification failed" in error_message else 500
+        )
+        return Response({"error": error_message}, status=status_code)
 
     # Generate cryptographically secure OTP and temp_token
     otp_bytes = secrets.token_bytes(6)
     otp = base64.b64encode(otp_bytes).decode("ascii")[:8]  # 8-digit OTP
-
     temp_token = secrets.token_urlsafe(32)  # 256-bit temp_token
 
-    # Create Redis storage
+    # Create Redis storage and clean up existing tokens
     r = get_redis_connection("default")
 
     # Clean up any existing temp_token for this client to prevent memory leaks
@@ -111,11 +121,10 @@ def auth_initiate_api(request):
             existing_state_key = f"temp_token_state:{existing_hash}"
             existing_state_data = r.get(existing_state_key)
             if existing_state_data:
-                # Clean up existing state and any associated OTP
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logging.info(
-                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}",
+                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}"
                 )
         except Exception as e:
             logging.warning(f"Error cleaning up existing temp_token: {e}")
@@ -137,7 +146,6 @@ def auth_initiate_api(request):
     logging.info(f"Created auth intent for action {action} with OTP and temp_token")
 
     survey_url = utils.get_survey_url(action)
-
     if not survey_url:
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
@@ -146,8 +154,6 @@ def auth_initiate_api(request):
 
     # Create response and set temp_token as HttpOnly cookie
     response = Response({"otp": otp, "redirect_url": survey_url}, status=200)
-
-    # Set temp_token as secure HttpOnly cookie
     response.set_cookie(
         "temp_token",
         temp_token,
