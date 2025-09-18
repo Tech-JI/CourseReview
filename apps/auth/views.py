@@ -160,8 +160,8 @@ def auth_initiate_api(request):
         max_age=TEMP_TOKEN_TIMEOUT,
         httponly=True,
         secure=getattr(settings, "SECURE_COOKIES", True),
+        samesite="Lax",
     )
-
     return response
 
 
