@@ -76,6 +76,7 @@
                 Redirecting in {{ countdown }}s...
               </span>
             </button>
+
             <p class="text-xs/5 text-indigo-600">
               Expires in {{ formatTime(otpData.expires_at) }}
             </p>
@@ -180,9 +181,11 @@ const redirecting = ref(false);
 const copyButtonText = ref("Copy Code & Continue");
 const countdown = ref(0);
 const redirectUrl = ref(null);
+const currentTime = ref(Date.now()); // For reactive countdown updates
 
 let turnstileWidget = null;
 let countdownInterval = null;
+let timeUpdateInterval = null; // For updating currentTime
 
 // Check for existing OTP data in localStorage
 const checkExistingOTP = () => {
@@ -201,6 +204,18 @@ const checkExistingOTP = () => {
         flowInfo.action === props.action &&
         flowInfo.status === "pending"
       ) {
+        // Check if too much time has passed since generation (likely verification failed)
+        const timeSinceGeneration =
+          Date.now() - (otpInfo.expires_at - 2 * 60 * 1000);
+        if (timeSinceGeneration > 15 * 1000) {
+          // 15 seconds - more aggressive detection
+          console.log(
+            "🔧 Debug: OTP has been unused for too long, restarting verification flow",
+          );
+          clearAuthData();
+          return false; // Restart the flow
+        }
+
         otpData.value = otpInfo;
         loading.value = false;
         return true;
@@ -220,6 +235,7 @@ const checkExistingOTP = () => {
 const clearAuthData = () => {
   localStorage.removeItem("auth_otp");
   localStorage.removeItem("auth_flow");
+  localStorage.removeItem("auth_redirect_time");
 };
 
 // Load Turnstile script
@@ -255,13 +271,24 @@ const initializeTurnstile = async () => {
     );
     console.log("🔧 Debug: All env vars =", import.meta.env);
 
+    // First ensure we're in the right state for turnstile to be rendered
+    loading.value = false;
+    turnstileToken.value = null;
+    otpData.value = null;
+    error.value = null;
+
     await loadTurnstile();
+
+    // Use multiple nextTicks to ensure DOM is fully updated
+    await nextTick();
+    await nextTick();
     await nextTick();
 
-    // Wait for DOM element to be available with timeout
+    // Wait for DOM element to be available with longer timeout and more attempts
     let widgetContainer = null;
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 30; // Further increased attempts
+    const waitTime = 300; // Increased wait time
 
     while (!widgetContainer && attempts < maxAttempts) {
       widgetContainer = document.getElementById("turnstile-widget");
@@ -269,7 +296,21 @@ const initializeTurnstile = async () => {
         console.log(
           `🔧 Debug: Waiting for turnstile-widget container (attempt ${attempts + 1}/${maxAttempts})`,
         );
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Ensure we're still in the correct state
+        if (
+          loading.value ||
+          turnstileToken.value ||
+          otpData.value ||
+          error.value
+        ) {
+          console.log("🔧 Debug: State changed during wait, resetting state");
+          loading.value = false;
+          turnstileToken.value = null;
+          otpData.value = null;
+          error.value = null;
+          await nextTick();
+        }
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
         attempts++;
       }
     }
@@ -373,6 +414,9 @@ const copyOTPAndRedirect = async () => {
   if (!otpData.value || !redirectUrl.value) return;
 
   try {
+    // Record the time when user leaves for questionnaire
+    localStorage.setItem("auth_redirect_time", Date.now().toString());
+
     // Copy to clipboard
     await navigator.clipboard.writeText(otpData.value.otp);
     copyButtonText.value = "Copied! ✓";
@@ -404,7 +448,10 @@ const copyOTPAndRedirect = async () => {
 
 // Format time remaining
 const formatTime = (expiresAt) => {
-  const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  const remaining = Math.max(
+    0,
+    Math.floor((expiresAt - currentTime.value) / 1000),
+  );
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -446,7 +493,7 @@ const resetAuth = () => {
     window.turnstile.reset(turnstileWidget);
   }
 
-  loading.value = true;
+  // Don't set loading.value = true here, let initializeTurnstile handle the state
   setTimeout(() => {
     initializeTurnstile();
   }, 100);
@@ -454,12 +501,110 @@ const resetAuth = () => {
 
 // Component lifecycle
 onMounted(async () => {
+  // Start time update interval for reactive countdown
+  timeUpdateInterval = setInterval(() => {
+    currentTime.value = Date.now();
+  }, 1000);
+
+  // Check if user just returned from signup or questionnaire
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasOtpHint = urlParams.has("otp_hint");
+  const referrer = document.referrer;
+  const isFromQuestionnaire =
+    referrer.includes("questionnaire") ||
+    referrer.includes("sjtu") ||
+    hasOtpHint;
+
+  // If user is on signup page and has stored auth data, restart verification flow
+  const isOnSignupWithStoredAuth =
+    props.action === "signup" && localStorage.getItem("auth_otp");
+
+  // If user returned from signup or questionnaire, always restart verification flow
+  if (isFromQuestionnaire || isOnSignupWithStoredAuth) {
+    console.log(
+      "🔧 Debug: Detected",
+      isOnSignupWithStoredAuth
+        ? "signup page with stored auth data"
+        : "return from questionnaire",
+      "- restarting verification flow",
+    );
+    clearAuthData();
+    // Don't set loading.value = true, let initializeTurnstile handle the state
+    await nextTick();
+    await initializeTurnstile();
+    return;
+  }
+
+  // Add visibility change listener to detect when user returns from questionnaire
+  const handleVisibilityChange = () => {
+    // Only check when page becomes visible
+    if (document.visibilityState === "visible") {
+      // Check if we have an OTP that's been around for a while
+      const storedOTP = localStorage.getItem("auth_otp");
+      const redirectTime = localStorage.getItem("auth_redirect_time");
+
+      if (storedOTP) {
+        try {
+          const otpInfo = JSON.parse(storedOTP);
+          const now = Date.now();
+
+          // Check time since OTP generation
+          const timeSinceGeneration =
+            now - (otpInfo.expires_at - 2 * 60 * 1000);
+
+          // If user left for questionnaire, check time since redirect
+          if (redirectTime) {
+            const timeSinceRedirect = now - parseInt(redirectTime);
+            // If user returned within 60 seconds, likely verification failed
+            if (timeSinceRedirect < 60 * 1000 && timeSinceRedirect > 5 * 1000) {
+              console.log(
+                "🔧 Debug: User returned quickly from questionnaire, likely verification failed",
+              );
+              clearAuthData();
+              localStorage.removeItem("auth_redirect_time");
+              otpData.value = null;
+              // Don't set loading.value = true, let initializeTurnstile handle the state
+              setTimeout(async () => {
+                await initializeTurnstile();
+              }, 100);
+              return;
+            }
+          }
+
+          // If OTP exists for more than 30 seconds when user returns, likely verification failed
+          if (timeSinceGeneration > 30 * 1000) {
+            console.log(
+              "🔧 Debug: OTP has been unused for too long, restarting verification flow",
+            );
+            clearAuthData();
+            localStorage.removeItem("auth_redirect_time");
+            otpData.value = null;
+            // Don't set loading.value = true, let initializeTurnstile handle the state
+            setTimeout(async () => {
+              await initializeTurnstile();
+            }, 100);
+          }
+        } catch (e) {
+          console.error("Error checking OTP on visibility change:", e);
+        }
+      }
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  // Store the handler for cleanup
+  window._authVisibilityHandler = handleVisibilityChange;
+
   // Check for existing valid OTP first
   if (!checkExistingOTP()) {
     // No valid OTP, set loading to false first to render the turnstile container
     loading.value = false;
     await nextTick();
     await initializeTurnstile();
+  } else {
+    // OTP exists, just show it
+    loading.value = false;
   }
 });
 
@@ -467,8 +612,19 @@ onUnmounted(() => {
   if (countdownInterval) {
     clearInterval(countdownInterval);
   }
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+  }
   if (turnstileWidget && window.turnstile) {
     window.turnstile.remove(turnstileWidget);
+  }
+  // Clean up visibility change event listener
+  if (window._authVisibilityHandler) {
+    document.removeEventListener(
+      "visibilitychange",
+      window._authVisibilityHandler,
+    );
+    delete window._authVisibilityHandler;
   }
 });
 </script>
