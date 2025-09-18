@@ -170,7 +170,7 @@ export default {
 
     // Constants
     const isDevelopment = process.env.NODE_ENV === "development";
-    const REDIRECT_DELAY = 3000; // 3 seconds
+    const REDIRECT_DELAY = 1000; // 1 second
     const PROGRESS_STEPS = [20, 50, 80, 100];
 
     // Computed properties
@@ -258,7 +258,7 @@ export default {
           clearInterval(countdownTimer);
           handleRedirect();
         }
-      }, 1000);
+      }, 0);
     }
 
     async function verifyCallback() {
@@ -360,6 +360,8 @@ export default {
           case "login":
           default:
             successMessage.value = "Login successful! Welcome back";
+            // Trigger authentication state change event
+            window.dispatchEvent(new CustomEvent("auth-state-changed"));
             break;
         }
 

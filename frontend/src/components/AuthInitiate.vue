@@ -183,7 +183,29 @@ const countdown = ref(0);
 const redirectUrl = ref(null);
 const currentTime = ref(Date.now()); // For reactive countdown updates
 
+// Turnstile management
 let turnstileWidget = null;
+let isInitializingTurnstile = false; // Prevent concurrent initialization
+
+// Safe cleanup of existing turnstile widget
+const cleanupTurnstile = () => {
+  if (turnstileWidget && window.turnstile) {
+    try {
+      console.log("🔧 Debug: Removing existing turnstile widget");
+      window.turnstile.remove(turnstileWidget);
+    } catch (e) {
+      console.warn("Error removing turnstile widget:", e);
+    }
+  }
+  turnstileWidget = null;
+
+  // Also clear the DOM container to ensure clean state
+  const widgetContainer = document.getElementById("turnstile-widget");
+  if (widgetContainer) {
+    widgetContainer.innerHTML = "";
+    console.log("🔧 Debug: Cleared turnstile widget container");
+  }
+};
 let countdownInterval = null;
 let timeUpdateInterval = null; // For updating currentTime
 
@@ -264,12 +286,24 @@ const loadTurnstile = () => {
 
 // Initialize Turnstile widget
 const initializeTurnstile = async () => {
+  // Prevent concurrent initialization
+  if (isInitializingTurnstile) {
+    console.log(
+      "🔧 Debug: Turnstile initialization already in progress, skipping",
+    );
+    return;
+  }
+
+  isInitializingTurnstile = true;
+
   try {
     console.log(
       "🔧 Debug: VITE_TURNSTILE_SITE_KEY =",
       import.meta.env.VITE_TURNSTILE_SITE_KEY,
     );
-    console.log("🔧 Debug: All env vars =", import.meta.env);
+
+    // Always cleanup any existing widget first
+    cleanupTurnstile();
 
     // First ensure we're in the right state for turnstile to be rendered
     loading.value = false;
@@ -318,9 +352,12 @@ const initializeTurnstile = async () => {
     if (!widgetContainer) {
       console.error("Turnstile widget container not found after waiting");
       error.value =
-        "Failed to initialize security verification. Please refresh the page.";
+        "Failed to initialize security verification. Please try again.";
       return;
     }
+
+    // Clear container content to ensure clean state
+    widgetContainer.innerHTML = "";
 
     const siteKey =
       import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAABVPBtNKmaBqXhw";
@@ -329,27 +366,34 @@ const initializeTurnstile = async () => {
     turnstileWidget = window.turnstile.render(widgetContainer, {
       sitekey: siteKey,
       callback: (token) => {
+        console.log("🔧 Debug: Turnstile callback received");
         turnstileToken.value = token;
         loading.value = false;
       },
       "error-callback": (errorCode) => {
         console.error("Turnstile error:", errorCode);
-        error.value =
-          "Security verification failed. Please refresh the page and try again.";
+        // Reset initialization flag so retry can work
+        isInitializingTurnstile = false;
+        error.value = "Security verification failed. Please try again.";
         loading.value = false;
       },
       "expired-callback": () => {
+        console.log("🔧 Debug: Turnstile expired");
+        // Reset initialization flag so retry can work
+        isInitializingTurnstile = false;
         turnstileToken.value = null;
-        error.value =
-          "Security verification expired. Please complete the check again.";
+        error.value = "Security verification expired. Please try again.";
       },
       theme: "light",
       size: "normal",
     });
+
+    console.log("🔧 Debug: Turnstile widget created with ID:", turnstileWidget);
   } catch (err) {
     console.error("Failed to load Turnstile:", err);
-    error.value =
-      "Failed to load security verification. Please check your internet connection and refresh the page.";
+    error.value = "Failed to load security verification. Please try again.";
+  } finally {
+    isInitializingTurnstile = false;
   }
 };
 
@@ -423,7 +467,7 @@ const copyOTPAndRedirect = async () => {
 
     // Start countdown and redirect
     redirecting.value = true;
-    countdown.value = 3;
+    countdown.value = 1;
 
     countdownInterval = setInterval(() => {
       countdown.value--;
@@ -475,11 +519,17 @@ const getCookie = (name) => {
 
 // Reset authentication state
 const resetAuth = () => {
+  console.log("🔧 Debug: Resetting auth state (try again)");
+
+  // Clear all state
   error.value = null;
   turnstileToken.value = null;
   otpData.value = null;
   redirecting.value = false;
   copyButtonText.value = "Copy Code & Continue";
+
+  // Reset initialization flag to allow retry
+  isInitializingTurnstile = false;
 
   if (countdownInterval) {
     clearInterval(countdownInterval);
@@ -488,15 +538,16 @@ const resetAuth = () => {
 
   clearAuthData();
 
-  // Reset turnstile widget
-  if (turnstileWidget && window.turnstile) {
-    window.turnstile.reset(turnstileWidget);
-  }
+  // Use cleanup function instead of reset to ensure complete removal
+  cleanupTurnstile();
 
-  // Don't set loading.value = true here, let initializeTurnstile handle the state
-  setTimeout(() => {
-    initializeTurnstile();
-  }, 100);
+  // Set loading state briefly to show user we're working
+  loading.value = true;
+
+  // Add delay to ensure cleanup is complete before reinitializing
+  setTimeout(async () => {
+    await initializeTurnstile();
+  }, 300); // Increased delay for error recovery
 };
 
 // Component lifecycle
@@ -628,9 +679,10 @@ onUnmounted(() => {
   if (timeUpdateInterval) {
     clearInterval(timeUpdateInterval);
   }
-  if (turnstileWidget && window.turnstile) {
-    window.turnstile.remove(turnstileWidget);
-  }
+
+  // Use cleanup function for consistent turnstile cleanup
+  cleanupTurnstile();
+
   // Clean up visibility change event listener
   if (window._authVisibilityHandler) {
     document.removeEventListener(

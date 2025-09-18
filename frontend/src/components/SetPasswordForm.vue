@@ -382,6 +382,7 @@ export default {
 
       let score = 0;
       // Length check - 12 characters is now the baseline
+      if (password.length < 10) return 1;
       if (password.length >= 12) score += 1;
       if (password.length >= 16) score += 1;
 
@@ -471,10 +472,10 @@ export default {
 
       if (!password) {
         errors.value.password = "Please enter a password";
-      } else if (password.length < 12) {
-        errors.value.password = "Password must be at least 12 characters";
-      } else if (password.length > 128) {
-        errors.value.password = "Password cannot exceed 128 characters";
+      } else if (password.length < 10) {
+        errors.value.password = "Password must be at least 10 characters";
+      } else if (password.length > 32) {
+        errors.value.password = "Password cannot exceed 32 characters";
       } else if (!/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password)) {
         errors.value.password =
           "Password must contain both letters and numbers";
