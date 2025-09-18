@@ -169,9 +169,9 @@ def validate_password_strength(password) -> tuple[bool, dict | None]:
     `error_response` is a dict with a detailed error message if invalid, otherwise None.
     """
     # Quick length check first
-    if len(password) <= PASSWORD_LENGTH_MIN:
+    if len(password) < PASSWORD_LENGTH_MIN:
         return False, {
-            "error": f"Password must be more than {PASSWORD_LENGTH_MIN} characters long.",
+            "error": f"Password must be equal to or more than {PASSWORD_LENGTH_MIN} characters long.",
         }
 
     # Single regex pattern to check all character requirements at once
