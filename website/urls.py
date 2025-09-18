@@ -21,6 +21,12 @@ urlpatterns = [
         auth_views.verify_callback_api,
         name="verify_callback_api",
     ),
+    # Backwards-compatible alias (some front-end code calls verify-callback)
+    re_path(
+        r"^api/auth/verify-callback/$",
+        auth_views.verify_callback_api,
+        name="verify_callback_api_alias",
+    ),
     re_path(
         r"^api/auth/password/$",
         auth_views.auth_reset_password_api,

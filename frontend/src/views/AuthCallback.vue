@@ -224,6 +224,14 @@ const performVerification = async () => {
     success.value = true;
     loading.value = false;
 
+    // If login, notify other parts of the app to refresh auth state
+    try {
+      if (result.action === "login") {
+        window.dispatchEvent(new CustomEvent("auth-state-changed"));
+      }
+    } catch (e) {
+      console.warn("Could not dispatch auth-state-changed event:", e);
+    }
     // Redirect based on action
     const redirectPath = getRedirectPath(result.action);
 

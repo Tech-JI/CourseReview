@@ -225,6 +225,12 @@ const handleLogin = async () => {
       throw new Error(data.error || "Login failed");
     }
 
+    // Notify other parts of the app that authentication state changed
+    try {
+      window.dispatchEvent(new CustomEvent("auth-state-changed"));
+    } catch (e) {
+      console.warn("Could not dispatch auth-state-changed event:", e);
+    }
     router.replace("/courses");
   } catch (err) {
     error.value = err.message;

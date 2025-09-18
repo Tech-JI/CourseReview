@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   Disclosure,
@@ -240,6 +240,12 @@ const showSearchBar = computed(() => {
 
 onMounted(async () => {
   await checkAuthentication();
+  // Re-check authentication whenever other parts of the app signal a change
+  window.addEventListener("auth-state-changed", checkAuthentication);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("auth-state-changed", checkAuthentication);
 });
 
 const checkAuthentication = async () => {
