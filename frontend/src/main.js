@@ -2,7 +2,6 @@ import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
 import Login from "./components/Login.vue";
-import Auth from "./components/Auth.vue";
 import CourseDetail from "./components/CourseDetail.vue";
 import Landing from "./components/Landing.vue";
 import CourseReviewSearch from "./components/CourseReviewSearch.vue";
@@ -17,11 +16,10 @@ const routes = [
   { path: "/login", component: Login },
   { path: "/accounts/login", component: Login }, // Legacy route for backward compatibility
   { path: "/signup", component: Signup },
-  { path: "/accounts/signup", component: Signup }, // Add accounts/signup route
+  { path: "/accounts/signup", component: Signup },
   { path: "/reset", component: ResetPassword },
-  { path: "/accounts/reset", component: ResetPassword }, // Add accounts/reset for consistency
+  { path: "/accounts/reset", component: ResetPassword },
   { path: "/callback", component: AuthCallback },
-  { path: "/auth", component: Auth },
   { path: "/course/:course_id", component: CourseDetail, props: true },
   {
     path: "/course/:courseId/review_search",

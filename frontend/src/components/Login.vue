@@ -124,9 +124,22 @@
           </div>
 
           <div>
+            <Turnstile
+              v-if="!showQuestionnaireLogin"
+              key="login-password-turnstile"
+              @token="onTurnstileToken"
+              @error="onTurnstileError"
+              @expired="onTurnstileExpired"
+              :show-title="false"
+              theme="light"
+              size="normal"
+            />
+          </div>
+
+          <div>
             <button
               type="submit"
-              :disabled="loading"
+              :disabled="loading || !turnstileToken"
               class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-2 focus:outline-offset-2 focus:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg
@@ -179,6 +192,7 @@ import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
 import AuthInitiate from "./AuthInitiate.vue";
+import Turnstile from "./Turnstile.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -187,6 +201,21 @@ const password = ref("");
 const error = ref("");
 const loading = ref(false);
 const showQuestionnaireLogin = ref(false);
+const turnstileToken = ref(null);
+
+// Turnstile event handlers
+const onTurnstileToken = (token) => {
+  turnstileToken.value = token;
+};
+
+const onTurnstileError = (errorMessage) => {
+  error.value = errorMessage;
+};
+
+const onTurnstileExpired = (errorMessage) => {
+  turnstileToken.value = null;
+  error.value = errorMessage;
+};
 
 onMounted(async () => {
   try {
@@ -204,6 +233,13 @@ onMounted(async () => {
 
 const handleLogin = async () => {
   error.value = "";
+
+  // Check if turnstile token is available
+  if (!turnstileToken.value) {
+    error.value = "Please complete the security verification first.";
+    return;
+  }
+
   loading.value = true;
 
   try {
@@ -216,6 +252,7 @@ const handleLogin = async () => {
       body: JSON.stringify({
         email: email.value,
         password: password.value,
+        turnstile_token: turnstileToken.value,
       }),
     });
 

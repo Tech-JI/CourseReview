@@ -90,19 +90,15 @@
       v-else-if="!turnstileToken"
       class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10"
     >
-      <div class="space-y-4">
-        <div class="text-center">
-          <h3 class="text-lg/7 font-medium text-gray-900 mb-2">
-            Verify you're human
-          </h3>
-          <p class="text-sm/6 text-gray-500 mb-4">
-            Complete the security check below to continue
-          </p>
-        </div>
-        <div class="flex justify-center">
-          <div id="turnstile-widget"></div>
-        </div>
-      </div>
+      <Turnstile
+        key="auth-initiate-turnstile"
+        @token="onTurnstileToken"
+        @error="onTurnstileError"
+        @expired="onTurnstileExpired"
+        :show-title="true"
+        theme="light"
+        size="normal"
+      />
     </div>
 
     <!-- Ready to Initiate -->
@@ -160,7 +156,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
+import Turnstile from "./Turnstile.vue";
 
 // Props
 const props = defineProps({
@@ -183,30 +180,26 @@ const countdown = ref(0);
 const redirectUrl = ref(null);
 const currentTime = ref(Date.now()); // For reactive countdown updates
 
-// Turnstile management
-let turnstileWidget = null;
-let isInitializingTurnstile = false; // Prevent concurrent initialization
-
-// Safe cleanup of existing turnstile widget
-const cleanupTurnstile = () => {
-  if (turnstileWidget && window.turnstile) {
-    try {
-      window.turnstile.remove(turnstileWidget);
-    } catch (e) {
-      console.warn("Error removing turnstile widget:", e);
-    }
-  }
-  turnstileWidget = null;
-
-  // Also clear the DOM container to ensure clean state
-  const widgetContainer = document.getElementById("turnstile-widget");
-  if (widgetContainer) {
-    widgetContainer.innerHTML = "";
-  }
-};
+// Interval references
 let countdownInterval = null;
-let timeUpdateInterval = null; // For updating currentTime
+let timeUpdateInterval = null;
 
+// Turnstile event handlers
+const onTurnstileToken = (token) => {
+  turnstileToken.value = token;
+  loading.value = false;
+};
+
+const onTurnstileError = (errorMessage) => {
+  console.error("Turnstile error:", errorMessage);
+  error.value = errorMessage;
+  loading.value = false;
+};
+
+const onTurnstileExpired = (errorMessage) => {
+  turnstileToken.value = null;
+  error.value = errorMessage;
+};
 // Check for existing OTP data in localStorage
 const checkExistingOTP = () => {
   const storedOTP = localStorage.getItem("auth_otp");
@@ -229,9 +222,6 @@ const checkExistingOTP = () => {
           Date.now() - (otpInfo.expires_at - 2 * 60 * 1000);
         if (timeSinceGeneration > 15 * 1000) {
           // 15 seconds - more aggressive detection
-          console.log(
-            "🔧 Debug: OTP has been unused for too long, restarting verification flow",
-          );
           clearAuthData();
           return false; // Restart the flow
         }
@@ -256,136 +246,6 @@ const clearAuthData = () => {
   localStorage.removeItem("auth_otp");
   localStorage.removeItem("auth_flow");
   localStorage.removeItem("auth_redirect_time");
-};
-
-// Load Turnstile script
-const loadTurnstile = () => {
-  return new Promise((resolve, reject) => {
-    if (window.turnstile) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.querySelector('script[src*="turnstile"]');
-    if (existingScript) {
-      existingScript.onload = resolve;
-      existingScript.onerror = reject;
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-    script.async = true;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-};
-
-// Initialize Turnstile widget
-const initializeTurnstile = async () => {
-  // Prevent concurrent initialization
-  if (isInitializingTurnstile) {
-    console.log(
-      "🔧 Debug: Turnstile initialization already in progress, skipping",
-    );
-    return;
-  }
-
-  isInitializingTurnstile = true;
-
-  try {
-    console.log(
-      "🔧 Debug: VITE_TURNSTILE_SITE_KEY =",
-      import.meta.env.VITE_TURNSTILE_SITE_KEY,
-    );
-
-    // Always cleanup any existing widget first
-    cleanupTurnstile();
-
-    // First ensure we're in the right state for turnstile to be rendered
-    loading.value = false;
-    turnstileToken.value = null;
-    otpData.value = null;
-    error.value = null;
-
-    await loadTurnstile();
-
-    // Use multiple nextTicks to ensure DOM is fully updated
-    await nextTick();
-    await nextTick();
-    await nextTick();
-
-    // Wait for DOM element to be available with longer timeout and more attempts
-    let widgetContainer = null;
-    let attempts = 0;
-    const maxAttempts = 30; // Further increased attempts
-    const waitTime = 300; // Increased wait time
-
-    while (!widgetContainer && attempts < maxAttempts) {
-      widgetContainer = document.getElementById("turnstile-widget");
-      if (!widgetContainer) {
-        console.log(
-          `🔧 Debug: Waiting for turnstile-widget container (attempt ${attempts + 1}/${maxAttempts})`,
-        );
-        // Ensure we're still in the correct state
-        if (
-          loading.value ||
-          turnstileToken.value ||
-          otpData.value ||
-          error.value
-        ) {
-          loading.value = false;
-          turnstileToken.value = null;
-          otpData.value = null;
-          error.value = null;
-          await nextTick();
-        }
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        attempts++;
-      }
-    }
-
-    if (!widgetContainer) {
-      console.error("Turnstile widget container not found after waiting");
-      error.value =
-        "Failed to initialize security verification. Please try again.";
-      return;
-    }
-
-    // Clear container content to ensure clean state
-    widgetContainer.innerHTML = "";
-
-    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
-
-    turnstileWidget = window.turnstile.render(widgetContainer, {
-      sitekey: siteKey,
-      callback: (token) => {
-        turnstileToken.value = token;
-        loading.value = false;
-      },
-      "error-callback": (errorCode) => {
-        console.error("Turnstile error:", errorCode);
-        // Reset initialization flag so retry can work
-        isInitializingTurnstile = false;
-        error.value = "Security verification failed. Please try again.";
-        loading.value = false;
-      },
-      "expired-callback": () => {
-        // Reset initialization flag so retry can work
-        isInitializingTurnstile = false;
-        turnstileToken.value = null;
-        error.value = "Security verification expired. Please try again.";
-      },
-      theme: "light",
-      size: "normal",
-    });
-  } catch (err) {
-    console.error("Failed to load Turnstile:", err);
-    error.value = "Failed to load security verification. Please try again.";
-  } finally {
-    isInitializingTurnstile = false;
-  }
 };
 
 // Initiate authentication
@@ -517,9 +377,6 @@ const resetAuth = () => {
   redirecting.value = false;
   copyButtonText.value = "Copy Code & Continue";
 
-  // Reset initialization flag to allow retry
-  isInitializingTurnstile = false;
-
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
@@ -527,16 +384,13 @@ const resetAuth = () => {
 
   clearAuthData();
 
-  // Use cleanup function instead of reset to ensure complete removal
-  cleanupTurnstile();
-
   // Set loading state briefly to show user we're working
   loading.value = true;
 
-  // Add delay to ensure cleanup is complete before reinitializing
-  setTimeout(async () => {
-    await initializeTurnstile();
-  }, 300); // Increased delay for error recovery
+  // Reset to show turnstile again
+  setTimeout(() => {
+    loading.value = false;
+  }, 300);
 };
 
 // Component lifecycle
@@ -570,21 +424,8 @@ onMounted(async () => {
     isOnResetPasswordWithStoredAuth ||
     isOnLoginWithStoredAuth
   ) {
-    console.log(
-      "🔧 Debug: Detected",
-      isOnSignupWithStoredAuth
-        ? "signup page with stored auth data"
-        : isOnResetPasswordWithStoredAuth
-          ? "reset_password page with stored auth data"
-          : isOnLoginWithStoredAuth
-            ? "login page with stored auth data"
-            : "return from questionnaire",
-      "- restarting verification flow",
-    );
     clearAuthData();
-    // Don't set loading.value = true, let initializeTurnstile handle the state
-    await nextTick();
-    await initializeTurnstile();
+    loading.value = false;
     return;
   }
 
@@ -610,32 +451,20 @@ onMounted(async () => {
             const timeSinceRedirect = now - parseInt(redirectTime);
             // If user returned within 60 seconds, likely verification failed
             if (timeSinceRedirect < 60 * 1000 && timeSinceRedirect > 5 * 1000) {
-              console.log(
-                "🔧 Debug: User returned quickly from questionnaire, likely verification failed",
-              );
               clearAuthData();
               localStorage.removeItem("auth_redirect_time");
               otpData.value = null;
-              // Don't set loading.value = true, let initializeTurnstile handle the state
-              setTimeout(async () => {
-                await initializeTurnstile();
-              }, 100);
+              loading.value = false;
               return;
             }
           }
 
           // If OTP exists for more than 30 seconds when user returns, likely verification failed
           if (timeSinceGeneration > 30 * 1000) {
-            console.log(
-              "🔧 Debug: OTP has been unused for too long, restarting verification flow",
-            );
             clearAuthData();
             localStorage.removeItem("auth_redirect_time");
             otpData.value = null;
-            // Don't set loading.value = true, let initializeTurnstile handle the state
-            setTimeout(async () => {
-              await initializeTurnstile();
-            }, 100);
+            loading.value = false;
           }
         } catch (e) {
           console.error("Error checking OTP on visibility change:", e);
@@ -651,10 +480,8 @@ onMounted(async () => {
 
   // Check for existing valid OTP first
   if (!checkExistingOTP()) {
-    // No valid OTP, set loading to false first to render the turnstile container
+    // No valid OTP, show turnstile
     loading.value = false;
-    await nextTick();
-    await initializeTurnstile();
   } else {
     // OTP exists, just show it
     loading.value = false;
@@ -668,9 +495,6 @@ onUnmounted(() => {
   if (timeUpdateInterval) {
     clearInterval(timeUpdateInterval);
   }
-
-  // Use cleanup function for consistent turnstile cleanup
-  cleanupTurnstile();
 
   // Clean up visibility change event listener
   if (window._authVisibilityHandler) {
