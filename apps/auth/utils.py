@@ -58,13 +58,44 @@ def get_survey_questionid(action: str) -> int | None:
     return None
 
 
+async def verify_turnstile_token(
+    turnstile_token, client_ip
+) -> tuple[bool, Response | None]:
+    """Helper function to verify Turnstile token with Cloudflare's API"""
+
+    try:
+        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+            response = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={
+                    "secret": settings.TURNSTILE_SECRET_KEY,
+                    "response": turnstile_token,
+                    "remoteip": client_ip,
+                },
+            )
+        if not response.json().get("success"):
+            logging.warning(f"Turnstile verification failed: {response.json()}")
+            return False, Response(
+                {"error": "Turnstile verification failed"}, status=403
+            )
+        return True, None
+    except httpx.TimeoutException:
+        logging.error("Turnstile verification timed out")
+        return False, Response(
+            {"error": "Turnstile verification timed out"}, status=504
+        )
+    except Exception as e:
+        logging.error(f"Error verifying Turnstile token: {e}")
+        return False, Response({"error": "Turnstile verification error"}, status=500)
+
+
 async def get_latest_answer(
     action: str,
     account: str,
 ) -> tuple[dict | None, Response | None]:
     """Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
     Returns a tuple of (filtered_data, error_response).
-    `filtered_data` contains: id, submitted_at, user.account, and verification_code.
+    `filtered_data` contains: id, submitted_at, user.account, and otp.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
     quest_api = get_survey_api_key(action)
@@ -97,14 +128,19 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,
-                timeout=OTP_TIME_OUT,
             )
             response.raise_for_status()  # Raise an exception for bad status codes
             full_data = response.json()
+    except httpx.TimeoutException:
+        logging.exception("Questionnaire API query timed out")
+        return None, Response(
+            {"error": "Questionnaire API query timed out"},
+            status=504,
+        )
     except httpx.RequestError as e:
         logging.exception(f"Error querying questionnaire API: {e}")
         return None, Response(
@@ -124,12 +160,12 @@ async def get_latest_answer(
     ):
         latest_answer = full_data["data"]["rows"][0]  # Get the first (latest) row
 
-        # Find the verification code by matching the question ID
-        verification_code = None
+        # Find the otp by matching the question ID
+        otp = None
         answers = latest_answer.get("answers", [])
         for ans in answers:
             if str(ans.get("question", {}).get("id")) == str(question_id):
-                verification_code = ans.get("answer")
+                otp = ans.get("answer")
                 break
 
         # Extract only the required fields from this row
@@ -139,13 +175,13 @@ async def get_latest_answer(
             "account": latest_answer.get("user", {}).get("account")
             if latest_answer.get("user")
             else None,
-            "verification_code": verification_code,
+            "otp": otp,
         }
 
         # Check if all required fields are present
         if not all(
             key in filtered_data and filtered_data[key] is not None
-            for key in ["id", "submitted_at", "account", "verification_code"]
+            for key in ["id", "submitted_at", "account", "otp"]
         ):
             logging.warning("Missing required field(s) in questionnaire response")
             return None, Response(

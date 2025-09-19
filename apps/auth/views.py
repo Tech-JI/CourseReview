@@ -42,32 +42,6 @@ TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
 
 
-def _verify_turnstile_token(turnstile_token, client_ip):
-    """Helper function to verify Turnstile token with Cloudflare's API"""
-
-    async def verify_turnstile():
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                data={
-                    "secret": settings.TURNSTILE_SECRET_KEY,
-                    "response": turnstile_token,
-                    "remoteip": client_ip,
-                },
-            )
-            return response.json()
-
-    try:
-        result = asyncio.run(verify_turnstile())
-        if not result.get("success"):
-            logging.warning(f"Turnstile verification failed: {result}")
-            return False, "Turnstile verification failed"
-        return True, None
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
-        return False, "Turnstile verification error"
-
-
 @api_view(["POST"])
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
@@ -90,7 +64,6 @@ def auth_initiate_api(request):
     if action not in ACTION_LIST:
         return Response({"error": "Invalid action"}, status=400)
 
-    # Get client IP from trusted headers for enhanced Turnstile security
     client_ip = (
         request.META.get("HTTP_CF_CONNECTING_IP")
         or request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
@@ -98,12 +71,11 @@ def auth_initiate_api(request):
     )
 
     # Verify Turnstile token
-    success, error_message = _verify_turnstile_token(turnstile_token, client_ip)
+    success, error_response = asyncio.run(
+        utils.verify_turnstile_token(turnstile_token, client_ip)
+    )
     if not success:
-        status_code = (
-            403 if error_message and "verification failed" in error_message else 500
-        )
-        return Response({"error": error_message}, status=status_code)
+        return error_response
 
     # Generate cryptographically secure OTP and temp_token
     otp_bytes = secrets.token_bytes(6)
@@ -239,7 +211,7 @@ def verify_callback_api(request):
         return Response({"error": "Answer ID mismatch"}, status=403)
 
     # Extract OTP and quest_id from submission
-    submitted_otp = latest_answer.get("verification_code")
+    submitted_otp = latest_answer.get("otp")
 
     # Atomically get and delete OTP record to prevent reuse
     otp_key = f"otp:{submitted_otp}"
@@ -471,11 +443,27 @@ def auth_reset_password_api(request) -> Response:
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
-    email = request.data.get("email", "").lower()
+    email = request.data.get("email", "")
     password = request.data.get("password", "")
+    turnstile_token = request.data.get("turnstile_token", "")
 
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=400)
+    if not email or not password or not turnstile_token:
+        return Response(
+            {"error": "Email, password, and Turnstile token are missing"}, status=400
+        )
+
+    client_ip = (
+        request.META.get("HTTP_CF_CONNECTING_IP")
+        or request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+        or request.META.get("REMOTE_ADDR")
+    )
+
+    # Verify Turnstile token
+    success, error_response = asyncio.run(
+        utils.verify_turnstile_token(turnstile_token, client_ip)
+    )
+    if not success:
+        return error_response
 
     username = email.split("@")[0]
     user = authenticate(username=username, password=password)
