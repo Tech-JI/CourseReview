@@ -199,7 +199,6 @@
               </template>
             </div>
           </div>
-
           <!-- Difficulty Score Card -->
           <div class="bg-white overflow-hidden shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -511,7 +510,7 @@
           >
             <div class="px-4 py-5 sm:px-6 bg-indigo-100">
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-medium text-indigo-900">Your Review</h3>
+                <h3 class="text-lg text-indigo-900">Your Review</h3>
                 <button
                   @click="deleteReview"
                   class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
@@ -617,7 +616,7 @@ import "md-editor-v3/lib/style.css";
 import { sanitize } from "../utils/sanitize";
 import { useAuth } from "../composables/useAuth";
 import { useReviews } from "../composables/useReviews";
-import ReviewPagination from "./ReviewPagination.vue";
+import ReviewPagination from "../components/ReviewPagination.vue";
 
 const route = useRoute();
 const router = useRouter();

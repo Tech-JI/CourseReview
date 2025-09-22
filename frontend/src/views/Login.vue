@@ -193,8 +193,8 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { getCookie } from "../utils/cookies";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
-import AuthInitiate from "./AuthInitiate.vue";
-import Turnstile from "./Turnstile.vue";
+import AuthInitiate from "../components/AuthInitiate.vue";
+import Turnstile from "../components/Turnstile.vue";
 
 const router = useRouter();
 const route = useRoute();

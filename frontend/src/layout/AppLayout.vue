@@ -36,7 +36,7 @@
 
           <!-- Search bar in header -->
           <div
-            class="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end"
+            class="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end self-center"
             v-if="showSearchBar"
           >
             <div class="max-w-lg w-full lg:max-w-xs">

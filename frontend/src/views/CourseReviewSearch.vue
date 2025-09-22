@@ -76,7 +76,7 @@ import { MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
 import "md-editor-v3/lib/style.css";
 import { sanitize } from "../utils/sanitize";
 import { useAuth } from "../composables/useAuth";
-import ReviewPagination from "./ReviewPagination.vue";
+import ReviewPagination from "../components/ReviewPagination.vue";
 
 const props = defineProps({
   courseId: {

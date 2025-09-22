@@ -1,10 +1,10 @@
 import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
-import Login from "./components/Login.vue";
-import CourseDetail from "./components/CourseDetail.vue";
-import Landing from "./components/Landing.vue";
-import CourseReviewSearch from "./components/CourseReviewSearch.vue";
+import Login from "./views/Login.vue";
+import CourseDetail from "./views/CourseDetail.vue";
+import Landing from "./views/Home.vue";
+import CourseReviewSearch from "./views/CourseReviewSearch.vue";
 import CourseList from "./components/CourseList.vue";
 import AuthCallback from "./views/AuthCallback.vue";
 import Signup from "./views/Signup.vue";
