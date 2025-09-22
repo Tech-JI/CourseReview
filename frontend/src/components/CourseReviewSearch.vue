@@ -74,7 +74,8 @@ import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
 import "md-editor-v3/lib/style.css";
-import DOMPurify from "dompurify";
+import { sanitize } from "../utils/sanitize";
+import { useAuth } from "../composables/useAuth";
 import ReviewPagination from "./ReviewPagination.vue";
 
 const props = defineProps({
@@ -84,16 +85,7 @@ const props = defineProps({
   },
 });
 
-// Sanitize function using DOMPurify with enhanced security configuration
-const sanitize = (html) =>
-  DOMPurify.sanitize(html, {
-    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
-    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
-    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
-    SAFE_FOR_TEMPLATES: true, // Protect against template injection
-    SANITIZE_DOM: true, // Protect against DOM clobbering
-    KEEP_CONTENT: false, // Remove content of forbidden tags
-  });
+// sanitize imported from utils/sanitize.js
 
 const route = useRoute();
 const router = useRouter();
@@ -105,7 +97,7 @@ const reviewsFullCount = ref(0);
 const remaining = ref(0);
 const courseShortName = ref("");
 const query = ref("");
-const isAuthenticated = ref(false);
+const { isAuthenticated, checkAuthentication } = useAuth();
 
 const fetchReviews = async () => {
   loading.value = true;
@@ -174,20 +166,7 @@ onMounted(async () => {
   await fetchReviews();
 });
 
-const checkAuthentication = async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      isAuthenticated.value = data.isAuthenticated;
-    } else {
-      isAuthenticated.value = false;
-    }
-  } catch (e) {
-    console.error("Error checking authentication:", e);
-    isAuthenticated.value = false;
-  }
-};
+// authentication handled by useAuth composable
 
 const updateReviewData = (updateData) => {
   const reviewIndex = reviews.value.findIndex(

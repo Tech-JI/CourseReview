@@ -130,6 +130,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useReviews } from "../composables/useReviews";
 import { MdPreview } from "md-editor-v3";
 import { HandThumbUpIcon, HandThumbDownIcon } from "@heroicons/vue/24/outline";
 import "md-editor-v3/lib/style.css";
@@ -175,6 +176,8 @@ const needsTruncation = computed(() => {
   return props.review?.comments?.split("\n").length > props.maxLines;
 });
 
+const { voteOnReview } = useReviews();
+
 const handleVote = async (reviewId, isKudos) => {
   if (!props.isAuthenticated) {
     if (confirm("Please login to vote on reviews!")) {
@@ -184,22 +187,8 @@ const handleVote = async (reviewId, isKudos) => {
   }
 
   try {
-    const response = await fetch(`/api/review/${reviewId}/vote/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-      body: JSON.stringify({ is_kudos: isKudos }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Emit event to parent so it can update the review data
+    const data = await voteOnReview(reviewId, isKudos);
+    if (!data) return;
     emit("reviewUpdated", {
       reviewId,
       kudos_count: data.kudos_count,
@@ -212,20 +201,7 @@ const handleVote = async (reviewId, isKudos) => {
   }
 };
 
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== "") {
-    const cookies = document.cookie.split(";");
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === name + "=") {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
+// getCookie imported from utils/cookies.js
 </script>
 
 <style scoped>

@@ -97,6 +97,29 @@ const error = ref(null);
 const token = ref(null);
 const siteKey = ref(import.meta.env.VITE_TURNSTILE_SITE_KEY);
 
+// Allow a local/dev mock token when real Turnstile cannot be loaded.
+// Enable by setting VITE_TURNSTILE_MOCK=true in your .env (only for local/dev).
+const allowMock =
+  import.meta.env.VITE_TURNSTILE_MOCK === "true" ||
+  location.hostname === "localhost" ||
+  location.hostname === "127.0.0.1";
+
+const createMockToken = () => `dev-turnstile-token-${Date.now()}`;
+
+const fallbackToMock = () => {
+  if (!allowMock) return false;
+  console.warn(
+    "Turnstile: falling back to mock token for development/testing.",
+  );
+  const mock = createMockToken();
+  token.value = mock;
+  loading.value = false;
+  error.value = null;
+  emit("token", mock);
+  emit("ready");
+  return true;
+};
+
 // Widget management
 let turnstileWidget = null;
 
@@ -148,7 +171,18 @@ const loadTurnstile = () => {
     script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
     script.async = true;
     script.addEventListener("load", resolve);
-    script.addEventListener("error", reject);
+    script.addEventListener("error", (ev) => {
+      // If loading the script errors and we're allowed to mock, resolve so caller
+      // will render the mock token state; otherwise reject to surface the error.
+      if (allowMock) {
+        console.warn(
+          "Turnstile script failed to load; allowMock=true -> using mock token",
+        );
+        resolve();
+      } else {
+        reject(ev);
+      }
+    });
     document.head.appendChild(script);
   });
 };
@@ -258,8 +292,14 @@ onMounted(async () => {
     await renderWidget();
   } catch (err) {
     console.error("Failed to load Turnstile:", err);
+    // If mocking is allowed, try to fallback to a mock token so local dev isn't blocked
+    const usedMock = fallbackToMock();
+    if (usedMock) {
+      return;
+    }
+
     const errorMessage =
-      "Failed to load security verification. Please try again.";
+      "Failed to load security verification. Please try again (network error).";
     error.value = errorMessage;
     loading.value = false;
     emit("error", errorMessage);

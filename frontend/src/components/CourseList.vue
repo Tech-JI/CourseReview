@@ -197,7 +197,7 @@
 
         <!-- Course Cards -->
         <div class="overflow-hidden bg-white shadow sm:rounded-md">
-          <ul role="list" class="divide-y divide-gray-200">
+          <ul class="divide-y divide-gray-200">
             <li v-for="course in courses" :key="course.id">
               <router-link
                 :to="`/course/${course.id}`"
@@ -373,6 +373,8 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAuth } from "../composables/useAuth";
+import { useCourses } from "../composables/useCourses";
 import {
   ExclamationTriangleIcon,
   AcademicCapIcon,
@@ -382,149 +384,66 @@ import {
 const route = useRoute();
 const router = useRouter();
 
-const courses = ref([]);
-const departments = ref([]);
-const loading = ref(false);
-const error = ref(null);
-const isAuthenticated = ref(false);
+const {
+  courses,
+  departments,
+  loading,
+  error,
+  pagination,
+  filters,
+  sorting,
+  fetchDepartments,
+  fetchCourses,
+  getQueryObject,
+  applyFiltersAndSort: applyFiltersAndSortFn,
+  resetFiltersAndSort: resetFiltersAndSortFn,
+  changePage: changePageFn,
+  syncStateFromQuery,
+} = useCourses();
+const { isAuthenticated, checkAuthentication } = useAuth();
 const currentTerm = ref("Current"); // TODO: Maybe fetch current term?
 
-const pagination = reactive({
-  current_page: 1,
-  total_pages: 1,
-  total_courses: 0,
-  limit: 20, // Should match backend LIMITS['courses']
-});
-
-const filters = reactive({
-  department: "",
-  code: "",
-  min_quality: null,
-  min_difficulty: null, // Consider adding if needed
-});
-
-const sorting = reactive({
-  sort_by: "course_code",
-  sort_order: "asc",
-});
+// pagination, filters, sorting provided by useCourses
 
 // --- API Fetching ---
 
-const fetchDepartments = async () => {
-  try {
-    const response = await fetch("/api/departments/");
-    if (!response.ok) throw new Error("Failed to fetch departments");
-    departments.value = await response.json();
-  } catch (e) {
-    console.error("Error fetching departments:", e);
-    // Non-critical error, maybe show a message?
-  }
-};
+// useCourses provides fetchDepartments and fetchCourses
 
-const fetchCourses = async () => {
-  loading.value = true;
-  error.value = null;
-
-  // Construct query parameters from reactive refs
-  const params = new URLSearchParams();
-  if (filters.department) params.append("department", filters.department);
-  if (filters.code) params.append("code", filters.code.trim());
-  if (filters.min_quality && isAuthenticated.value)
-    params.append("min_quality", filters.min_quality);
-  // if (filters.min_difficulty && isAuthenticated.value) params.append('min_difficulty', filters.min_difficulty);
-
-  params.append("sort_by", sorting.sort_by);
-  params.append("sort_order", sorting.sort_order);
-  params.append("page", pagination.current_page);
-
-  try {
-    const response = await fetch(`/api/courses/?${params.toString()}`);
-    if (!response.ok) {
-      const errorData = await response
-        .json()
-        .catch(() => ({ detail: "Unknown error" }));
-      throw new Error(
-        errorData.detail || `HTTP error! status: ${response.status}`,
-      );
-    }
-    const data = await response.json();
-    courses.value = data.courses;
-    pagination.current_page = data.pagination.current_page;
-    pagination.total_pages = data.pagination.total_pages;
-    pagination.total_courses = data.pagination.total_courses;
-    pagination.limit = data.pagination.limit;
-  } catch (e) {
-    console.error("Error fetching courses:", e);
-    error.value = e.message;
-    courses.value = []; // Clear courses on error
-  } finally {
-    loading.value = false;
-  }
-};
-
-const checkAuthentication = async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      isAuthenticated.value = data.isAuthenticated;
-      // Reset sort if user logs out and was sorting by auth-only field
-      if (
-        !isAuthenticated.value &&
-        (sorting.sort_by === "quality_score" ||
-          sorting.sort_by === "difficulty_score")
-      ) {
-        sorting.sort_by = "course_code";
-      }
-    } else {
-      isAuthenticated.value = false;
-    }
-  } catch (e) {
-    console.error("Error checking authentication:", e);
-    isAuthenticated.value = false;
-  }
-};
+// useAuth provides checkAuthentication and reactive isAuthenticated
 
 // --- Event Handling & Logic ---
 
 const updateRoute = () => {
-  const query = {};
-  if (filters.department) query.department = filters.department;
-  if (filters.code) query.code = filters.code.trim();
-  if (filters.min_quality && isAuthenticated.value)
-    query.min_quality = filters.min_quality;
-  // if (filters.min_difficulty && isAuthenticated.value) query.min_difficulty = filters.min_difficulty;
-
-  if (sorting.sort_by !== "course_code" || sorting.sort_order !== "asc") {
-    query.sort_by = sorting.sort_by;
-    query.sort_order = sorting.sort_order;
-  }
-  if (pagination.current_page > 1) query.page = pagination.current_page;
-
+  const query = getQueryObject(isAuthenticated.value);
   router.push({ path: "/courses", query });
 };
 
+const applyFiltersAndSortLocal = () => {
+  applyFiltersAndSortFn();
+  updateRoute();
+};
+
+// Expose original names used by the template
 const applyFiltersAndSort = () => {
-  pagination.current_page = 1; // Reset to first page when filters change
+  applyFiltersAndSortLocal();
+};
+
+const resetFiltersAndSortLocal = () => {
+  resetFiltersAndSortFn();
   updateRoute();
 };
 
 const resetFiltersAndSort = () => {
-  filters.department = "";
-  filters.code = "";
-  filters.min_quality = null;
-  filters.min_difficulty = null;
-  sorting.sort_by = "course_code";
-  sorting.sort_order = "asc";
-  pagination.current_page = 1;
+  resetFiltersAndSortLocal();
+};
+
+const changePageLocal = (newPage) => {
+  changePageFn(newPage);
   updateRoute();
 };
 
 const changePage = (newPage) => {
-  if (newPage >= 1 && newPage <= pagination.total_pages) {
-    pagination.current_page = newPage;
-    updateRoute();
-  }
+  changePageLocal(newPage);
 };
 
 // --- Lifecycle and Watchers ---
@@ -533,38 +452,19 @@ onMounted(async () => {
   await checkAuthentication();
   await fetchDepartments();
   // Sync state from initial route query parameters
-  syncStateFromRoute(route.query);
-  await fetchCourses(); // Fetch initial data based on URL state
+  syncStateFromQuery(route.query);
+  await fetchCourses(isAuthenticated.value); // Fetch initial data based on URL state
 });
 
 // Watch for route changes to re-fetch data
 watch(
   () => route.query,
   (newQuery) => {
-    syncStateFromRoute(newQuery);
-    fetchCourses();
+    syncStateFromQuery(newQuery);
+    fetchCourses(isAuthenticated.value);
   },
 );
 
 // Helper to update component state from URL query params
-const syncStateFromRoute = (query) => {
-  filters.department = query.department || "";
-  filters.code = query.code || "";
-  filters.min_quality = query.min_quality
-    ? parseInt(query.min_quality, 10)
-    : null;
-  // filters.min_difficulty = query.min_difficulty ? parseInt(query.min_difficulty, 10) : null;
-  sorting.sort_by = query.sort_by || "course_code";
-  sorting.sort_order = query.sort_order || "asc";
-  pagination.current_page = query.page ? parseInt(query.page, 10) : 1;
-
-  // Ensure sort_by is valid if user is not authenticated
-  if (
-    !isAuthenticated.value &&
-    (sorting.sort_by === "quality_score" ||
-      sorting.sort_by === "difficulty_score")
-  ) {
-    sorting.sort_by = "course_code"; // Default if auth changed
-  }
-};
+// syncStateFromQuery provided by useCourses
 </script>

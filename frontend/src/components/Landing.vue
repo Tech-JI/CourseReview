@@ -137,15 +137,16 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { MagnifyingGlassIcon } from "@heroicons/vue/24/outline";
+import { useAuth } from "../composables/useAuth";
 
 const router = useRouter();
 const reviewCount = ref(0);
-const isAuthenticated = ref(false);
+const { isAuthenticated } = useAuth();
 const searchQuery = ref("");
 
 onMounted(async () => {
   await fetchLandingData();
-  await checkAuthentication();
+  // useAuth performs initial authentication check
 });
 
 const fetchLandingData = async () => {
@@ -161,17 +162,7 @@ const fetchLandingData = async () => {
   }
 };
 
-const checkAuthentication = async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      isAuthenticated.value = data.isAuthenticated;
-    }
-  } catch (error) {
-    console.error("Error checking authentication:", error);
-  }
-};
+// Authentication checking handled via shared util
 
 const performSearch = () => {
   if (searchQuery.value.trim().length >= 2) {

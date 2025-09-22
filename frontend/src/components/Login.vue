@@ -190,12 +190,15 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useAuth } from "../composables/useAuth";
+import { getCookie } from "../utils/cookies";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
 import AuthInitiate from "./AuthInitiate.vue";
 import Turnstile from "./Turnstile.vue";
 
 const router = useRouter();
 const route = useRoute();
+const { isAuthenticated } = useAuth();
 const email = ref("");
 const password = ref("");
 const error = ref("");
@@ -218,16 +221,9 @@ const onTurnstileExpired = (errorMessage) => {
 };
 
 onMounted(async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      if (data.isAuthenticated) {
-        router.push("/courses");
-      }
-    }
-  } catch (error) {
-    console.error("Error checking authentication:", error);
+  // useAuth performs initial check; redirect if already authenticated
+  if (isAuthenticated.value) {
+    router.push("/courses");
   }
 });
 
@@ -237,6 +233,16 @@ const handleLogin = async () => {
   // Check if turnstile token is available
   if (!turnstileToken.value) {
     error.value = "Please complete the security verification first.";
+    return;
+  }
+
+  // Prevent sending development/mock tokens to backend which will fail verification.
+  const mockPrefix = "dev-turnstile-token-";
+  if (turnstileToken.value && turnstileToken.value.startsWith(mockPrefix)) {
+    error.value =
+      "Security verification is currently running in local mock mode. The server cannot verify mock tokens.\n" +
+      "Disable mock mode (unset VITE_TURNSTILE_MOCK) or ensure Turnstile script can be loaded to proceed.";
+    loading.value = false;
     return;
   }
 
@@ -276,18 +282,5 @@ const handleLogin = async () => {
   }
 };
 
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== "") {
-    const cookies = document.cookie.split(";");
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === name + "=") {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
+// getCookie imported from utils/cookies.js
 </script>

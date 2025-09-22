@@ -176,7 +176,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
+import { useAuth } from "../composables/useAuth";
 import { useRoute, useRouter } from "vue-router";
 import {
   Disclosure,
@@ -197,7 +198,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const searchQuery = ref("");
-const isAuthenticated = ref(false);
+const { isAuthenticated, logout, checkAuthentication } = useAuth();
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -205,30 +206,9 @@ const navigation = [
 ];
 
 const handleLogout = async () => {
-  console.log("Logout button clicked");
-  try {
-    const response = await fetch("/api/auth/logout/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-    });
-
-    console.log("Response status:", response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("Logout response:", data);
-      isAuthenticated.value = false;
-      router.push("/");
-    } else {
-      console.error("Logout failed with status:", response.status);
-      const errorData = await response.json();
-      console.error("Error data:", errorData);
-    }
-  } catch (error) {
-    console.error("Error during logout:", error);
+  const ok = await logout();
+  if (ok) {
+    router.push("/");
   }
 };
 
@@ -238,27 +218,7 @@ const showSearchBar = computed(() => {
   return route.path !== "/";
 });
 
-onMounted(async () => {
-  await checkAuthentication();
-  // Re-check authentication whenever other parts of the app signal a change
-  window.addEventListener("auth-state-changed", checkAuthentication);
-});
-
-onUnmounted(() => {
-  window.removeEventListener("auth-state-changed", checkAuthentication);
-});
-
-const checkAuthentication = async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      isAuthenticated.value = data.isAuthenticated;
-    }
-  } catch (error) {
-    console.error("Error checking authentication:", error);
-  }
-};
+// useAuth already performs initial check and listens for auth-state-changed
 
 const performSearch = () => {
   const query = searchQuery.value.trim();
@@ -271,18 +231,5 @@ const performSearch = () => {
   }
 };
 
-const getCookie = (name) => {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== "") {
-    const cookies = document.cookie.split(";");
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === name + "=") {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-};
+// getCookie imported from utils/cookies.js
 </script>

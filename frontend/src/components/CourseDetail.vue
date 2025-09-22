@@ -452,6 +452,7 @@
               </div>
               <div>
                 <label
+                  for="review-comments"
                   id="review-comments-label"
                   class="block text-sm font-medium leading-6 text-gray-900"
                 >
@@ -613,7 +614,9 @@ import {
 } from "@heroicons/vue/24/outline";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
-import DOMPurify from "dompurify";
+import { sanitize } from "../utils/sanitize";
+import { useAuth } from "../composables/useAuth";
+import { useReviews } from "../composables/useReviews";
 import ReviewPagination from "./ReviewPagination.vue";
 
 const route = useRoute();
@@ -622,7 +625,14 @@ const course = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const currentTerm = "25S";
-const isAuthenticated = ref(false);
+const { isAuthenticated, checkAuthentication } = useAuth();
+const {
+  fetchUserReview: fetchUserReviewFn,
+  submitReview: submitReviewFn,
+  deleteReview: deleteReviewFn,
+  vote: voteFn,
+  voteOnReview: voteOnReviewFn,
+} = useReviews();
 const userReview = ref(null);
 const userReviewExpanded = ref(false);
 const newReview = ref({
@@ -657,6 +667,7 @@ onMounted(async () => {
   if (courseId.value) {
     await fetchCourse();
   }
+  // useAuth performs initial authentication check; ensure fresh state
   await checkAuthentication();
 
   // Only fetch user review if authenticated and they are NOT able to write a review
@@ -682,37 +693,15 @@ const fetchCourse = async () => {
   }
 };
 
-const checkAuthentication = async () => {
-  try {
-    const response = await fetch("/api/user/status/");
-    if (response.ok) {
-      const data = await response.json();
-      isAuthenticated.value = data.isAuthenticated;
-    } else {
-      isAuthenticated.value = false;
-    }
-  } catch (e) {
-    console.error("Error checking authentication:", e);
-    isAuthenticated.value = false;
-  }
-};
+// authentication handled by useAuth (checkAuthentication and isAuthenticated)
 const fetchUserReview = async () => {
   if (!isAuthenticated.value || !courseId.value) return;
-
   try {
-    const response = await fetch(`/api/course/${courseId.value}/my-review/`);
-    if (response.ok) {
-      const data = await response.json();
-      // Handle case where API might return a list - take first one
-      userReview.value = Array.isArray(data) ? data[0] : data;
-    } else if (response.status === 404) {
-      // User hasn't written a review yet - this is expected
-      userReview.value = null;
-    } else {
-      console.error("Error fetching user review:", response.status);
-    }
+    const data = await fetchUserReviewFn(courseId.value);
+    userReview.value = data ?? null;
   } catch (e) {
     console.error("Error fetching user review:", e);
+    userReview.value = null;
   }
 };
 
@@ -724,47 +713,21 @@ const vote = async (value, forLayup) => {
     return;
   }
   try {
-    const postData = { value, forLayup };
-    const response = await fetch(`/api/course/${courseId.value}/vote`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-      body: JSON.stringify(postData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await voteFn(courseId.value, value, forLayup);
+    if (!data) return;
     if (forLayup) {
       course.value.difficulty_score = data.new_score;
-      if (data.was_unvote) {
-        course.value.difficulty_vote = null;
-      } else {
-        course.value.difficulty_vote = {
-          value: value,
-        };
-      }
+      course.value.difficulty_vote = data.was_unvote ? null : { value };
       if (typeof data.new_vote_count !== "undefined") {
         course.value.difficulty_vote_count = data.new_vote_count;
       }
     } else {
       course.value.quality_score = data.new_score;
-      if (data.was_unvote) {
-        course.value.quality_vote = null;
-      } else {
-        course.value.quality_vote = {
-          value: value,
-        };
-      }
+      course.value.quality_vote = data.was_unvote ? null : { value };
       if (typeof data.new_vote_count !== "undefined") {
         course.value.quality_vote_count = data.new_vote_count;
       }
     }
-    // Update new_vote_count if present in response
   } catch (e) {
     console.error("Error voting:", e);
   }
@@ -779,22 +742,8 @@ const voteOnReview = async (reviewId, isKudos) => {
   }
 
   try {
-    const response = await fetch(`/api/review/${reviewId}/vote/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-      body: JSON.stringify({ is_kudos: isKudos }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Update the review in the course data
+    const data = await voteOnReviewFn(reviewId, isKudos);
+    if (!data) return;
     const reviewIndex = course.value.review_set.findIndex(
       (r) => r.id === reviewId,
     );
@@ -821,30 +770,8 @@ const updateReviewData = (updateData) => {
   }
 };
 
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== "") {
-    const cookies = document.cookie.split(";");
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === name + "=") {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
-// Sanitize function using DOMPurify with enhanced security configuration
-const sanitize = (html) =>
-  DOMPurify.sanitize(html, {
-    FORBID_TAGS: ["img", "svg", "math", "script", "iframe"],
-    FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onmouseout"],
-    USE_PROFILES: { html: true }, // Only allow HTML, no SVG or MathML
-    SAFE_FOR_TEMPLATES: true, // Protect against template injection
-    SANITIZE_DOM: true, // Protect against DOM clobbering
-    KEEP_CONTENT: false, // Remove content of forbidden tags
-  });
+// getCookie imported from utils/cookies.js
+// sanitize imported from utils/sanitize.js
 
 const submitReview = async () => {
   if (!isAuthenticated.value) {
@@ -852,64 +779,15 @@ const submitReview = async () => {
     return;
   }
   try {
-    const response = await fetch(`/api/course/${courseId.value}/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-      body: JSON.stringify(newReview.value),
-    });
-    if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        // Handle Django REST Framework serializer errors (which are objects with field arrays)
-        if (
-          errorData &&
-          typeof errorData === "object" &&
-          !Array.isArray(errorData)
-        ) {
-          const errorLines = [];
-          for (const [field, messages] of Object.entries(errorData)) {
-            if (Array.isArray(messages) && messages.length > 0) {
-              // Join multiple messages for a single field with a space
-              errorLines.push(`${field}: ${messages.join(" ")}`);
-            } else if (typeof messages === "string") {
-              errorLines.push(`${field}: ${messages}`);
-            }
-          }
-          if (errorLines.length > 0) {
-            errorMessage = errorLines.join("\n"); // Join fields with a newline
-          } else {
-            // Fallback if structure is not as expected
-            errorMessage = JSON.stringify(errorData);
-          }
-        } else if (errorData.detail) {
-          // Handle generic DRF error responses
-          errorMessage = errorData.detail;
-        } else if (typeof errorData === "string") {
-          errorMessage = errorData;
-        } else {
-          // Fallback for other object types or arrays
-          errorMessage = JSON.stringify(errorData);
-        }
-      } catch (e) {
-        // If parsing JSON fails, use the status text
-        errorMessage = response.statusText || errorMessage;
-      }
-      throw new Error(errorMessage);
+    const updatedCourse = await submitReviewFn(courseId.value, newReview.value);
+    if (updatedCourse) {
+      course.value = updatedCourse;
+      newReview.value = { term: "", professor: "", comments: "" };
+      await fetchUserReview();
+      alert("Review submitted successfully!");
     }
-    course.value = await response.json();
-    newReview.value = { term: "", professor: "", comments: "" };
-
-    // Refresh user review after successful submission
-    await fetchUserReview();
-
-    alert("Review submitted successfully!");
   } catch (error) {
     console.error("Error submitting review:", error);
-    // Use alert with newline characters preserved
     alert(`Error submitting review:\n${error.message}`);
   }
 };
@@ -927,27 +805,12 @@ const deleteReview = async () => {
   }
 
   try {
-    const response = await fetch(`/api/course/${courseId.value}/review/`, {
-      method: "DELETE",
-      headers: {
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `HTTP error! status: ${response.status}, detail: ${JSON.stringify(errorData)}`,
-      );
+    const updatedCourse = await deleteReviewFn(courseId.value);
+    if (updatedCourse) {
+      course.value = updatedCourse;
+      userReview.value = null;
+      alert("Review deleted successfully!");
     }
-
-    // Refresh the course data to reflect the deletion
-    course.value = await response.json();
-
-    // Clear user review after successful deletion
-    userReview.value = null;
-
-    alert("Review deleted successfully!");
   } catch (error) {
     console.error("Error deleting review:", error);
     alert(`Error deleting review: ${error.message}`);
