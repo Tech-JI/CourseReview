@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10">
-    <form @submit.prevent="handleSubmit" class="space-y-6">
+    <form class="space-y-6" @submit.prevent="handleSubmit">
       <!-- Title -->
       <div>
         <h3 class="text-lg/7 font-semibold text-gray-900 text-center">
@@ -87,9 +87,9 @@
           />
           <button
             type="button"
-            @click="showPassword = !showPassword"
             class="absolute inset-y-0 right-0 pr-3 flex items-center"
             :disabled="isLoading"
+            @click="showPassword = !showPassword"
           >
             <svg
               v-if="showPassword"
@@ -174,9 +174,9 @@
           />
           <button
             type="button"
-            @click="showConfirmPassword = !showConfirmPassword"
             class="absolute inset-y-0 right-0 pr-3 flex items-center"
             :disabled="isLoading"
+            @click="showConfirmPassword = !showConfirmPassword"
           >
             <svg
               v-if="showConfirmPassword"
@@ -307,9 +307,9 @@
       <div v-if="showBackButton" class="text-center">
         <button
           type="button"
-          @click="$emit('back')"
           class="text-sm/6 text-indigo-600 hover:text-indigo-500 transition duration-150 ease-in-out"
           :disabled="isLoading"
+          @click="$emit('back')"
         >
           Back
         </button>

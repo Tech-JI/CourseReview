@@ -22,15 +22,15 @@
         <MdPreview
           :model-value="truncatedContent"
           :sanitize="sanitize"
-          previewTheme="github"
+          preview-theme="github"
           class="text-sm text-indigo-700 markdown-content"
         />
 
         <!-- Enhanced Expand/Collapse button -->
         <div v-if="needsTruncation" class="mt-3 flex justify-center">
           <button
-            @click="expanded = !expanded"
             class="inline-flex items-center gap-x-1.5 rounded-md bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 shadow-xs hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all"
+            @click="expanded = !expanded"
           >
             {{ expanded ? "Show Less" : "Read More" }}
             <svg
@@ -62,7 +62,6 @@
         <div class="flex items-center space-x-4">
           <!-- Kudos Button -->
           <button
-            @click="handleVote(review.id, true)"
             :class="[
               'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
               review.user_vote === true
@@ -70,6 +69,7 @@
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
             ]"
             :title="review.user_vote === true ? 'Remove kudos' : 'Give kudos'"
+            @click="handleVote(review.id, true)"
           >
             <HandThumbUpIcon
               :class="[
@@ -84,7 +84,6 @@
 
           <!-- Dislike Button -->
           <button
-            @click="handleVote(review.id, false)"
             :class="[
               'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
               review.user_vote === false
@@ -92,6 +91,7 @@
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
             ]"
             :title="review.user_vote === false ? 'Remove dislike' : 'Dislike'"
+            @click="handleVote(review.id, false)"
           >
             <HandThumbDownIcon
               :class="[

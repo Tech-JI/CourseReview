@@ -6,10 +6,10 @@
         v-for="review in paginatedReviews"
         :key="review.id"
         :review="review"
-        :isAuthenticated="isAuthenticated"
+        :is-authenticated="isAuthenticated"
         :sanitize="sanitize"
-        :maxLines="maxLines"
-        @reviewUpdated="handleReviewUpdate"
+        :max-lines="maxLines"
+        @review-updated="handleReviewUpdate"
       />
     </div>
 
@@ -25,7 +25,6 @@
       <!-- Mobile pagination (always show) -->
       <div class="flex flex-1 justify-between sm:hidden">
         <button
-          @click="goToPage(currentPage - 1)"
           :disabled="currentPage === 1"
           :class="[
             'relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium',
@@ -33,11 +32,11 @@
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-700 hover:bg-gray-50',
           ]"
+          @click="goToPage(currentPage - 1)"
         >
           Previous
         </button>
         <button
-          @click="goToPage(currentPage + 1)"
           :disabled="currentPage === totalPages || totalPages === 0"
           :class="[
             'relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium',
@@ -45,6 +44,7 @@
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-700 hover:bg-gray-50',
           ]"
+          @click="goToPage(currentPage + 1)"
         >
           Next
         </button>
@@ -73,7 +73,6 @@
           >
             <!-- Previous Button -->
             <button
-              @click="goToPage(currentPage - 1)"
               :disabled="currentPage === 1"
               :class="[
                 'relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0',
@@ -81,6 +80,7 @@
                   ? 'text-gray-300 cursor-not-allowed'
                   : 'text-gray-400 hover:bg-gray-50',
               ]"
+              @click="goToPage(currentPage - 1)"
             >
               <span class="sr-only">Previous</span>
               <ChevronLeftIcon class="size-5" aria-hidden="true" />
@@ -96,7 +96,6 @@
               </span>
               <button
                 v-else
-                @click="goToPage(page)"
                 :class="[
                   'relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20',
                   page === currentPage
@@ -104,6 +103,7 @@
                     : 'text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:outline-offset-0',
                 ]"
                 :aria-current="page === currentPage ? 'page' : undefined"
+                @click="goToPage(page)"
               >
                 {{ page }}
               </button>
@@ -111,7 +111,6 @@
 
             <!-- Next Button -->
             <button
-              @click="goToPage(currentPage + 1)"
               :disabled="currentPage === totalPages || totalPages === 0"
               :class="[
                 'relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-gray-300 ring-inset focus:z-20 focus:outline-offset-0',
@@ -119,6 +118,7 @@
                   ? 'text-gray-300 cursor-not-allowed'
                   : 'text-gray-400 hover:bg-gray-50',
               ]"
+              @click="goToPage(currentPage + 1)"
             >
               <span class="sr-only">Next</span>
               <ChevronRightIcon class="size-5" aria-hidden="true" />

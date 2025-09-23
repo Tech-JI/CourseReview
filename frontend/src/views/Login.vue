@@ -26,25 +26,25 @@
           <nav class="flex space-x-8" aria-label="Tabs">
             <button
               type="button"
-              @click="showQuestionnaireLogin = false"
               :class="[
                 'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                 !showQuestionnaireLogin
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
               ]"
+              @click="showQuestionnaireLogin = false"
             >
               Password Login
             </button>
             <button
               type="button"
-              @click="showQuestionnaireLogin = true"
               :class="[
                 'whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                 showQuestionnaireLogin
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
               ]"
+              @click="showQuestionnaireLogin = true"
             >
               SJTU Authentication
             </button>
@@ -81,11 +81,11 @@
             <div class="mt-2">
               <input
                 id="email"
+                v-model="email"
                 name="email"
                 type="email"
                 autocomplete="email"
                 required
-                v-model="email"
                 placeholder="Enter your SJTU email"
                 class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
               />
@@ -112,11 +112,11 @@
             <div class="mt-2">
               <input
                 id="password"
+                v-model="password"
                 name="password"
                 type="password"
                 autocomplete="current-password"
                 required
-                v-model="password"
                 placeholder="Enter your password"
                 class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
               />
@@ -127,12 +127,12 @@
             <Turnstile
               v-if="!showQuestionnaireLogin"
               key="login-password-turnstile"
-              @token="onTurnstileToken"
-              @error="onTurnstileError"
-              @expired="onTurnstileExpired"
               :show-title="false"
               theme="light"
               size="normal"
+              @token="onTurnstileToken"
+              @error="onTurnstileError"
+              @expired="onTurnstileExpired"
             />
           </div>
 

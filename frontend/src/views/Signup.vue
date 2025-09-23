@@ -101,8 +101,8 @@
       <!-- Step 1: Identity Verification -->
       <AuthInitiate
         v-if="currentStep === 1"
-        action="signup"
         :key="authKey"
+        action="signup"
         @verified="handleVerified"
         @error="handleAuthError"
       />
@@ -148,8 +148,8 @@
           </p>
           <div class="mt-6 space-y-3">
             <button
-              @click="goToLogin"
               class="w-full flex justify-center py-2 px-3 border border-transparent rounded-md shadow-sm text-sm/6 font-semibold text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
+              @click="goToLogin"
             >
               Sign in now
             </button>
@@ -206,8 +206,8 @@
           <div class="ml-auto pl-3">
             <div class="-mx-1.5 -my-1.5">
               <button
-                @click="hideErrorToast"
                 class="inline-flex bg-red-50 rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
+                @click="hideErrorToast"
               >
                 <svg
                   class="h-3 w-3"
@@ -421,7 +421,7 @@ export default {
           }
 
           // Pre-fill account field
-          accountForm.account = authState.account || "";
+          accountForm.value.account = authState.account || "";
           currentStep.value = 2;
         } else if (authState.action !== "signup") {
           // Wrong action, clear state and start over

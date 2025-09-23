@@ -60,17 +60,17 @@
                 </div>
                 <input
                   id="search"
+                  v-model="searchQuery"
                   name="search"
                   type="search"
-                  v-model="searchQuery"
-                  @keyup.enter="performSearch"
                   class="block w-full rounded-md border-0 bg-white py-3 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   placeholder="Search for courses..."
+                  @keyup.enter="performSearch"
                 />
               </div>
               <button
-                @click="performSearch"
                 class="mt-4 w-full rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                @click="performSearch"
               >
                 Search Courses
               </button>
@@ -80,20 +80,20 @@
           <!-- Action buttons -->
           <div class="mt-10 flex items-center justify-center gap-x-6">
             <button
-              @click="goToBestClasses"
               class="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              @click="goToBestClasses"
             >
               Best Classes
             </button>
             <button
-              @click="goToLayups"
               class="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              @click="goToLayups"
             >
               Layups {{ !isAuthenticated ? "(login required)" : "" }}
             </button>
             <button
-              @click="goToDepartments"
               class="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              @click="goToDepartments"
             >
               Browse All
             </button>

@@ -158,13 +158,13 @@
                     <button
                       v-for="star in 5"
                       :key="star"
-                      @click="vote(star, false)"
                       :class="[
                         'p-1 rounded transition-colors',
                         course.quality_vote && course.quality_vote.value >= star
                           ? 'text-yellow-500 hover:text-yellow-600'
                           : 'text-gray-300 hover:text-yellow-400',
                       ]"
+                      @click="vote(star, false)"
                     >
                       <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
                         <path
@@ -226,7 +226,6 @@
                     <button
                       v-for="star in 5"
                       :key="star"
-                      @click="vote(star, true)"
                       :class="[
                         'p-1 rounded transition-colors',
                         course.difficulty_vote &&
@@ -234,6 +233,7 @@
                           ? 'text-red-500 hover:text-red-600'
                           : 'text-gray-300 hover:text-red-400',
                       ]"
+                      @click="vote(star, true)"
                     >
                       <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
                         <path
@@ -328,7 +328,9 @@
                   >
                     <td class="px-6 py-4 whitespace-nowrap">
                       <router-link
-                        :to="`/course/${courseId}/review_search?q=${encodeURIComponent(item[0])}`"
+                        :to="`/course/${courseId}/review_search?q=${encodeURIComponent(
+                          item[0],
+                        )}`"
                         class="text-indigo-600 hover:text-indigo-900 font-medium"
                       >
                         {{ item[0] }}
@@ -365,11 +367,11 @@
             </h3>
             <ReviewPagination
               :reviews="course.review_set"
-              :isAuthenticated="isAuthenticated"
+              :is-authenticated="isAuthenticated"
               :sanitize="sanitize"
-              :maxLines="5"
-              :pageSize="10"
-              @reviewUpdated="updateReviewData"
+              :max-lines="5"
+              :page-size="10"
+              @review-updated="updateReviewData"
             />
           </div>
         </div>
@@ -414,7 +416,7 @@
             <h3 class="text-lg font-medium leading-6 text-gray-900 mb-6">
               Write a Review for {{ course.course_code }}
             </h3>
-            <form @submit.prevent="submitReview" class="space-y-6">
+            <form class="space-y-6" @submit.prevent="submitReview">
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div>
                   <label
@@ -424,9 +426,9 @@
                     Term
                   </label>
                   <input
-                    type="text"
                     id="term"
                     v-model="newReview.term"
+                    type="text"
                     required
                     :placeholder="currentTerm"
                     class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -440,9 +442,9 @@
                     Professor
                   </label>
                   <input
-                    type="text"
                     id="professor"
                     v-model="newReview.professor"
+                    type="text"
                     required
                     placeholder="Full name, e.g., John Smith"
                     class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -451,8 +453,8 @@
               </div>
               <div>
                 <label
-                  for="review-comments"
                   id="review-comments-label"
+                  for="review-comments"
                   class="block text-sm font-medium leading-6 text-gray-900"
                 >
                   Review
@@ -481,7 +483,7 @@
                     'preview',
                     'htmlPreview',
                   ]"
-                  previewTheme="github"
+                  preview-theme="github"
                   tabindex="0"
                   style="height: 300px"
                   class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 markdown-content"
@@ -512,8 +514,8 @@
               <div class="flex items-center justify-between">
                 <h3 class="text-lg text-indigo-900">Your Review</h3>
                 <button
-                  @click="deleteReview"
                   class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                  @click="deleteReview"
                 >
                   Delete Review
                 </button>
@@ -536,15 +538,15 @@
                 <MdPreview
                   :model-value="truncatedUserReviewContent"
                   :sanitize="sanitize"
-                  previewTheme="github"
+                  preview-theme="github"
                   class="text-sm text-gray-700 markdown-content"
                 />
 
                 <!-- Expand/Collapse button for long reviews -->
                 <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
                   <button
-                    @click="userReviewExpanded = !userReviewExpanded"
                     class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                    @click="userReviewExpanded = !userReviewExpanded"
                   >
                     {{ userReviewExpanded ? "Show Less" : "Read More" }}
                     <svg
@@ -585,8 +587,8 @@
             </p>
             <button
               v-if="isAuthenticated && !course.can_write_review && !userReview"
-              @click="deleteReview"
               class="ml-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              @click="deleteReview"
             >
               Delete Review
             </button>

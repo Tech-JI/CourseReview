@@ -26,15 +26,15 @@
         >"
       </h1>
 
-      <form @submit.prevent="performSearch" class="mb-6">
+      <form class="mb-6" @submit.prevent="performSearch">
         <div class="flex max-w-md mx-auto">
           <div class="grid grid-cols-1 grow">
             <input
+              v-model="searchQuery"
               name="q"
               type="search"
               class="col-start-1 row-start-1 block w-full rounded-l-md bg-white py-2 pr-3 pl-10 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
               placeholder="Search reviews..."
-              v-model="searchQuery"
             />
             <MagnifyingGlassIcon
               class="pointer-events-none col-start-1 row-start-1 ml-3 size-5 self-center text-gray-400"
@@ -58,11 +58,11 @@
       <div v-else>
         <ReviewPagination
           :reviews="reviews"
-          :isAuthenticated="isAuthenticated"
+          :is-authenticated="isAuthenticated"
           :sanitize="sanitize"
-          :maxLines="3"
-          :pageSize="10"
-          @reviewUpdated="updateReviewData"
+          :max-lines="3"
+          :page-size="10"
+          @review-updated="updateReviewData"
         />
       </div>
     </div>
@@ -112,7 +112,9 @@ const fetchReviews = async () => {
 
   try {
     const response = await fetch(
-      `/api/course/${props.courseId}/review_search/?q=${encodeURIComponent(searchQuery.value)}`,
+      `/api/course/${props.courseId}/review_search/?q=${encodeURIComponent(
+        searchQuery.value,
+      )}`,
     );
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {

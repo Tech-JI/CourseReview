@@ -20,9 +20,9 @@
           </div>
           <div class="mt-4">
             <button
-              @click="resetAuth"
               type="button"
               class="rounded-md bg-red-50 px-2 py-1.5 text-sm/6 font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+              @click="resetAuth"
             >
               Try Again
             </button>
@@ -46,10 +46,10 @@
           </p>
           <div class="space-y-2">
             <button
-              @click="copyOTPAndRedirect"
               :disabled="redirecting"
               type="button"
               class="w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="copyOTPAndRedirect"
             >
               <span v-if="!redirecting">{{ copyButtonText }}</span>
               <span v-else class="flex items-center justify-center">
@@ -92,12 +92,12 @@
     >
       <Turnstile
         key="auth-initiate-turnstile"
-        @token="onTurnstileToken"
-        @error="onTurnstileError"
-        @expired="onTurnstileExpired"
         :show-title="true"
         theme="light"
         size="normal"
+        @token="onTurnstileToken"
+        @error="onTurnstileError"
+        @expired="onTurnstileExpired"
       />
     </div>
 
@@ -120,10 +120,10 @@
           </div>
         </div>
         <button
-          @click="initiateAuth"
           :disabled="initiating"
           type="button"
           class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="initiateAuth"
         >
           <span v-if="!initiating">Continue with SJTU Authentication</span>
           <span v-else class="flex items-center">

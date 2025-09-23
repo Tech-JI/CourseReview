@@ -12,9 +12,9 @@
           </div>
           <div class="mt-4">
             <button
-              @click="resetTurnstile"
               type="button"
               class="rounded-md bg-red-50 px-2 py-1.5 text-sm/6 font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+              @click="resetTurnstile"
             >
               Try Again
             </button>
@@ -124,7 +124,9 @@ const fallbackToMock = () => {
 let turnstileWidget = null;
 
 // Generate unique container ID for this instance
-const containerId = `turnstile-widget-${Math.random().toString(36).substr(2, 9)}`;
+const containerId = `turnstile-widget-${Math.random()
+  .toString(36)
+  .substr(2, 9)}`;
 
 // Success callback
 const onSuccess = (receivedToken) => {

@@ -34,9 +34,9 @@
             </div>
             <div class="mt-4 space-y-2">
               <button
-                @click="retryVerification"
                 type="button"
                 class="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
+                @click="retryVerification"
               >
                 Retry Verification
               </button>
