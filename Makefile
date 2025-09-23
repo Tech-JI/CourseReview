@@ -50,7 +50,7 @@ format-backend:
 
 format-frontend:
 	@echo "Formatting frontend code with prettier..."
-	cd frontend && bun run format
+	cd frontend && bun run format | rg -v -F '(unchanged)'
 
 lint: lint-backend lint-frontend
 	@echo "All code linted successfully!"
