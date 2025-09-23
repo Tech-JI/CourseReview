@@ -417,6 +417,20 @@
               Write a Review for {{ course.course_code }}
             </h3>
             <form class="space-y-6" @submit.prevent="submitReview">
+              <!-- top-level form errors -->
+              <div v-if="Object.keys(formErrors).length" class="mb-4">
+                <div class="rounded-md bg-red-50 p-3">
+                  <div class="text-sm text-red-700">
+                    Please fix the following errors:
+                  </div>
+                  <ul class="mt-2 list-disc list-inside text-sm text-red-600">
+                    <li v-for="(msgs, field) in formErrors" :key="field">
+                      <strong>{{ field }}:</strong>
+                      {{ Array.isArray(msgs) ? msgs[0] : msgs }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
               <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div>
                   <label
@@ -433,6 +447,9 @@
                     :placeholder="currentTerm"
                     class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
+                  <p v-if="formErrors.term" class="mt-1 text-sm text-red-600">
+                    {{ formErrors.term[0] }}
+                  </p>
                 </div>
                 <div>
                   <label
@@ -449,6 +466,12 @@
                     placeholder="Full name, e.g., John Smith"
                     class="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
+                  <p
+                    v-if="formErrors.professor"
+                    class="mt-1 text-sm text-red-600"
+                  >
+                    {{ formErrors.professor[0] }}
+                  </p>
                 </div>
               </div>
               <div>
@@ -488,6 +511,9 @@
                   style="height: 300px"
                   class="mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 markdown-content"
                 />
+                <p v-if="formErrors.comments" class="mt-1 text-sm text-red-600">
+                  {{ formErrors.comments[0] }}
+                </p>
               </div>
               <div class="flex justify-end">
                 <button
@@ -637,6 +663,7 @@ const newReview = ref({
   professor: "",
   comments: "",
 });
+const formErrors = ref({});
 
 const courseId = computed(() => {
   return route.params.course_id;
@@ -742,14 +769,40 @@ const updateReviewData = (updateData) => {
   }
 };
 
-// getCookie imported from utils/cookies.js
-// sanitize imported from utils/sanitize.js
+const validateReview = () => {
+  const errs = {};
+  // term: must be 3 chars like 24F
+  if (!newReview.value.term || newReview.value.term.length !== 3) {
+    errs.term = ["Please provide a valid term, e.g. 24F"];
+  }
+  // professor: at least two words
+  if (
+    !newReview.value.professor ||
+    newReview.value.professor.trim().split(/\s+/).length < 2
+  ) {
+    errs.professor = [
+      "Please provide the professor's full name, e.g. John Smith",
+    ];
+  }
+  // comments length
+  if (!newReview.value.comments || newReview.value.comments.length < 30) {
+    errs.comments = ["Please write a longer review (at least 30 characters)"];
+  }
+  formErrors.value = errs;
+  return Object.keys(errs).length === 0;
+};
 
 const submitReview = async () => {
+  formErrors.value = {};
   if (!isAuthenticated.value) {
     alert("You must be logged in to submit a review.");
     return;
   }
+
+  if (!validateReview()) {
+    return;
+  }
+
   try {
     const updatedCourse = await submitReviewFn(courseId.value, newReview.value);
     if (updatedCourse) {
@@ -760,7 +813,11 @@ const submitReview = async () => {
     }
   } catch (error) {
     console.error("Error submitting review:", error);
-    alert(`Error submitting review:\n${error.message}`);
+    if (error && error.errors && typeof error.errors === "object") {
+      formErrors.value = error.errors;
+    } else {
+      alert(`Error submitting review:\n${error.message}`);
+    }
   }
 };
 
