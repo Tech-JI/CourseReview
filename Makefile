@@ -50,7 +50,14 @@ format-backend:
 
 format-frontend:
 	@echo "Formatting frontend code with prettier..."
-	cd frontend && bun run format | rg -v -F '(unchanged)'
+	@cd frontend && \
+	output=$$(bun run format); \
+	filtered_output=$$(echo "$$output" | rg -v -F '(unchanged)'); \
+	if [ -n "$$filtered_output" ]; then \
+		echo "$$filtered_output"; \
+	else \
+		echo "All files are already formatted."; \
+	fi
 
 lint: lint-backend lint-frontend
 	@echo "All code linted successfully!"
