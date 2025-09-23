@@ -247,17 +247,9 @@ const handleReviewUpdate = (updateData) => {
 };
 
 // Reset to first page when reviews change, but ensure current page doesn't exceed total pages
-watch(
-  () => props.reviews,
-  () => {
-    if (currentPage.value > totalPages.value) {
-      currentPage.value = Math.max(1, totalPages.value);
-    }
-  },
-);
-
-// Adjust current page if it exceeds total pages when reviews are filtered
-watch(totalPages, (newTotalPages) => {
+// Ensure currentPage stays within bounds whenever reviews or totalPages change
+watch([() => props.reviews, totalPages], ([, newTotalPages]) => {
+  // If currentPage is greater than the new total pages, clamp it to valid range
   if (currentPage.value > newTotalPages) {
     currentPage.value = Math.max(1, newTotalPages);
   }

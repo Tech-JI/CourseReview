@@ -283,8 +283,6 @@ const resetTurnstile = async () => {
 // Expose methods for parent components
 defineExpose({
   resetTurnstile,
-  getToken: () => token.value,
-  isReady: () => !!token.value && !error.value && !loading.value,
 });
 
 // Component lifecycle

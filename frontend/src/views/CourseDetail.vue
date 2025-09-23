@@ -654,7 +654,6 @@ const {
   submitReview: submitReviewFn,
   deleteReview: deleteReviewFn,
   vote: voteFn,
-  voteOnReview: voteOnReviewFn,
 } = useReviews();
 const userReview = ref(null);
 const userReviewExpanded = ref(false);
