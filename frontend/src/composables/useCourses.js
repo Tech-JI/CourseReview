@@ -1,9 +1,6 @@
 import { ref, reactive } from "vue";
-import { useRouter } from "vue-router";
 
 export function useCourses() {
-  const router = useRouter();
-
   const courses = ref([]);
   const departments = ref([]);
   const loading = ref(false);

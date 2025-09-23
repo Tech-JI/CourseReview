@@ -144,15 +144,6 @@ const storeVerificationResult = (action, expires_at, account) => {
   localStorage.setItem("auth_flow", stateString);
   sessionStorage.setItem("auth_flow", stateString);
   sessionStorage.setItem("auth_verification_data", stateString); // Backup key
-
-  // Debug: Verify what was actually stored
-  const storedState = localStorage.getItem("auth_flow");
-  const sessionState = sessionStorage.getItem("auth_flow");
-  try {
-    const parsedState = JSON.parse(storedState);
-  } catch (e) {
-    console.error("Failed to parse stored state:", e);
-  }
 };
 
 // Get redirect path based on action
@@ -237,11 +228,7 @@ const performVerification = async () => {
 
     // Small delay to show success state, then redirect
     setTimeout(() => {
-      // Debug: Final check before redirect
-      const finalCheck = localStorage.getItem("auth_flow");
-      const sessionCheck = sessionStorage.getItem("auth_flow");
-
-      // Also pass verification state in URL as backup
+      // Pass verification state in URL as backup
       const urlParams = new URLSearchParams({
         verified: "true",
         account: params.account,

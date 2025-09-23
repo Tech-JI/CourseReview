@@ -605,13 +605,9 @@ import { useRoute, useRouter } from "vue-router";
 import {
   ExclamationTriangleIcon,
   CheckIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
   LockClosedIcon,
   UsersIcon,
   InformationCircleIcon,
-  HandThumbUpIcon,
-  HandThumbDownIcon,
 } from "@heroicons/vue/24/outline";
 import { MdEditor, MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
@@ -731,31 +727,6 @@ const vote = async (value, forLayup) => {
     }
   } catch (e) {
     console.error("Error voting:", e);
-  }
-};
-
-const voteOnReview = async (reviewId, isKudos) => {
-  if (!isAuthenticated.value) {
-    if (confirm("Please login to vote on reviews!")) {
-      router.push("/accounts/login");
-    }
-    return;
-  }
-
-  try {
-    const data = await voteOnReviewFn(reviewId, isKudos);
-    if (!data) return;
-    const reviewIndex = course.value.review_set.findIndex(
-      (r) => r.id === reviewId,
-    );
-    if (reviewIndex !== -1) {
-      course.value.review_set[reviewIndex].kudos_count = data.kudos_count;
-      course.value.review_set[reviewIndex].dislike_count = data.dislike_count;
-      course.value.review_set[reviewIndex].user_vote = data.user_vote;
-    }
-  } catch (e) {
-    console.error("Error voting on review:", e);
-    alert("Error voting on review. Please try again.");
   }
 };
 

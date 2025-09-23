@@ -371,7 +371,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useCourses } from "../composables/useCourses";

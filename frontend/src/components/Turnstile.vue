@@ -126,7 +126,7 @@ let turnstileWidget = null;
 // Generate unique container ID for this instance
 const containerId = `turnstile-widget-${Math.random()
   .toString(36)
-  .substr(2, 9)}`;
+  .slice(2, 11)}`;
 
 // Success callback
 const onSuccess = (receivedToken) => {

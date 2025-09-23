@@ -314,7 +314,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import AuthInitiate from "../components/AuthInitiate.vue";
 import SetPasswordForm from "../components/SetPasswordForm.vue";
@@ -451,7 +451,7 @@ export default {
       showErrorToastMessage(error.message || "Identity verification failed");
     }
 
-    function handleResetSuccess(event) {
+    function handleResetSuccess() {
       currentStep.value = 3;
 
       // Start redirect countdown

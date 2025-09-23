@@ -198,7 +198,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const searchQuery = ref("");
-const { isAuthenticated, logout, checkAuthentication } = useAuth();
+const { isAuthenticated, logout } = useAuth();
 
 const navigation = [
   { name: "Home", href: "/" },

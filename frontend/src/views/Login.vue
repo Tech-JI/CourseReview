@@ -189,7 +189,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { getCookie } from "../utils/cookies";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
@@ -197,7 +197,6 @@ import AuthInitiate from "../components/AuthInitiate.vue";
 import Turnstile from "../components/Turnstile.vue";
 
 const router = useRouter();
-const route = useRoute();
 const { isAuthenticated } = useAuth();
 const email = ref("");
 const password = ref("");
