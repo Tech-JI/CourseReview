@@ -6,7 +6,7 @@ import globals from "globals";
 export default [
   // Global ignores
   {
-    ignores: ["dist", "node_modules"],
+    ignores: ["dist", "node_modules", "TailwindPlus"],
   },
 
   // Base configuration for all JavaScript/Vue files
