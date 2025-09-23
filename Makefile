@@ -1,4 +1,4 @@
-.PHONY: run clean collect format format-backend format-frontend makemigrations migrate shell createsuperuser dev-frontend help
+.PHONY: run dev-frontend clean collect install-frontend format format-backend format-frontend lint lint-backend lint-frontend makemigrations migrate shell createsuperuser help
 
 # Default target when 'make' is run without arguments
 .DEFAULT_GOAL := help
@@ -9,6 +9,7 @@ help:
 	@echo "  dev-frontend          - Starts the frontend development server (formats frontend code first)"
 	@echo "  clean                 - Clears Django session data"
 	@echo "  collect               - Collects Django static files"
+	@echo "  install-frontend      - Installs frontend dependencies using bun"
 	@echo "  format                - Formats both backend (Python) and frontend (JS/TS/CSS) code"
 	@echo "  format-backend        - Formats Python code using isort and black"
 	@echo "  format-frontend       - Formats frontend code using prettier"
@@ -35,6 +36,10 @@ clean:
 collect:
 	@echo "Collecting Django static files (confirming 'yes')..."
 	echo 'yes' | uv run manage.py collectstatic
+
+install-frontend:
+	@echo "Installing frontend dependencies with bun..."
+	cd frontend && bun install
 
 format: format-backend format-frontend
 	@echo "All code formatted successfully!"
