@@ -1,0 +1,12 @@
+# Build artifacts
+dist
+.turbo
+
+# Dependencies
+node_modules
+TailwindPlus
+
+# Environment files
+.env
+.env.*
+!.env.example
