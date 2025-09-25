@@ -28,6 +28,7 @@ services:
     restart: unless-stopped
 
   backend:
+    image: coursereview
     build: .
     ports:
       - "8000:8000"

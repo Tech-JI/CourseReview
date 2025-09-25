@@ -6,16 +6,16 @@ echo "Starting application deployment inside container..."
 
 echo "Build static files"
 
-make collect
+echo 'yes' | uv run manage.py collectstatic
 
 # Run Django migrations
 echo "[INFO] Running database migrations..."
-make migrate
+uv run manage.py migrate
 
-make migrations
+uv run manage.py makemigrations
 
 echo "[INFO] Creating superuser..."
-make createsuperuser
+uv run create_admin.py
 
 echo "[INFO] Setting up admin permissions..."
 # Execute the Python commands to make the last user an admin
