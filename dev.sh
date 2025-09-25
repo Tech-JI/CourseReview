@@ -19,6 +19,7 @@ uv run pre-commit install
 # Step 6: Make directory for builds of static files
 echo "[INFO] Creating static files directory..."
 mkdir -p staticfiles
+mkdir -p website/static
 
 # Step 7: Create .env file for storing secrets
 echo "[INFO] Creating .env file..."
@@ -104,7 +105,7 @@ if u:
     u.is_admin = True
     u.save()
     print(f"User {u.username} has been made an admin.")
-else
+else:
     print("No user found to make admin.")
 EOF
 
