@@ -1,8 +1,4 @@
 <template>
-  <!--
-    Improved login form using TailwindPlus design patterns
-    Consistent with existing app design language
-  -->
   <div
     class="flex min-h-full flex-1 flex-col justify-center py-12 sm:px-6 lg:px-8"
   >
@@ -21,7 +17,6 @@
 
     <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
       <div class="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
-        <!-- Login Method Tabs -->
         <div class="mb-8">
           <nav class="flex space-x-8" aria-label="Tabs">
             <button
@@ -51,7 +46,6 @@
           </nav>
         </div>
 
-        <!-- Error Alert -->
         <div v-if="error" class="rounded-md bg-red-50 p-4 mb-6">
           <div class="flex">
             <ExclamationTriangleIcon
@@ -65,7 +59,6 @@
           </div>
         </div>
 
-        <!-- Password Login Form -->
         <form
           v-if="!showQuestionnaireLogin"
           class="space-y-6"
@@ -142,33 +135,16 @@
               :disabled="loading || !turnstileToken"
               class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-2 focus:outline-offset-2 focus:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg
+              <Icon
                 v-if="loading"
-                class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
+                name="loading"
+                class="-ml-1 mr-3 h-5 w-5 text-white"
+              />
               {{ loading ? "Signing in..." : "Sign in" }}
             </button>
           </div>
         </form>
 
-        <!-- SJTU Authentication -->
         <div v-else>
           <AuthInitiate action="login" />
         </div>
@@ -195,6 +171,7 @@ import { getCookie } from "../utils/cookies";
 import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
 import AuthInitiate from "../components/AuthInitiate.vue";
 import Turnstile from "../components/Turnstile.vue";
+import Icon from "../components/Icon.vue";
 
 const router = useRouter();
 const { isAuthenticated } = useAuth();
@@ -205,7 +182,6 @@ const loading = ref(false);
 const showQuestionnaireLogin = ref(false);
 const turnstileToken = ref(null);
 
-// Turnstile event handlers
 const onTurnstileToken = (token) => {
   turnstileToken.value = token;
 };
@@ -220,28 +196,16 @@ const onTurnstileExpired = (errorMessage) => {
 };
 
 onMounted(async () => {
-  // useAuth performs initial check; redirect if already authenticated
   if (isAuthenticated.value) {
-    router.push("/courses");
+    router.push("/");
   }
 });
 
 const handleLogin = async () => {
   error.value = "";
 
-  // Check if turnstile token is available
   if (!turnstileToken.value) {
     error.value = "Please complete the security verification first.";
-    return;
-  }
-
-  // Prevent sending development/mock tokens to backend which will fail verification.
-  const mockPrefix = "dev-turnstile-token-";
-  if (turnstileToken.value && turnstileToken.value.startsWith(mockPrefix)) {
-    error.value =
-      "Security verification is currently running in local mock mode. The server cannot verify mock tokens.\n" +
-      "Disable mock mode (unset VITE_TURNSTILE_MOCK) or ensure Turnstile script can be loaded to proceed.";
-    loading.value = false;
     return;
   }
 
@@ -261,25 +225,23 @@ const handleLogin = async () => {
       }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       throw new Error(data.error || "Login failed");
     }
 
-    // Notify other parts of the app that authentication state changed
+    const data = await response.json();
+
     try {
       window.dispatchEvent(new CustomEvent("auth-state-changed"));
     } catch (e) {
       console.warn("Could not dispatch auth-state-changed event:", e);
     }
-    router.replace("/courses");
+    router.replace("/");
   } catch (err) {
     error.value = err.message;
   } finally {
     loading.value = false;
   }
 };
-
-// getCookie imported from utils/cookies.js
 </script>

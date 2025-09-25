@@ -24,88 +24,68 @@
       </div>
     </div>
 
-    <AuthFlow
-      action="signup"
-      password-label="Set your password"
-      set-password-mode="signup"
-      success-title="Registration successful!"
-      success-message="Welcome to CourseReview! Your account has been created successfully."
-      success-button-text="Sign in now"
-      help-title=""
-      :help-items="[]"
-    />
+    <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+      <!-- If auth flow is verified, show password form -->
+      <SetPasswordForm v-if="showPasswordForm" action="signup" />
+      <!-- Otherwise show auth initiate -->
+      <AuthInitiate v-else action="signup" />
+    </div>
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted } from "vue";
-import AuthFlow from "../components/AuthFlow.vue";
+import AuthInitiate from "../components/AuthInitiate.vue";
+import SetPasswordForm from "../components/SetPasswordForm.vue";
 
-export default {
-  name: "Signup",
-  components: { AuthFlow },
-  setup() {
-    const accountForm = ref({ account: "" });
+const showPasswordForm = ref(false);
 
-    function getAuthState() {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (
-          urlParams.get("verified") === "true" &&
-          urlParams.get("from_callback") === "true"
-        ) {
-          const urlAuthState = {
-            status: "verified",
-            action: urlParams.get("action"),
-            account: urlParams.get("account"),
-            expires_at: urlParams.get("expires_at"),
-            verified_at: new Date().toISOString(),
-            source: "url_params",
-          };
-          return urlAuthState;
-        }
+const checkAuthState = () => {
+  try {
+    const authFlow = localStorage.getItem("auth_flow");
 
-        const localStorageState = localStorage.getItem("auth_flow");
-        if (localStorageState) {
-          const parsed = JSON.parse(localStorageState);
-          return { ...parsed, source: "localStorage" };
-        }
+    if (authFlow) {
+      const flowData = JSON.parse(authFlow);
 
-        const sessionStorageState = sessionStorage.getItem("auth_flow");
-        if (sessionStorageState) {
-          const parsed = JSON.parse(sessionStorageState);
-          return { ...parsed, source: "sessionStorage" };
-        }
+      // Check if verified, correct action, and not expired
+      const isVerified = flowData.status === "verified";
+      const isSignupAction = flowData.action === "signup";
+      const hasExpiresAt = !!flowData.expires_at;
+      const isNotExpired =
+        flowData.expires_at && Date.now() < parseInt(flowData.expires_at);
 
-        const backupSessionState = sessionStorage.getItem(
-          "auth_verification_data",
-        );
-        if (backupSessionState) {
-          const parsed = JSON.parse(backupSessionState);
-          return { ...parsed, source: "sessionStorage_backup" };
-        }
-
-        return null;
-      } catch (error) {
-        console.error("Error reading auth state:", error);
-        return null;
+      if (isVerified && isSignupAction && hasExpiresAt && isNotExpired) {
+        showPasswordForm.value = true;
+        return;
       }
     }
 
-    onMounted(() => {
-      const authState = getAuthState();
-      if (
-        authState &&
-        authState.action === "signup" &&
-        authState.status === "verified"
-      ) {
-        accountForm.value.account = authState.account || "";
-      }
-    });
-
-    return { accountForm };
-  },
+    showPasswordForm.value = false;
+  } catch (e) {
+    console.error("Error checking auth state:", e);
+    showPasswordForm.value = false;
+  }
 };
-</script>
 
-<style scoped></style>
+onMounted(() => {
+  // Check URL parameters first (from AuthCallback redirect)
+  const urlParams = new URLSearchParams(window.location.search);
+  const verified = urlParams.get("verified");
+  const action = urlParams.get("action");
+  const fromCallback = urlParams.get("from_callback");
+
+  if (verified === "true" && action === "signup" && fromCallback === "true") {
+    showPasswordForm.value = true;
+    return;
+  }
+
+  // Also check for the case where from_callback is not present but we have verification
+  if (verified === "true" && action === "signup") {
+    showPasswordForm.value = true;
+    return;
+  }
+
+  // Then check localStorage
+  checkAuthState();
+});
+</script>

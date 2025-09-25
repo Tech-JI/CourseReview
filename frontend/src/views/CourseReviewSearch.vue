@@ -85,8 +85,6 @@ const props = defineProps({
   },
 });
 
-// sanitize imported from utils/sanitize.js
-
 const route = useRoute();
 const router = useRouter();
 const searchQuery = ref("");
@@ -103,7 +101,6 @@ const fetchReviews = async () => {
   loading.value = true;
   error.value = null;
 
-  // Check authentication before fetching reviews
   if (!isAuthenticated.value) {
     error.value = "Please log in to search reviews.";
     loading.value = false;
@@ -131,7 +128,7 @@ const fetchReviews = async () => {
     reviewsFullCount.value = data.reviews_full_count;
     remaining.value = data.remaining;
     courseShortName.value = data.course_short_name;
-    query.value = data.query; // Update the displayed query
+    query.value = data.query;
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -140,24 +137,20 @@ const fetchReviews = async () => {
 };
 
 const performSearch = () => {
-  router.push({ query: { q: searchQuery.value } }); // Update the query in the route
+  router.push({ query: { q: searchQuery.value } });
 };
 
-// Watch for changes in the route query
 watch(
   () => route.query.q,
   (newQuery) => {
-    // Always update searchQuery and fetch when route changes
     searchQuery.value = newQuery || "";
     fetchReviews();
   },
   { immediate: true },
 );
 
-// Watch for authentication status changes
 watch(isAuthenticated, (newAuth) => {
   if (newAuth) {
-    // User just logged in, fetch reviews
     fetchReviews();
   }
 });
@@ -167,8 +160,6 @@ onMounted(async () => {
   await checkAuthentication();
   await fetchReviews();
 });
-
-// authentication handled by useAuth composable
 
 const updateReviewData = (updateData) => {
   const reviewIndex = reviews.value.findIndex(

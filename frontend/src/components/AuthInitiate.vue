@@ -1,14 +1,10 @@
 <template>
   <div class="auth-initiate">
-    <!-- Loading State -->
     <div v-if="loading" class="text-center">
-      <div
-        class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"
-      ></div>
+      <Icon name="loading" class="h-8 w-8 text-indigo-600 mx-auto" />
       <p class="mt-2 text-sm/6 text-gray-500">Loading authentication...</p>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="rounded-lg bg-red-50 p-4 mb-4">
       <div class="flex">
         <div class="ml-3">
@@ -31,7 +27,6 @@
       </div>
     </div>
 
-    <!-- OTP Display and Copy -->
     <div v-else-if="otpData" class="space-y-4">
       <div class="rounded-lg bg-indigo-50 p-4">
         <div class="text-center">
@@ -53,26 +48,10 @@
             >
               <span v-if="!redirecting">{{ copyButtonText }}</span>
               <span v-else class="flex items-center justify-center">
-                <svg
-                  class="animate-spin -ml-1 mr-3 size-4 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
+                <Icon
+                  name="loading"
+                  class="animate-spin -ml-1 mr-3 text-white"
+                />
                 Redirecting in {{ countdown }}s...
               </span>
             </button>
@@ -85,12 +64,12 @@
       </div>
     </div>
 
-    <!-- Turnstile Widget -->
     <div
       v-else-if="!turnstileToken"
       class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10"
     >
       <Turnstile
+        ref="turnstileRef"
         key="auth-initiate-turnstile"
         :show-title="true"
         theme="light"
@@ -101,7 +80,6 @@
       />
     </div>
 
-    <!-- Ready to Initiate -->
     <div v-else class="bg-white py-8 px-4 shadow-sm sm:rounded-lg sm:px-10">
       <div class="space-y-4">
         <div class="rounded-lg bg-green-50 p-4">
@@ -127,26 +105,7 @@
         >
           <span v-if="!initiating">Continue with SJTU Authentication</span>
           <span v-else class="flex items-center">
-            <svg
-              class="animate-spin -ml-1 mr-3 size-4 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
+            <Icon name="loading" class="animate-spin -ml-1 mr-3 text-white" />
             Initializing...
           </span>
         </button>
@@ -158,9 +117,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
 import { getCookie } from "../utils/cookies";
+import { clearAuthState } from "../utils/auth";
 import Turnstile from "./Turnstile.vue";
+import Icon from "./Icon.vue";
 
-// Props
 const props = defineProps({
   action: {
     type: String,
@@ -169,7 +129,6 @@ const props = defineProps({
   },
 });
 
-// Reactive state
 const loading = ref(true);
 const error = ref(null);
 const turnstileToken = ref(null);
@@ -179,13 +138,12 @@ const redirecting = ref(false);
 const copyButtonText = ref("Copy Code & Continue");
 const countdown = ref(0);
 const redirectUrl = ref(null);
-const currentTime = ref(Date.now()); // For reactive countdown updates
+const currentTime = ref(Date.now());
+const turnstileRef = ref(null);
 
-// Interval references
 let countdownInterval = null;
 let timeUpdateInterval = null;
 
-// Turnstile event handlers
 const onTurnstileToken = (token) => {
   turnstileToken.value = token;
   loading.value = false;
@@ -201,7 +159,6 @@ const onTurnstileExpired = (errorMessage) => {
   turnstileToken.value = null;
   error.value = errorMessage;
 };
-// Check for existing OTP data in localStorage
 const checkExistingOTP = () => {
   const storedOTP = localStorage.getItem("auth_otp");
   const storedFlow = localStorage.getItem("auth_flow");
@@ -211,27 +168,17 @@ const checkExistingOTP = () => {
       const otpInfo = JSON.parse(storedOTP);
       const flowInfo = storedFlow ? JSON.parse(storedFlow) : null;
 
-      // Check if OTP is still valid and matches current action
+      // Check if OTP is not expired and flow state matches
       if (
         otpInfo.expires_at > Date.now() &&
         flowInfo &&
         flowInfo.action === props.action &&
         flowInfo.status === "pending"
       ) {
-        // Check if too much time has passed since generation (likely verification failed)
-        const timeSinceGeneration =
-          Date.now() - (otpInfo.expires_at - 2 * 60 * 1000);
-        if (timeSinceGeneration > 15 * 1000) {
-          // 15 seconds - more aggressive detection
-          clearAuthData();
-          return false; // Restart the flow
-        }
-
         otpData.value = otpInfo;
-        loading.value = false;
         return true;
       } else {
-        // Clean up expired data
+        // Clear expired OTP and auth flow state records
         clearAuthData();
       }
     } catch (e) {
@@ -242,28 +189,13 @@ const checkExistingOTP = () => {
   return false;
 };
 
-// Clear authentication data from localStorage
 const clearAuthData = () => {
-  localStorage.removeItem("auth_otp");
-  localStorage.removeItem("auth_flow");
-  localStorage.removeItem("auth_redirect_time");
+  clearAuthState();
 };
 
-// Initiate authentication
 const initiateAuth = async () => {
   if (!turnstileToken.value) {
     error.value = "Please complete the security verification first.";
-    return;
-  }
-
-  // Prevent sending development/mock tokens to backend which will fail verification.
-  // Mock tokens are generated by Turnstile.vue when VITE_TURNSTILE_MOCK=true or on localhost.
-  const mockPrefix = "dev-turnstile-token-";
-  if (turnstileToken.value && turnstileToken.value.startsWith(mockPrefix)) {
-    error.value =
-      "Security verification is currently running in local mock mode. The server cannot verify mock tokens.\n" +
-      "Disable mock mode (unset VITE_TURNSTILE_MOCK) or ensure Turnstile script can be loaded to proceed.";
-    initiating.value = false;
     return;
   }
 
@@ -287,7 +219,7 @@ const initiateAuth = async () => {
     const data = await response.json();
 
     if (response.ok) {
-      const expiresAt = Date.now() + 2 * 60 * 1000; // 2 minutes from now
+      const expiresAt = Date.now() + 2 * 60 * 1000;
       const otpInfo = {
         otp: data.otp,
         expires_at: expiresAt,
@@ -295,10 +227,10 @@ const initiateAuth = async () => {
       const flowInfo = {
         status: "pending",
         action: props.action,
-        expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes from now
+        expires_at: Date.now() + 10 * 60 * 1000,
+        redirect_url: data.redirect_url, // Store redirect URL
       };
 
-      // Store in localStorage
       localStorage.setItem("auth_otp", JSON.stringify(otpInfo));
       localStorage.setItem("auth_flow", JSON.stringify(flowInfo));
 
@@ -316,19 +248,38 @@ const initiateAuth = async () => {
   }
 };
 
-// Copy OTP and redirect
 const copyOTPAndRedirect = async () => {
-  if (!otpData.value || !redirectUrl.value) return;
+  if (!otpData.value) {
+    console.error("No OTP data available");
+    return;
+  }
+
+  if (!redirectUrl.value) {
+    console.error("No redirect URL available, trying to get from localStorage");
+    // Try to get redirect URL from localStorage
+    const storedFlow = localStorage.getItem("auth_flow");
+    if (storedFlow) {
+      try {
+        const flowInfo = JSON.parse(storedFlow);
+        redirectUrl.value = flowInfo.redirect_url;
+      } catch (e) {
+        console.error("Error parsing stored flow:", e);
+        return;
+      }
+    }
+
+    if (!redirectUrl.value) {
+      console.error("Still no redirect URL available");
+      return;
+    }
+  }
 
   try {
-    // Record the time when user leaves for questionnaire
     localStorage.setItem("auth_redirect_time", Date.now().toString());
 
-    // Copy to clipboard
     await navigator.clipboard.writeText(otpData.value.otp);
-    copyButtonText.value = "Copied! ✓";
+    copyButtonText.value = "Copied!";
 
-    // Start countdown and redirect
     redirecting.value = true;
     countdown.value = 1;
 
@@ -336,7 +287,6 @@ const copyOTPAndRedirect = async () => {
       countdown.value--;
       if (countdown.value <= 0) {
         clearInterval(countdownInterval);
-        // Append OTP as hint parameter
         const url = new URL(redirectUrl.value);
         url.searchParams.set("otp_hint", otpData.value.otp);
         window.location.href = url.toString();
@@ -344,7 +294,6 @@ const copyOTPAndRedirect = async () => {
     }, 1000);
   } catch (err) {
     console.error("Failed to copy to clipboard:", err);
-    // Fallback: just redirect without clipboard
     setTimeout(() => {
       const url = new URL(redirectUrl.value);
       url.searchParams.set("otp_hint", otpData.value.otp);
@@ -353,7 +302,6 @@ const copyOTPAndRedirect = async () => {
   }
 };
 
-// Format time remaining
 const formatTime = (expiresAt) => {
   const remaining = Math.max(
     0,
@@ -364,9 +312,6 @@ const formatTime = (expiresAt) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-// getCookie imported from utils/cookies.js
-
-// Reset authentication state
 const resetAuth = () => {
   // Clear all state
   error.value = null;
@@ -374,115 +319,92 @@ const resetAuth = () => {
   otpData.value = null;
   redirecting.value = false;
   copyButtonText.value = "Copy Code & Continue";
+  countdown.value = 0;
+  redirectUrl.value = null;
 
+  // Clear intervals
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
   }
 
+  // Clear auth data
   clearAuthData();
 
-  // Set loading state briefly to show user we're working
+  // Reset Turnstile widget if available
+  if (turnstileRef.value && turnstileRef.value.resetTurnstile) {
+    turnstileRef.value.resetTurnstile();
+  }
+
+  // Set loading state briefly to show reset
   loading.value = true;
 
-  // Reset to show turnstile again
   setTimeout(() => {
     loading.value = false;
   }, 300);
 };
 
-// Component lifecycle
 onMounted(async () => {
-  // Start time update interval for reactive countdown
+  // Clear any existing intervals
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
   timeUpdateInterval = setInterval(() => {
     currentTime.value = Date.now();
   }, 1000);
 
-  // Check if user just returned from signup or questionnaire
-  const urlParams = new URLSearchParams(window.location.search);
-  const hasOtpHint = urlParams.has("otp_hint");
-  const referrer = document.referrer;
-  const isFromQuestionnaire =
-    referrer.includes("questionnaire") ||
-    referrer.includes("sjtu") ||
-    hasOtpHint;
+  // Check for existing OTP first
+  const hasExistingOTP = checkExistingOTP();
 
-  // If user is on signup, reset_password, or login page and has stored auth data, restart verification flow
-  const isOnSignupWithStoredAuth =
-    props.action === "signup" && localStorage.getItem("auth_otp");
-  const isOnResetPasswordWithStoredAuth =
-    props.action === "reset_password" && localStorage.getItem("auth_otp");
-  const isOnLoginWithStoredAuth =
-    props.action === "login" && localStorage.getItem("auth_otp");
+  if (hasExistingOTP) {
+    // If we have existing OTP data, restore redirect URL
+    const storedFlow = localStorage.getItem("auth_flow");
+    if (storedFlow) {
+      try {
+        const flowInfo = JSON.parse(storedFlow);
+        redirectUrl.value = flowInfo.redirect_url;
 
-  // If user returned from signup/reset_password/login/questionnaire, always restart verification flow
-  if (
-    isFromQuestionnaire ||
-    isOnSignupWithStoredAuth ||
-    isOnResetPasswordWithStoredAuth ||
-    isOnLoginWithStoredAuth
-  ) {
-    clearAuthData();
-    loading.value = false;
-    return;
-  }
+        // Reset button states for returning users
+        redirecting.value = false;
+        copyButtonText.value = "Copy Code & Continue";
+        countdown.value = 0;
 
-  // Add visibility change listener to detect when user returns from questionnaire
-  const handleVisibilityChange = () => {
-    // Only check when page becomes visible
-    if (document.visibilityState === "visible") {
-      // Check if we have an OTP that's been around for a while
-      const storedOTP = localStorage.getItem("auth_otp");
-      const redirectTime = localStorage.getItem("auth_redirect_time");
-
-      if (storedOTP) {
-        try {
-          const otpInfo = JSON.parse(storedOTP);
-          const now = Date.now();
-
-          // Check time since OTP generation
-          const timeSinceGeneration =
-            now - (otpInfo.expires_at - 2 * 60 * 1000);
-
-          // If user left for questionnaire, check time since redirect
-          if (redirectTime) {
-            const timeSinceRedirect = now - parseInt(redirectTime);
-            // If user returned within 60 seconds, likely verification failed
-            if (timeSinceRedirect < 60 * 1000 && timeSinceRedirect > 5 * 1000) {
-              clearAuthData();
-              localStorage.removeItem("auth_redirect_time");
-              otpData.value = null;
-              loading.value = false;
-              return;
-            }
-          }
-
-          // If OTP exists for more than 30 seconds when user returns, likely verification failed
-          if (timeSinceGeneration > 30 * 1000) {
-            clearAuthData();
-            localStorage.removeItem("auth_redirect_time");
-            otpData.value = null;
-            loading.value = false;
-          }
-        } catch (e) {
-          console.error("Error checking OTP on visibility change:", e);
+        // Clear any existing countdown interval
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
         }
+
+        loading.value = false;
+      } catch (e) {
+        console.error("Error parsing flow data:", e);
+        loading.value = false;
       }
+    } else {
+      loading.value = false;
+      redirecting.value = false;
+      copyButtonText.value = "Copy Code & Continue";
+      countdown.value = 0;
     }
-  };
-
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  // Store the handler for cleanup
-  window._authVisibilityHandler = handleVisibilityChange;
-
-  // Check for existing valid OTP first
-  if (!checkExistingOTP()) {
-    // No valid OTP, show turnstile
-    loading.value = false;
   } else {
-    // OTP exists, just show it
+    // Reset all state when starting fresh
     loading.value = false;
+    error.value = null;
+    turnstileToken.value = null;
+    otpData.value = null;
+    redirecting.value = false;
+    copyButtonText.value = "Copy Code & Continue";
+    countdown.value = 0;
+    redirectUrl.value = null;
+
+    // Reset Turnstile when starting fresh
+    setTimeout(() => {
+      if (turnstileRef.value && turnstileRef.value.resetTurnstile) {
+        turnstileRef.value.resetTurnstile();
+      }
+    }, 100);
   }
 });
 
@@ -492,15 +414,6 @@ onUnmounted(() => {
   }
   if (timeUpdateInterval) {
     clearInterval(timeUpdateInterval);
-  }
-
-  // Clean up visibility change event listener
-  if (window._authVisibilityHandler) {
-    document.removeEventListener(
-      "visibilitychange",
-      window._authVisibilityHandler,
-    );
-    delete window._authVisibilityHandler;
   }
 });
 </script>

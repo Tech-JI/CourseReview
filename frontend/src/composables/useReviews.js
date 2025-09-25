@@ -67,7 +67,7 @@ export function useReviews() {
 
   const vote = async (courseId, value, forLayup) => {
     try {
-      const response = await fetch(`/api/course/${courseId}/vote`, {
+      const response = await fetch(`/api/course/${courseId}/vote/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

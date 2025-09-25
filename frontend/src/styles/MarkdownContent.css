@@ -1,23 +1,3 @@
-:deep(.markdown-content) ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-:deep(.markdown-content) ul ul,
-:deep(.markdown-content) ol ul {
-  list-style-type: circle;
-}
-
-:deep(.markdown-content) ul ol,
-:deep(.markdown-content) ol ol {
-  list-style-type: lower-alpha;
-}
-
 /* MarkdownContent.css: Unified style for markdown preview/editor in the frontend */
 :deep(.markdown-content) {
   font-family:
@@ -26,7 +6,6 @@
     sans-serif;
   font-size: 1.05rem;
   line-height: 1.8;
-  /* max-width: 48rem; */
   margin-left: 0;
   margin-right: auto;
   text-align: left;

@@ -1,6 +1,5 @@
 <template>
   <div class="min-h-full">
-    <!-- Loading State -->
     <div v-if="loading" class="flex justify-center items-center min-h-96">
       <div
         class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-white bg-indigo-500"
@@ -29,7 +28,6 @@
       </div>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div class="rounded-md bg-red-50 p-4">
         <div class="flex">
@@ -47,9 +45,7 @@
       </div>
     </div>
 
-    <!-- Course Content -->
     <div v-else class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <!-- Course Header -->
       <div class="mb-8">
         <h1 class="text-3xl font-bold tracking-tight text-gray-900">
           {{ course.course_code }} | {{ course.course_title }}
@@ -78,11 +74,8 @@
         </p>
       </div>
 
-      <!-- Course Info Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        <!-- Left Column: Course Topics and Cross-listings -->
         <div class="lg:col-span-2 space-y-6">
-          <!-- Course Topics -->
           <div
             v-if="course.course_topics && course.course_topics.length > 0"
             class="bg-white overflow-hidden shadow sm:rounded-lg"
@@ -106,7 +99,6 @@
             </div>
           </div>
 
-          <!-- Cross-listed Courses -->
           <div
             v-if="course.xlist && course.xlist.length > 0"
             class="bg-white overflow-hidden shadow sm:rounded-lg"
@@ -129,9 +121,7 @@
           </div>
         </div>
 
-        <!-- Right Column: Voting Cards -->
         <div class="space-y-6">
-          <!-- Quality Score Card -->
           <div class="bg-white overflow-hidden shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6 text-center">
               <h3 class="text-lg font-medium text-gray-900 mb-4">
@@ -199,7 +189,7 @@
               </template>
             </div>
           </div>
-          <!-- Difficulty Score Card -->
+
           <div class="bg-white overflow-hidden shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6 text-center">
               <h3 class="text-lg font-medium text-gray-900 mb-4">
@@ -271,7 +261,6 @@
         </div>
       </div>
 
-      <!-- Instructors Section -->
       <div
         v-if="course.instructors && course.instructors.length > 0"
         class="mb-8"
@@ -295,7 +284,6 @@
         </div>
       </div>
 
-      <!-- Professors with Reviews -->
       <div v-if="course.professors_and_review_count" class="mb-8">
         <div class="bg-white overflow-hidden shadow sm:rounded-lg">
           <div class="px-4 py-5 sm:p-6">
@@ -353,7 +341,6 @@
         </div>
       </div>
 
-      <!-- Reviews Section -->
       <div
         v-if="
           isAuthenticated && course.review_set && course.review_set.length > 0
@@ -376,7 +363,7 @@
           </div>
         </div>
       </div>
-      <!-- Auth message for reviews -->
+
       <div v-else-if="course.review_count > 0" class="mb-8">
         <div class="rounded-md bg-blue-50 p-4">
           <div class="flex">
@@ -409,7 +396,6 @@
         </div>
       </div>
 
-      <!-- Write Review Section -->
       <div v-if="course.can_write_review" class="mb-8">
         <div class="bg-white overflow-hidden shadow sm:rounded-lg">
           <div class="px-4 py-5 sm:p-6">
@@ -417,7 +403,6 @@
               Write a Review for {{ course.course_code }}
             </h3>
             <form class="space-y-6" @submit.prevent="submitReview">
-              <!-- top-level form errors -->
               <div v-if="Object.keys(formErrors).length" class="mb-4">
                 <div class="rounded-md bg-red-50 p-3">
                   <div class="text-sm text-red-700">
@@ -528,10 +513,8 @@
         </div>
       </div>
 
-      <!-- Review Status Message / User's Review Display -->
       <div v-else class="mb-8">
         <div class="rounded-md bg-gray-50 p-4">
-          <!-- Show user's review if they have written one -->
           <div
             v-if="isAuthenticated && !course.can_write_review && userReview"
             class="bg-indigo-50 overflow-hidden shadow rounded-lg ring-1 ring-indigo-200"
@@ -548,7 +531,6 @@
               </div>
             </div>
             <div class="px-4 py-5 sm:p-6">
-              <!-- Review metadata -->
               <div class="text-sm text-indigo-700 font-medium mb-4">
                 <span v-if="userReview.term">{{ userReview.term }}</span>
                 <span v-if="userReview.professor && userReview.term">
@@ -559,7 +541,6 @@
                 }}</span>
               </div>
 
-              <!-- Review content with truncation -->
               <div class="bg-white rounded-2xl p-4 border border-indigo-200">
                 <MdPreview
                   :model-value="truncatedUserReviewContent"
@@ -568,7 +549,6 @@
                   class="text-sm text-gray-700 markdown-content"
                 />
 
-                <!-- Expand/Collapse button for long reviews -->
                 <div v-if="reviewNeedsTruncation" class="mt-3 text-center">
                   <button
                     class="inline-flex items-center px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none"
@@ -597,7 +577,6 @@
             </div>
           </div>
 
-          <!-- Fallback messages for users without reviews -->
           <div v-else class="text-center flex items-center justify-between">
             <p v-if="isAuthenticated" class="text-sm text-gray-600 flex-1">
               Thanks for writing a review of this course!
@@ -665,7 +644,7 @@ const newReview = ref({
 const formErrors = ref({});
 
 const courseId = computed(() => {
-  return route.params.course_id;
+  return route.params.courseId;
 });
 
 const truncatedUserReviewContent = computed(() => {
@@ -690,11 +669,8 @@ onMounted(async () => {
   if (courseId.value) {
     await fetchCourse();
   }
-  // useAuth performs initial authentication check; ensure fresh state
   await checkAuthentication();
 
-  // Only fetch user review if authenticated and they are NOT able to write a review
-  // (can_write_review === false means they already have a review)
   if (isAuthenticated.value && course.value && !course.value.can_write_review) {
     await fetchUserReview();
   }
@@ -716,7 +692,6 @@ const fetchCourse = async () => {
   }
 };
 
-// authentication handled by useAuth (checkAuthentication and isAuthenticated)
 const fetchUserReview = async () => {
   if (!isAuthenticated.value || !courseId.value) return;
   try {
@@ -770,11 +745,9 @@ const updateReviewData = (updateData) => {
 
 const validateReview = () => {
   const errs = {};
-  // term: must be 3 chars like 24F
   if (!newReview.value.term || newReview.value.term.length !== 3) {
     errs.term = ["Please provide a valid term, e.g. 24F"];
   }
-  // professor: at least two words
   if (
     !newReview.value.professor ||
     newReview.value.professor.trim().split(/\s+/).length < 2
@@ -783,7 +756,6 @@ const validateReview = () => {
       "Please provide the professor's full name, e.g. John Smith",
     ];
   }
-  // comments length
   if (!newReview.value.comments || newReview.value.comments.length < 30) {
     errs.comments = ["Please write a longer review (at least 30 characters)"];
   }

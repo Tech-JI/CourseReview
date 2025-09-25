@@ -1,6 +1,5 @@
 <template>
   <div class="bg-white">
-    <!-- Hero section -->
     <div class="relative isolate px-6 pt-14 lg:px-8">
       <div
         class="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
@@ -45,7 +44,6 @@
             {{ reviewCount.toLocaleString() }} reviews and counting
           </p>
 
-          <!-- Search section -->
           <div class="mt-10">
             <div class="mx-auto max-w-md">
               <label for="search" class="sr-only">Search for courses</label>
@@ -77,7 +75,6 @@
             </div>
           </div>
 
-          <!-- Action buttons -->
           <div class="mt-10 flex items-center justify-center gap-x-6">
             <button
               class="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -146,7 +143,6 @@ const searchQuery = ref("");
 
 onMounted(async () => {
   await fetchLandingData();
-  // useAuth performs initial authentication check
 });
 
 const fetchLandingData = async () => {
@@ -162,13 +158,11 @@ const fetchLandingData = async () => {
   }
 };
 
-// Authentication checking handled via shared util
-
 const performSearch = () => {
   if (searchQuery.value.trim().length >= 2) {
     router.push({
-      path: "/courses", // Navigate to the new courses page
-      query: { code: searchQuery.value.trim().toUpperCase() }, // Use 'code' query param
+      path: "/courses",
+      query: { code: searchQuery.value.trim().toUpperCase() },
     });
   } else {
     alert("Search query must be at least 2 characters long");
@@ -190,6 +184,6 @@ const goToLayups = () => {
 };
 
 const goToDepartments = () => {
-  router.push("/courses"); // Simply go to the main courses page
+  router.push("/courses");
 };
 </script>

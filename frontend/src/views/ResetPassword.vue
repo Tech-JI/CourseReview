@@ -23,31 +23,66 @@
       </div>
     </div>
 
-    <AuthFlow
-      action="reset_password"
-      password-label="Set new password"
-      set-password-mode="reset"
-      success-title="Password reset successful!"
-      success-message="Your password has been reset successfully. You can now sign in with your new password."
-      success-button-text="Sign in now"
-      help-title="Password Reset Instructions"
-      :help-items="[
-        'First, verify your identity through SJTU authentication',
-        'After successful verification, you can set a new password',
-        'Ensure your new password is secure (contains letters and numbers, at least 12 characters)',
-        'Keep your new password safe after resetting',
-      ]"
-    />
+    <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+      <!-- If auth flow is verified, show password form -->
+      <SetPasswordForm v-if="showPasswordForm" action="reset_password" />
+      <!-- Otherwise show auth initiate -->
+      <AuthInitiate v-else action="reset_password" />
+    </div>
   </div>
 </template>
 
-<script>
-import AuthFlow from "../components/AuthFlow.vue";
+<script setup>
+import { ref, onMounted } from "vue";
+import AuthInitiate from "../components/AuthInitiate.vue";
+import SetPasswordForm from "../components/SetPasswordForm.vue";
 
-export default {
-  name: "ResetPassword",
-  components: { AuthFlow },
+const showPasswordForm = ref(false);
+
+const checkAuthState = () => {
+  try {
+    const authFlow = localStorage.getItem("auth_flow");
+
+    if (authFlow) {
+      const flowData = JSON.parse(authFlow);
+
+      // Check if verified, correct action, and not expired
+      const isVerified = flowData.status === "verified";
+      const isResetAction = flowData.action === "reset_password";
+      const hasExpiresAt = !!flowData.expires_at;
+      const isNotExpired =
+        flowData.expires_at && Date.now() < parseInt(flowData.expires_at);
+
+      if (isVerified && isResetAction && hasExpiresAt && isNotExpired) {
+        showPasswordForm.value = true;
+        return;
+      }
+    }
+
+    showPasswordForm.value = false;
+  } catch (e) {
+    console.error("Error checking auth state:", e);
+    showPasswordForm.value = false;
+  }
 };
-</script>
 
-<style scoped></style>
+onMounted(() => {
+  // Check URL parameters first (from AuthCallback redirect)
+  const urlParams = new URLSearchParams(window.location.search);
+  const verified = urlParams.get("verified");
+  const action = urlParams.get("action");
+  const fromCallback = urlParams.get("from_callback");
+
+  if (
+    verified === "true" &&
+    action === "reset_password" &&
+    fromCallback === "true"
+  ) {
+    showPasswordForm.value = true;
+    return;
+  }
+
+  // Then check localStorage
+  checkAuthState();
+});
+</script>

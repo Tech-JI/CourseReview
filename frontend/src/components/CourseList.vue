@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-full">
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <!-- Page header -->
       <div class="mb-8">
         <h1 class="text-3xl font-bold tracking-tight text-gray-900">Courses</h1>
         <p class="mt-2 text-sm text-gray-700">
@@ -10,7 +9,6 @@
         </p>
       </div>
 
-      <!-- Filters Card -->
       <div class="mb-8">
         <div class="overflow-hidden bg-white shadow sm:rounded-lg">
           <div class="px-4 py-5 sm:p-6">
@@ -18,7 +16,6 @@
               Filters & Sorting
             </h3>
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
-              <!-- Department Filter -->
               <div>
                 <label
                   for="department"
@@ -43,7 +40,6 @@
                 </select>
               </div>
 
-              <!-- Course Code Search -->
               <div>
                 <label
                   for="code"
@@ -61,7 +57,6 @@
                 />
               </div>
 
-              <!-- Min Quality Filter (Auth Only) -->
               <div v-if="isAuthenticated">
                 <label
                   for="min_quality"
@@ -79,7 +74,6 @@
                 />
               </div>
 
-              <!-- Sort By -->
               <div>
                 <label
                   for="sort_by"
@@ -104,7 +98,6 @@
                 </select>
               </div>
 
-              <!-- Sort Order -->
               <div>
                 <label
                   for="sort_order"
@@ -124,7 +117,6 @@
               </div>
             </div>
 
-            <!-- Action Buttons -->
             <div class="mt-6 flex gap-3">
               <button
                 class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
@@ -143,7 +135,6 @@
         </div>
       </div>
 
-      <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">
         <div
           class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-white bg-indigo-500"
@@ -172,7 +163,6 @@
         </div>
       </div>
 
-      <!-- Error State -->
       <div v-else-if="error" class="rounded-md bg-red-50 p-4">
         <div class="flex">
           <ExclamationTriangleIcon
@@ -188,14 +178,11 @@
         </div>
       </div>
 
-      <!-- Course Results -->
       <div v-else-if="courses.length > 0">
-        <!-- Results Count -->
         <div class="mb-4 text-sm text-gray-700">
           Showing {{ courses.length }} of {{ pagination.total_courses }} courses
         </div>
 
-        <!-- Course Cards -->
         <div class="overflow-hidden bg-white shadow sm:rounded-md">
           <ul class="divide-y divide-gray-200">
             <li v-for="course in courses" :key="course.id">
@@ -210,7 +197,6 @@
                         {{ course.course_code }}: {{ course.course_title }}
                       </h3>
                       <div class="mt-1 flex items-center text-sm text-gray-500">
-                        <!-- Offered Status -->
                         <span
                           v-if="course.is_offered_in_current_term"
                           class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
@@ -230,7 +216,6 @@
                           Not Recently Offered
                         </span>
 
-                        <!-- Instructors -->
                         <span
                           v-if="
                             course.instructors && course.instructors.length > 0
@@ -243,7 +228,6 @@
                         </span>
                       </div>
 
-                      <!-- Distribs -->
                       <div
                         v-if="course.distribs && course.distribs.length > 0"
                         class="mt-2"
@@ -264,9 +248,7 @@
                       </div>
                     </div>
 
-                    <!-- Stats -->
                     <div class="ml-4 flex-shrink-0 flex items-center space-x-4">
-                      <!-- Reviews -->
                       <div class="text-center">
                         <div class="text-2xl font-bold text-gray-900">
                           {{ course.review_count }}
@@ -274,7 +256,6 @@
                         <div class="text-xs text-gray-500">Reviews</div>
                       </div>
 
-                      <!-- Quality Score (Auth Only) -->
                       <div v-if="isAuthenticated" class="text-center">
                         <div class="text-2xl font-bold text-indigo-600">
                           {{
@@ -286,7 +267,6 @@
                         <div class="text-xs text-gray-500">Quality</div>
                       </div>
 
-                      <!-- Difficulty Score (Auth Only) -->
                       <div v-if="isAuthenticated" class="text-center">
                         <div class="text-2xl font-bold text-green-600">
                           {{
@@ -298,7 +278,6 @@
                         <div class="text-xs text-gray-500">Difficulty</div>
                       </div>
 
-                      <!-- Login prompt for non-auth users -->
                       <div v-if="!isAuthenticated" class="text-center">
                         <router-link
                           to="/accounts/login/"
@@ -315,7 +294,6 @@
           </ul>
         </div>
 
-        <!-- Pagination -->
         <nav
           class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-6"
           aria-label="Pagination"
@@ -346,7 +324,6 @@
         </nav>
       </div>
 
-      <!-- No Results -->
       <div v-else class="text-center py-12">
         <div class="mx-auto h-12 w-12 text-gray-400">
           <AcademicCapIcon class="h-12 w-12" />
@@ -401,17 +378,7 @@ const {
   syncStateFromQuery,
 } = useCourses();
 const { isAuthenticated, checkAuthentication } = useAuth();
-const currentTerm = ref("Current"); // TODO: Maybe fetch current term?
-
-// pagination, filters, sorting provided by useCourses
-
-// --- API Fetching ---
-
-// useCourses provides fetchDepartments and fetchCourses
-
-// useAuth provides checkAuthentication and reactive isAuthenticated
-
-// --- Event Handling & Logic ---
+const currentTerm = ref("Current");
 
 const updateRoute = () => {
   const query = getQueryObject(isAuthenticated.value);
@@ -423,7 +390,6 @@ const applyFiltersAndSortLocal = () => {
   updateRoute();
 };
 
-// Expose original names used by the template
 const applyFiltersAndSort = () => {
   applyFiltersAndSortLocal();
 };
@@ -446,17 +412,13 @@ const changePage = (newPage) => {
   changePageLocal(newPage);
 };
 
-// --- Lifecycle and Watchers ---
-
 onMounted(async () => {
   await checkAuthentication();
   await fetchDepartments();
-  // Sync state from initial route query parameters
   syncStateFromQuery(route.query);
-  await fetchCourses(isAuthenticated.value); // Fetch initial data based on URL state
+  await fetchCourses(isAuthenticated.value);
 });
 
-// Watch for route changes to re-fetch data
 watch(
   () => route.query,
   (newQuery) => {
@@ -464,7 +426,4 @@ watch(
     fetchCourses(isAuthenticated.value);
   },
 );
-
-// Helper to update component state from URL query params
-// syncStateFromQuery provided by useCourses
 </script>

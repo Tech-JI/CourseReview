@@ -115,11 +115,6 @@ export function useCourses() {
     sorting.sort_by = query.sort_by || "course_code";
     sorting.sort_order = query.sort_order || "asc";
     pagination.current_page = query.page ? parseInt(query.page, 10) : 1;
-
-    // Ensure sort_by is valid if auth state changes will be handled by caller
-    if (!filters.min_quality) {
-      // noop
-    }
   };
 
   return {

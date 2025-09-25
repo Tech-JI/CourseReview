@@ -9,7 +9,6 @@ import AppLayout from "./layout/AppLayout.vue";
 </script>
 
 <style>
-/* Global styles */
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",

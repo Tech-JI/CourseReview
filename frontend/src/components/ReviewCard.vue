@@ -17,7 +17,6 @@
         </div>
       </div>
 
-      <!-- Use MdPreview for displaying review comments -->
       <div class="mt-4">
         <MdPreview
           :model-value="truncatedContent"
@@ -26,7 +25,6 @@
           class="text-sm text-indigo-700 markdown-content"
         />
 
-        <!-- Enhanced Expand/Collapse button -->
         <div v-if="needsTruncation" class="mt-3 flex justify-center">
           <button
             class="inline-flex items-center gap-x-1.5 rounded-md bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 shadow-xs hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all"
@@ -54,13 +52,11 @@
         </div>
       </div>
 
-      <!-- Review Voting Section -->
       <div
         v-if="isAuthenticated"
         class="mt-6 flex items-center justify-between"
       >
         <div class="flex items-center space-x-4">
-          <!-- Kudos Button -->
           <button
             :class="[
               'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
@@ -82,7 +78,6 @@
             {{ review.kudos_count || 0 }}
           </button>
 
-          <!-- Dislike Button -->
           <button
             :class="[
               'inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
@@ -103,9 +98,8 @@
           </button>
         </div>
       </div>
-      <!-- Vote counts display only (for non-authenticated users) -->
+
       <div v-else class="mt-6 flex items-center space-x-4">
-        <!-- Kudos Count -->
         <div
           v-if="review.kudos_count > 0"
           class="inline-flex items-center text-sm text-green-600"
@@ -114,7 +108,6 @@
           {{ review.kudos_count }}
         </div>
 
-        <!-- Dislikes Count -->
         <div
           v-if="review.dislike_count > 0"
           class="inline-flex items-center text-sm text-red-600"
@@ -200,8 +193,6 @@ const handleVote = async (reviewId, isKudos) => {
     alert("Error voting on review. Please try again.");
   }
 };
-
-// getCookie imported from utils/cookies.js
 </script>
 
 <style scoped>

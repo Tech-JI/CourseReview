@@ -9,7 +9,6 @@
         </h2>
       </div>
 
-      <!-- Loading State -->
       <div v-if="loading" class="text-center">
         <div
           class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"
@@ -19,7 +18,6 @@
         </p>
       </div>
 
-      <!-- Error State -->
       <div v-else-if="error" class="rounded-md bg-red-50 p-4">
         <div class="flex">
           <div class="ml-3">
@@ -48,7 +46,6 @@
         </div>
       </div>
 
-      <!-- Success State (should not be visible as we redirect immediately) -->
       <div v-else-if="success" class="rounded-md bg-green-50 p-4">
         <div class="flex">
           <div class="ml-3">
@@ -77,7 +74,6 @@ const error = ref(null);
 const success = ref(false);
 const parsedParams = ref({});
 
-// Parse query parameters from URL
 const parseUrlParams = () => {
   const { account, answer_id, action } = route.query;
 
@@ -88,7 +84,6 @@ const parseUrlParams = () => {
     return null;
   }
 
-  // Validate action parameter - only allow the three valid actions
   const validActions = ["signup", "login", "reset_password"];
   if (!validActions.includes(action)) {
     error.value =
@@ -100,7 +95,6 @@ const parseUrlParams = () => {
   return { account, answer_id, action };
 };
 
-// Call backend verification API
 const verifyAuthentication = async (params) => {
   try {
     const response = await fetch("/api/auth/verify/", {
@@ -108,7 +102,7 @@ const verifyAuthentication = async (params) => {
       headers: {
         "Content-Type": "application/json",
       },
-      credentials: "include", // Include HttpOnly cookies
+      credentials: "include",
       body: JSON.stringify(params),
     });
 
@@ -129,53 +123,48 @@ const verifyAuthentication = async (params) => {
   }
 };
 
-// Store verification result in localStorage
 const storeVerificationResult = (action, expires_at, account) => {
   const authFlowState = {
     status: "verified",
     action: action,
-    account: account, // Add account information
+    account: account,
     expires_at: expires_at,
     verified_at: new Date().toISOString(),
   };
 
-  // Try multiple storage methods
   const stateString = JSON.stringify(authFlowState);
   localStorage.setItem("auth_flow", stateString);
   sessionStorage.setItem("auth_flow", stateString);
-  sessionStorage.setItem("auth_verification_data", stateString); // Backup key
+  sessionStorage.setItem("auth_verification_data", stateString);
 };
 
-// Get redirect path based on action
 const getRedirectPath = (action) => {
   switch (action) {
     case "login":
-      return "/"; // Redirect to homepage for login
+      return "/";
     case "signup":
-      return "/accounts/signup"; // Redirect back to accounts signup page
+      return "/signup";
     case "reset_password":
-      return "/accounts/reset"; // Redirect back to accounts reset password page
-    default:
-      return "/"; // Fallback to homepage
-  }
-};
-
-// Get return path for error state
-const getReturnPath = () => {
-  const action = parsedParams.value.action;
-  switch (action) {
-    case "signup":
-      return "/accounts/signup";
-    case "login":
-      return "/accounts/login";
-    case "reset_password":
-      return "/accounts/reset";
+      return "/reset";
     default:
       return "/";
   }
 };
 
-// Get display name for action
+const getReturnPath = () => {
+  const action = parsedParams.value.action;
+  switch (action) {
+    case "signup":
+      return "/signup";
+    case "login":
+      return "/login";
+    case "reset_password":
+      return "/reset";
+    default:
+      return "/";
+  }
+};
+
 const getActionDisplayName = () => {
   const action = parsedParams.value.action;
   switch (action) {
@@ -190,32 +179,28 @@ const getActionDisplayName = () => {
   }
 };
 
-// Retry verification
 const retryVerification = () => {
   error.value = null;
   loading.value = true;
   performVerification();
 };
 
-// Main verification logic
 const performVerification = async () => {
   try {
     const params = parseUrlParams();
     if (!params) {
-      return; // Error already set in parseUrlParams
+      return;
     }
 
     parsedParams.value = params;
 
     const result = await verifyAuthentication(params);
 
-    // Store the verification result
     storeVerificationResult(result.action, result.expires_at, params.account);
 
     success.value = true;
     loading.value = false;
 
-    // If login, notify other parts of the app to refresh auth state
     try {
       if (result.action === "login") {
         window.dispatchEvent(new CustomEvent("auth-state-changed"));
@@ -223,12 +208,9 @@ const performVerification = async () => {
     } catch (e) {
       console.warn("Could not dispatch auth-state-changed event:", e);
     }
-    // Redirect based on action
     const redirectPath = getRedirectPath(result.action);
 
-    // Small delay to show success state, then redirect
     setTimeout(() => {
-      // Pass verification state in URL as backup
       const urlParams = new URLSearchParams({
         verified: "true",
         account: params.account,
@@ -249,7 +231,6 @@ const performVerification = async () => {
   }
 };
 
-// Component lifecycle
 onMounted(() => {
   performVerification();
 });

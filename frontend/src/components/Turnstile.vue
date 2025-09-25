@@ -1,6 +1,5 @@
 <template>
   <div class="turnstile-container">
-    <!-- Error State -->
     <div v-if="error" class="rounded-lg bg-red-50 p-4 mb-4">
       <div class="flex">
         <div class="ml-3">
@@ -23,19 +22,14 @@
       </div>
     </div>
 
-    <!-- Turnstile Widget Wrapper - Always render this to ensure DOM container exists -->
     <div v-else class="turnstile-widget-wrapper">
-      <!-- Loading State -->
       <div v-if="loading" class="text-center">
-        <div
-          class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"
-        ></div>
+        <Icon name="loading" class="h-8 w-8 text-indigo-600 mx-auto" />
         <p class="mt-2 text-sm/6 text-gray-500">
           Loading security verification...
         </p>
       </div>
 
-      <!-- Success State -->
       <div v-else-if="token" class="rounded-lg bg-green-50 p-4">
         <div class="flex">
           <div class="ml-3">
@@ -49,7 +43,6 @@
         </div>
       </div>
 
-      <!-- Widget Content -->
       <div v-else>
         <div v-if="showTitle" class="text-center mb-4">
           <h3 class="text-lg/7 font-medium text-gray-900 mb-2">
@@ -69,8 +62,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import Icon from "./Icon.vue";
 
-// Props
 const props = defineProps({
   size: {
     type: String,
@@ -88,17 +81,13 @@ const props = defineProps({
   },
 });
 
-// Emits
 const emit = defineEmits(["token", "error", "expired", "ready"]);
 
-// Reactive state
 const loading = ref(true);
 const error = ref(null);
 const token = ref(null);
 const siteKey = ref(import.meta.env.VITE_TURNSTILE_SITE_KEY);
 
-// Allow a local/dev mock token when real Turnstile cannot be loaded.
-// Enable by setting VITE_TURNSTILE_MOCK=true in your .env (only for local/dev).
 const allowMock =
   import.meta.env.VITE_TURNSTILE_MOCK === "true" ||
   location.hostname === "localhost" ||
@@ -120,15 +109,12 @@ const fallbackToMock = () => {
   return true;
 };
 
-// Widget management
 let turnstileWidget = null;
 
-// Generate unique container ID for this instance
 const containerId = `turnstile-widget-${Math.random()
   .toString(36)
   .slice(2, 11)}`;
 
-// Success callback
 const onSuccess = (receivedToken) => {
   token.value = receivedToken;
   loading.value = false;
@@ -136,7 +122,6 @@ const onSuccess = (receivedToken) => {
   emit("ready");
 };
 
-// Error callback
 const onError = (errorCode) => {
   console.error("Turnstile error:", errorCode);
   const errorMessage = "Security verification failed. Please try again.";
@@ -145,7 +130,6 @@ const onError = (errorCode) => {
   emit("error", errorMessage);
 };
 
-// Expired callback
 const onExpired = () => {
   console.log("Turnstile expired");
   token.value = null;
@@ -154,7 +138,6 @@ const onExpired = () => {
   emit("expired", errorMessage);
 };
 
-// Load Turnstile script
 const loadTurnstile = () => {
   return new Promise((resolve, reject) => {
     if (window.turnstile) {
@@ -174,8 +157,6 @@ const loadTurnstile = () => {
     script.async = true;
     script.addEventListener("load", resolve);
     script.addEventListener("error", (ev) => {
-      // If loading the script errors and we're allowed to mock, resolve so caller
-      // will render the mock token state; otherwise reject to surface the error.
       if (allowMock) {
         console.warn(
           "Turnstile script failed to load; allowMock=true -> using mock token",
@@ -189,17 +170,11 @@ const loadTurnstile = () => {
   });
 };
 
-// Render the Turnstile widget
 const renderWidget = async () => {
-  // Set loading to false first to ensure DOM is rendered
   loading.value = false;
 
-  // Wait for DOM to be ready
   await nextTick();
-  await nextTick();
-  await nextTick(); // Extra wait to ensure DOM is fully rendered
 
-  // Try to find the container with retries
   let container = null;
   let attempts = 0;
   const maxAttempts = 10;
@@ -219,7 +194,6 @@ const renderWidget = async () => {
     return;
   }
 
-  // Clear any existing content
   container.innerHTML = "";
 
   try {
@@ -238,7 +212,6 @@ const renderWidget = async () => {
   }
 };
 
-// Cleanup widget
 const cleanupWidget = () => {
   if (turnstileWidget && window.turnstile) {
     try {
@@ -249,14 +222,12 @@ const cleanupWidget = () => {
   }
   turnstileWidget = null;
 
-  // Clear the container
   const container = document.getElementById(containerId);
   if (container) {
     container.innerHTML = "";
   }
 };
 
-// Reset turnstile
 const resetTurnstile = async () => {
   error.value = null;
   token.value = null;
@@ -264,11 +235,9 @@ const resetTurnstile = async () => {
 
   cleanupWidget();
 
-  // Re-render the widget
   if (window.turnstile) {
     await renderWidget();
   } else {
-    // If script not loaded, reload it
     try {
       await loadTurnstile();
       await renderWidget();
@@ -280,19 +249,16 @@ const resetTurnstile = async () => {
   }
 };
 
-// Expose methods for parent components
 defineExpose({
   resetTurnstile,
 });
 
-// Component lifecycle
 onMounted(async () => {
   try {
     await loadTurnstile();
     await renderWidget();
   } catch (err) {
     console.error("Failed to load Turnstile:", err);
-    // If mocking is allowed, try to fallback to a mock token so local dev isn't blocked
     const usedMock = fallbackToMock();
     if (usedMock) {
       return;

@@ -1,6 +1,5 @@
 <template>
   <div class="pagination-container">
-    <!-- Reviews Display -->
     <div class="space-y-6">
       <ReviewCard
         v-for="review in paginatedReviews"
@@ -13,16 +12,13 @@
       />
     </div>
 
-    <!-- No Reviews Message -->
     <div v-if="reviews.length === 0" class="text-center py-8">
       <p class="text-gray-500">No reviews found.</p>
     </div>
 
-    <!-- TailwindPlus Pagination Controls - Always Display -->
     <div
       class="mt-8 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6"
     >
-      <!-- Mobile pagination (always show) -->
       <div class="flex flex-1 justify-between sm:hidden">
         <button
           :disabled="currentPage === 1"
@@ -50,9 +46,7 @@
         </button>
       </div>
 
-      <!-- Desktop pagination -->
       <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <!-- Page Info -->
         <div>
           <p class="text-sm text-gray-700">
             Showing
@@ -65,13 +59,11 @@
           </p>
         </div>
 
-        <!-- Pagination Buttons with TailwindPlus styling -->
         <div v-if="totalPages > 0">
           <nav
             class="isolate inline-flex -space-x-px rounded-md shadow-xs"
             aria-label="Pagination"
           >
-            <!-- Previous Button -->
             <button
               :disabled="currentPage === 1"
               :class="[
@@ -86,7 +78,6 @@
               <ChevronLeftIcon class="size-5" aria-hidden="true" />
             </button>
 
-            <!-- Page Numbers -->
             <template v-for="page in visiblePages" :key="page">
               <span
                 v-if="page === '...'"
@@ -109,7 +100,6 @@
               </button>
             </template>
 
-            <!-- Next Button -->
             <button
               :disabled="currentPage === totalPages || totalPages === 0"
               :class="[
@@ -162,7 +152,6 @@ const emit = defineEmits(["reviewUpdated"]);
 
 const currentPage = ref(1);
 
-// Computed properties for pagination
 const totalPages = computed(() => {
   return Math.max(1, Math.ceil(props.reviews.length / props.pageSize));
 });
@@ -175,7 +164,6 @@ const endIndex = computed(() => {
   return startIndex.value + props.pageSize;
 });
 
-// Display indices (1-based for user display)
 const displayStartIndex = computed(() => {
   return props.reviews.length === 0 ? 0 : startIndex.value + 1;
 });
@@ -188,33 +176,27 @@ const paginatedReviews = computed(() => {
   return props.reviews.slice(startIndex.value, endIndex.value);
 });
 
-// Enhanced visible page numbers with ellipsis logic
 const visiblePages = computed(() => {
   const total = totalPages.value;
   const current = currentPage.value;
-  const delta = 2; // Number of pages to show around current page
+  const delta = 2;
 
-  // Always show at least page 1 for consistent UI
   if (total <= 1) {
     return [1];
   }
 
   if (total <= 7) {
-    // Show all pages if total is small
     return Array.from({ length: total }, (_, i) => i + 1);
   }
 
   const pages = [];
 
-  // Always show first page
   pages.push(1);
 
-  // Add ellipsis if needed
   if (current - delta > 2) {
     pages.push("...");
   }
 
-  // Add pages around current page
   const start = Math.max(2, current - delta);
   const end = Math.min(total - 1, current + delta);
 
@@ -222,12 +204,10 @@ const visiblePages = computed(() => {
     pages.push(i);
   }
 
-  // Add ellipsis if needed
   if (current + delta < total - 1) {
     pages.push("...");
   }
 
-  // Always show last page if not already included
   if (total > 1 && !pages.includes(total)) {
     pages.push(total);
   }
@@ -235,7 +215,6 @@ const visiblePages = computed(() => {
   return pages;
 });
 
-// Methods
 const goToPage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page;
@@ -246,10 +225,7 @@ const handleReviewUpdate = (updateData) => {
   emit("reviewUpdated", updateData);
 };
 
-// Reset to first page when reviews change, but ensure current page doesn't exceed total pages
-// Ensure currentPage stays within bounds whenever reviews or totalPages change
 watch([() => props.reviews, totalPages], ([, newTotalPages]) => {
-  // If currentPage is greater than the new total pages, clamp it to valid range
   if (currentPage.value > newTotalPages) {
     currentPage.value = Math.max(1, newTotalPages);
   }

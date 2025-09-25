@@ -20,7 +20,7 @@ const routes = [
   { path: "/reset", component: ResetPassword },
   { path: "/accounts/reset", component: ResetPassword },
   { path: "/callback", component: AuthCallback },
-  { path: "/course/:course_id", component: CourseDetail, props: true },
+  { path: "/course/:courseId", component: CourseDetail, props: true },
   {
     path: "/course/:courseId/review_search",
     component: CourseReviewSearch,

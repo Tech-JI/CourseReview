@@ -34,7 +34,6 @@
             </div>
           </div>
 
-          <!-- Search bar in header -->
           <div
             v-if="showSearchBar"
             class="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end self-center"
@@ -64,7 +63,6 @@
           </div>
 
           <div class="hidden sm:ml-6 sm:flex sm:items-center relative z-10">
-            <!-- User menu -->
             <div v-if="isAuthenticated" class="relative">
               <Menu as="div" class="relative">
                 <div>
@@ -121,7 +119,6 @@
           </div>
 
           <div class="-mr-2 flex items-center sm:hidden">
-            <!-- Mobile menu button -->
             <DisclosureButton
               class="relative inline-flex items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden"
             >
@@ -218,8 +215,6 @@ const showSearchBar = computed(() => {
   return route.path !== "/";
 });
 
-// useAuth already performs initial check and listens for auth-state-changed
-
 const performSearch = () => {
   const query = searchQuery.value.trim();
   if (query.length >= 2) {
@@ -230,6 +225,4 @@ const performSearch = () => {
     searchQuery.value = "";
   }
 };
-
-// getCookie imported from utils/cookies.js
 </script>
