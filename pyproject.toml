@@ -12,6 +12,7 @@ dependencies = [
     "django-crispy-forms>=2.3",
     "django-debug-toolbar>=5.0.1",
     "django-pipeline>=4.0.0",
+    "httpx>=0.28.1",
     "psycopg2-binary>=2.9.10",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.1",
@@ -22,6 +23,8 @@ dependencies = [
     "ptpython>=3.0.29",
     "djangorestframework>=3.16.0",
     "django-cors-headers>=4.7.0",
+    "django-redis",
+    "pyyaml>=6.0.2",
 ]
 
 [tool.uv]

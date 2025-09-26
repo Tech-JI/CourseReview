@@ -1,56 +1,39 @@
-import datetime
-import uuid
-import traceback
-
-import dateutil.parser
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count
-from django.http import (
-    HttpResponseBadRequest,
-    HttpResponseForbidden,
-    HttpResponseRedirect,
-    JsonResponse,
-)
-from django.shortcuts import redirect, render
-from django.urls import reverse
-from django.views.decorators.http import require_POST, require_safe
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.decorators import (
-    api_view,
-    authentication_classes,
-    permission_classes,
-)
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-
-
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return
-
-
 from apps.web.models import (
     Course,
     CourseMedian,
-    DistributiveRequirement,
     Instructor,
     Review,
     ReviewVote,
-    Student,
     Vote,
 )
-from apps.web.models.forms import ReviewForm, SignupForm
+
+from apps.web.models.forms import ReviewForm
+
 from apps.web.serializers import (
     CourseSearchSerializer,
     CourseSerializer,
     ReviewSerializer,
 )
+
 from lib import constants
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
+
+import datetime
+import uuid
+import dateutil.parser
+
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Count
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
 
 LIMITS = {
     "courses": 20,
@@ -103,113 +86,6 @@ def get_prior_course_id(request, current_course_id):
     request.session["prior_course_id"] = current_course_id
     request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
     return prior_course_id
-
-
-def signup(request):
-    if request.method == "POST":
-        form = SignupForm(request.POST)
-        if form.is_valid():
-            form.save_and_send_confirmation(request)
-            return render(request, "instructions.html")
-        else:
-            return render(request, "signup.html", {"form": form})
-
-    else:
-        return render(request, "signup.html", {"form": SignupForm()})
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
-def auth_login_api(request):
-    email = request.data.get("email", "").lower()
-    password = request.data.get("password", "")
-    next_url = request.data.get("next", "/courses")
-
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=400)
-
-    username = email.split("@")[0]
-    user = authenticate(username=username, password=password)
-
-    if user is not None:
-        if user.is_active:
-            login(request, user)
-            if "user_id" in request.session:
-                try:
-                    student = Student.objects.get(user=user)
-                    student.unauth_session_ids.append(request.session["user_id"])
-                    student.save()
-                except Student.DoesNotExist:
-                    student = Student.objects.create(
-                        user=user, unauth_session_ids=[request.session["user_id"]]
-                    )
-            request.session["user_id"] = user.username
-
-            return Response(
-                {"success": True, "next": next_url, "username": user.username}
-            )
-        else:
-            return Response(
-                {
-                    "error": "Please activate your account via the activation link first."
-                },
-                status=403,
-            )
-    else:
-        return Response({"error": "Invalid email or password"}, status=401)
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
-@permission_classes([AllowAny])
-def auth_logout_api(request):
-    """
-    API endpoint for user logout.
-    """
-    if request.user.is_authenticated:
-        try:
-            student = Student.objects.get(user=request.user)
-            if "user_id" in request.session:
-                if request.session["user_id"] in student.unauth_session_ids:
-                    student.unauth_session_ids.remove(request.session["user_id"])
-                    student.save()
-        except Student.DoesNotExist:
-            pass
-
-        logout(request)
-        request.session["userID"] = uuid.uuid4().hex
-        return Response({"success": True, "message": "Logged out successfully"})
-    else:
-        return Response(
-            {"success": False, "message": "User not authenticated"}, status=400
-        )
-
-
-@require_safe
-def confirmation(request):
-    link = request.GET.get("link")
-
-    if link:
-        try:
-            student = Student.objects.get(confirmation_link=link)
-        except Student.DoesNotExist:
-            return render(
-                request,
-                "confirmation.html",
-                {"error": "Confirmation code expired or does not exist."},
-            )
-
-        if student.user.is_active:
-            return render(request, "confirmation.html", {"already_confirmed": True})
-
-        student.user.is_active = True
-        student.user.save()
-        return render(request, "confirmation.html", {"already_confirmed": False})
-    else:
-        return render(
-            request, "confirmation.html", {"error": "Please provide confirmation code."}
-        )
 
 
 @api_view(["GET"])
@@ -320,11 +196,8 @@ def course_detail_api(request, course_id):
 
 
 @api_view(["DELETE"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def delete_review_api(request, course_id):
-    # Check if user is authenticated
-    if not request.user.is_authenticated:
-        return Response({"detail": "Authentication required"}, status=403)
     course = Course.objects.get(id=course_id)
     Review.objects.delete_reviews_for_user_course(user=request.user, course=course)
     serializer = CourseSerializer(course, context={"request": request})
@@ -403,7 +276,7 @@ def course_review_search_api(request, course_id):
     )
 
 
-@require_safe
+@api_view(["GET"])
 def medians(request, course_id):
     # retrieve course medians for term, and group by term for averaging
     medians_by_term = {}
@@ -420,7 +293,7 @@ def medians(request, course_id):
             }
         )
 
-    return JsonResponse(
+    return Response(
         {
             "medians": sorted(
                 [
@@ -437,13 +310,14 @@ def medians(request, course_id):
                 key=lambda x: numeric_value_of_term(x["term"]),
                 reverse=True,
             )
-        }
+        },
+        status=200,
     )
 
 
-@require_safe
+@api_view(["GET"])
 def course_professors(request, course_id):
-    return JsonResponse(
+    return Response(
         {
             "professors": sorted(
                 set(
@@ -459,46 +333,40 @@ def course_professors(request, course_id):
                     .distinct()
                 )
             )
-        }
+        },
+        status=200,
     )
 
 
-@require_safe
+@api_view(["GET"])
 def course_instructors(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
         instructors = course.get_instructors()
-        return JsonResponse(
-            {"instructors": [instructor.name for instructor in instructors]}
+        return Response(
+            {"instructors": [instructor.name for instructor in instructors]}, status=200
         )
     except Course.DoesNotExist:
-        return JsonResponse({"error": "Course not found"}, status=404)
+        return Response({"error": "Course not found"}, status=404)
 
 
-@require_POST
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def course_vote_api(request, course_id):
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
     try:
-        import json
-
-        if request.content_type == "application/json":
-            data = json.loads(request.body)
-            value = data["value"]
-            forLayup = data["forLayup"]
-        else:
-            value = request.POST["value"]
-            forLayup = request.POST["forLayup"]
-    except (KeyError, json.JSONDecodeError):
-        return HttpResponseBadRequest()
+        value = request.data["value"]
+        forLayup = request.data["forLayup"]
+    except KeyError:
+        return Response(
+            {"detail": "Missing required fields: value, forLayup"}, status=400
+        )
 
     category = Vote.CATEGORIES.DIFFICULTY if forLayup else Vote.CATEGORIES.QUALITY
     new_score, is_unvote, new_vote_count = Vote.objects.vote(
         int(value), course_id, category, request.user
     )
 
-    return JsonResponse(
+    return Response(
         {
             "new_score": new_score,
             "was_unvote": is_unvote,
@@ -508,7 +376,7 @@ def course_vote_api(request, course_id):
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def review_vote_api(request, review_id):
     """
     API endpoint for voting on reviews (kudos/dislike).
@@ -522,8 +390,6 @@ def review_vote_api(request, review_id):
     - dislike_count: updated dislike count
     - user_vote: user's current vote (True/False/None)
     """
-    if not request.user.is_authenticated:
-        return Response({"detail": "Authentication required"}, status=403)
 
     try:
         is_kudos = request.data.get("is_kudos")
@@ -558,7 +424,7 @@ def review_vote_api(request, review_id):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def get_user_review_api(request, course_id):
     """
     API endpoint to get the authenticated user's review for a specific course.
@@ -568,8 +434,6 @@ def get_user_review_api(request, course_id):
     - 404 if no review found
     - 403 if user is not authenticated
     """
-    if not request.user.is_authenticated:
-        return Response({"detail": "Authentication required"}, status=403)
 
     try:
         # Get the course
