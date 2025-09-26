@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from apps.web.models import Student
 
 PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
+PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
 OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
 QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
 EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
@@ -197,24 +198,48 @@ async def get_latest_answer(
     )
 
 
-def validate_password_strength(password) -> tuple[bool, dict | None]:
+def rate_password_strength(password: str) -> int:
+    """Helper function to rate password strength"""
+
+    if len(password) < PASSWORD_LENGTH_MIN or len(password) > PASSWORD_LENGTH_MAX:
+        return 0
+
+    score = 1
+
+    if re.search(r"[a-z]", password):
+        score += 1
+    if re.search(r"[A-Z]", password):
+        score += 1
+    if re.search(r"\d", password):
+        score += 1
+    if re.search(r"[^a-zA-Z0-9\s]", password):
+        score += 1
+
+    length_step = (PASSWORD_LENGTH_MAX - PASSWORD_LENGTH_MIN) // 10
+
+    score += (len(password) - PASSWORD_LENGTH_MIN) // length_step
+
+    return min(score, 5)
+
+
+def validate_password_strength(password: str) -> tuple[bool, dict | None]:
     """Helper function to validate password complexity and strength.
 
     Returns: A tuple of (is_valid, error_response).
     `is_valid` is True if the password is valid, otherwise False.
     `error_response` is a dict with a detailed error message if invalid, otherwise None.
     """
-    # Quick length check first
-    if len(password) < PASSWORD_LENGTH_MIN:
+
+    score = rate_password_strength(password)
+
+    if score == 0:
         return False, {
-            "error": f"Password must be equal to or more than {PASSWORD_LENGTH_MIN} characters long.",
+            "error": "Password is too short or too long.",
         }
 
-    # Single regex pattern to check all character requirements at once
-    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$"
-    if not re.match(pattern, password):
+    if score < 3:
         return False, {
-            "error": "Password must contain at least one uppercase letter, one lowercase letter, and one numeric digit.",
+            "error": "Password is too weak.",
         }
 
     # Use Django's built-in validators for additional checks

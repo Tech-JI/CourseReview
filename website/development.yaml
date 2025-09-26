@@ -129,5 +129,6 @@ AUTH:
   TOKEN_RATE_LIMIT: 5 # max 5 callback attempts per temp_token
   TOKEN_RATE_LIMIT_TIME: 600 # 10 minutes window
   PASSWORD_LENGTH_MIN: 10
+  PASSWORD_LENGTH_MAX: 32
   QUEST_BASE_URL: "https://wj.sjtu.edu.cn/api/v1/public/export"
   EMAIL_DOMAIN_NAME: "sjtu.edu.cn"
