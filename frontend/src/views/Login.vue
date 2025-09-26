@@ -219,7 +219,7 @@ const handleLogin = async () => {
         "X-CSRFToken": getCookie("csrftoken"),
       },
       body: JSON.stringify({
-        email: email.value,
+        account: email.value,
         password: password.value,
         turnstile_token: turnstileToken.value,
       }),

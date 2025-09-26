@@ -29,12 +29,6 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return
 
 
-LIMITS = {
-    "courses": 20,
-    "reviews": 5,
-    "unauthenticated_review_search": 3,
-}
-
 OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
 TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
 ACTION_LIST = settings.AUTH["ACTION_LIST"]
@@ -78,9 +72,8 @@ def auth_initiate_api(request):
         return error_response
 
     # Generate cryptographically secure OTP and temp_token
-    otp_bytes = secrets.token_bytes(6)
-    otp = base64.b64encode(otp_bytes).decode("ascii")[:8]  # 8-digit OTP
-    temp_token = secrets.token_urlsafe(32)  # 256-bit temp_token
+    otp = "".join([str(secrets.randbelow(10)) for _ in range(8)])
+    temp_token = secrets.token_urlsafe(32)
 
     # Create Redis storage and clean up existing tokens
     r = get_redis_connection("default")
@@ -443,13 +436,13 @@ def auth_reset_password_api(request) -> Response:
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
-    email = request.data.get("email", "")
+    account = request.data.get("account", "")
     password = request.data.get("password", "")
     turnstile_token = request.data.get("turnstile_token", "")
 
-    if not email or not password or not turnstile_token:
+    if not account or not password or not turnstile_token:
         return Response(
-            {"error": "Email, password, and Turnstile token are missing"}, status=400
+            {"error": "Account, password, and Turnstile token are missing"}, status=400
         )
 
     client_ip = (
@@ -465,24 +458,13 @@ def auth_login_api(request) -> Response:
     if not success:
         return error_response
 
-    username = email.split("@")[0]
-    user = authenticate(username=username, password=password)
+    user = authenticate(username=account, password=password)
 
-    if user is not None:
-        if user.is_active:
-            login(request, user)
-            # Link user to a student profile
-            Student.objects.get_or_create(user=user)
-            request.session["user_id"] = user.username
-
-            return Response({"success": True, "username": user.username})
-        return Response(
-            {
-                "error": "Please activate your account via the activation link first.",
-            },
-            status=403,
-        )
-    return Response({"error": "Invalid email or password"}, status=401)
+    if user is not None and user.is_active:
+        login(request, user)
+        Student.objects.get_or_create(user=user)
+        return Response({"message": "Login successfully"}, status=200)
+    return Response({"error": "Invalid account or password"}, status=401)
 
 
 @api_view(["POST"])

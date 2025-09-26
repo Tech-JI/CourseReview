@@ -10,15 +10,22 @@
 export function calculatePasswordStrength(password) {
   if (!password) return 0;
 
-  let score = 0;
-  if (password.length < 10) return 1;
-  if (password.length >= 12) score += 1;
-  if (password.length >= 16) score += 1;
+  const minLength = 10;
+  const maxLength = 32;
+
+  if (password.length < minLength || password.length > maxLength) {
+    return 0;
+  }
+
+  let score = 1;
 
   if (/[a-z]/.test(password)) score += 1;
   if (/[A-Z]/.test(password)) score += 1;
   if (/[0-9]/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  if (/[^A-Za-z0-9\s]/.test(password)) score += 1;
+
+  const lengthStep = Math.floor((maxLength - minLength) / 10);
+  score += Math.floor((password.length - minLength) / lengthStep);
 
   return Math.min(score, 5);
 }
