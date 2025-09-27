@@ -18,11 +18,15 @@ class ReviewManager(models.Manager):
         """
         Get the review written by a user for a specific course.
         Returns the Review object if found, None otherwise.
+        If multiple reviews exist, returns the most recent one.
         """
         try:
             return self.get(user=user, course=course)
         except self.model.DoesNotExist:
             return None
+        except self.model.MultipleObjectsReturned:
+            # If somehow there are multiple reviews, return the most recent one
+            return self.filter(user=user, course=course).order_by("-created_at").first()
 
 
 class Review(models.Model):

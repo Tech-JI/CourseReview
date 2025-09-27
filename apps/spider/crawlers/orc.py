@@ -39,8 +39,9 @@ INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
 
 
 def crawl_program_urls():
+    program_urls = set()  # Initialize to empty set
     for orc_url in [UNDERGRAD_URL]:
-        program_urls = _get_department_urls_from_url(orc_url)
+        program_urls.update(_get_department_urls_from_url(orc_url))
     return program_urls
 
 
@@ -58,7 +59,11 @@ def _is_department_url(candidate_url):
 
 def _crawl_course_data(course_url):
     soup = retrieve_soup(course_url)
-    course_heading = soup.find("h2").get_text()
+    course_heading_element = soup.find("h2")
+    if course_heading_element is None:
+        return None  # Return early if no h2 element found
+
+    course_heading = course_heading_element.get_text()
     if course_heading:
         split_course_heading = course_heading.split(" – ")
         children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
