@@ -23,17 +23,8 @@ mkdir -p website/static
 
 # Step 7: Create .env file for storing secrets
 echo "[INFO] Creating .env file..."
-cat > .env << 'EOL'
-   # PostgreSQL
-   DB_USER=admin
-   DB_PASSWORD=test
-   DB_HOST=localhost
-   DB_PORT=5432
-   REDIS_URL=redis://localhost:6379/0
-   SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
-   DEBUG=True
-   OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
-EOL
+echo "[INFO] Secret config should be manually added. "
+cp .env.example .env
 
 # Step 8: Build static files
 echo "[INFO] Building static files..."
@@ -54,7 +45,17 @@ docker run -d --name coursereview-postgres -p 5432:5432 \
 
 # Wait for PostgreSQL to be ready
 echo "[INFO] Waiting for PostgreSQL to be ready..."
-sleep 15
+POSTGRES_MAX_RETRIES=8
+POSTGRES_WAIT_TIME=2
+until docker exec coursereview-postgres pg_isready -U admin; do
+    POSTGRES_MAX_RETRIES=$((POSTGRES_MAX_RETRIES - 1))
+    if [ $POSTGRES_MAX_RETRIES -eq 0 ]; then
+        echo "[ERROR] PostgreSQL is not ready after multiple attempts"
+        exit 1
+    fi
+    echo "[INFO] Waiting for PostgreSQL... $POSTGRES_MAX_RETRIES attempts remaining"
+    sleep $POSTGRES_WAIT_TIME
+done
 
 # Check if PostgreSQL container is running
 if docker ps | grep coursereview-postgres > /dev/null; then
@@ -76,7 +77,17 @@ docker run -d --name valkey-cache -p 6379:6379 \
 
 # Wait for Valkey to be ready
 echo "[INFO] Waiting for Valkey to be ready..."
-sleep 8
+VALKEY_MAX_RETRIES=8
+VALKEY_WAIT_TIME=2
+until docker exec valkey-cache redis-cli ping; do
+    VALKEY_MAX_RETRIES=$((VALKEY_MAX_RETRIES - 1))
+    if [ $VALKEY_MAX_RETRIES -eq 0 ]; then
+        echo "[ERROR] Valkey is not ready after multiple attempts"
+        exit 1
+    fi
+    echo "[INFO] Waiting for Valkey... $VALKEY_MAX_RETRIES attempts remaining"
+    sleep $VALKEY_WAIT_TIME
+done
 
 # Check if Valkey container is running
 if docker ps | grep valkey-cache > /dev/null; then
@@ -96,7 +107,7 @@ make createsuperuser
 
 echo "[INFO] Setting up admin permissions..."
 # Execute the Python commands to make the last user an admin
-uv run python manage.py shell << 'EOF'
+make shell << 'EOF'
 from django.contrib.auth.models import User
 u = User.objects.last()
 if u:
