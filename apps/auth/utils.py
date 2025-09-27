@@ -14,7 +14,7 @@ from apps.web.models import Student
 
 PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
 PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
-OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
+OTP_TIMEOUT = settings.AUTH["OTP_TIMEOUT"]
 QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
 EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
 
@@ -65,7 +65,7 @@ async def verify_turnstile_token(
     """Helper function to verify Turnstile token with Cloudflare's API"""
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.post(
                 "https://challenges.cloudflare.com/turnstile/v0/siteverify",
                 data={
@@ -129,7 +129,7 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,

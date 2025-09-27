@@ -29,9 +29,13 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return
 
 
-OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
+OTP_TIMEOUT = settings.AUTH["OTP_TIMEOUT"]
 TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
-ACTION_LIST = settings.AUTH["ACTION_LIST"]
+ACTION_LIST = [
+    "signup",
+    "login",
+    "reset_password",
+]
 TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
 
@@ -97,7 +101,7 @@ def auth_initiate_api(request):
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
     otp_data = {"temp_token": temp_token, "initiated_at": current_time}
-    r.setex(f"otp:{otp}", OTP_TIME_OUT, json.dumps(otp_data))
+    r.setex(f"otp:{otp}", OTP_TIMEOUT, json.dumps(otp_data))
 
     # Store temp_token with SHA256 hash as key, and status of pending as well as action
     temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
@@ -236,7 +240,7 @@ def verify_callback_api(request):
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
         # Additional validation: check submission is after initiation and within window
-        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIME_OUT:
+        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIMEOUT:
             return Response(
                 {"error": "Submission timestamp outside validity window"},
                 status=401,
