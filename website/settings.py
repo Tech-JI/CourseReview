@@ -1,4 +1,6 @@
 import os
+import json
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -154,7 +156,11 @@ SESSION_SAVE_EVERY_REQUEST = os.getenv("SESSION_SAVE_EVERY_REQUEST", "True") == 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(",")
+try:
+    ALLOWED_HOSTS = json.loads(os.getenv("ALLOWED_HOSTS", "[]"))
+except (json.JSONDecodeError, TypeError):
+    logging.error("Failed to parse ALLOWED_HOSTS.")
+    ALLOWED_HOSTS = []
 
 # OAuth settings
 AUTH = {
@@ -185,15 +191,11 @@ DEBUG = os.getenv("DEBUG") == "True"
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    CORS_ALLOWED_ORIGINS = [
-        origin.strip() for origin in CORS_ALLOWED_ORIGINS if origin.strip()
-    ]
-    CORS_ALLOWED_ORIGINS.extend(
-        [
-            FRONTEND_URL,
-        ]
-    )
+    try:
+        CORS_ALLOWED_ORIGINS = json.loads(os.getenv("CORS_ALLOWED_ORIGINS", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        logging.error("Failed to parse CORS_ALLOWED_ORIGINS.")
+        CORS_ALLOWED_ORIGINS = []
 
 
 # Database
