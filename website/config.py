@@ -1,7 +1,6 @@
 import os
 import yaml
 import collections.abc
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 from django.core.exceptions import ImproperlyConfigured
@@ -24,22 +23,31 @@ class Config:
     """
 
     def __init__(self, config_path: Path, defaults: dict[str, Any] | None = None):
-        self._defaults = defaults or {}
-        self._yaml_config = self._load_yaml(config_path)
-        self._env_config = self._load_from_env()
+        # 1. Load all sources of configuration.
+        default_config = defaults or {}
+        yaml_config = self._load_yaml(config_path)
+        env_config = self._load_from_env()
 
-    def _deep_merge(self, base: dict, new: dict) -> dict:
-        """Recursively merges `new` dict into `base` dict."""
+        # 2. Build the final config by merging sources in the correct order of priority.
+        # Start with an empty dict, merge defaults, then yaml, then env.
+        self._final_config = {}
+        self._deep_merge(self._final_config, default_config)
+        self._deep_merge(self._final_config, yaml_config)
+        self._deep_merge(self._final_config, env_config)
+
+    def _deep_merge(self, base: dict, new: dict) -> None:
+        """Recursively merges `new` dict into `base` dict in place."""
 
         for key, value in new.items():
-            if isinstance(base.get(key), dict) and isinstance(
+            base_value = base.get(key)
+            if isinstance(base_value, dict) and isinstance(
                 value, collections.abc.Mapping
             ):
-                base[key] = self._deep_merge(base.get(key, {}), value)
+                # If both the base and new values for a key are dicts, recurse.
+                self._deep_merge(base_value, value)
             else:
+                # Otherwise, the new value overwrites the base value.
                 base[key] = value
-
-        return base
 
     def _load_yaml(self, config_path: Path) -> dict[str, Any]:
         """Loads the YAML config file if it exists, otherwise returns an empty dict."""
@@ -59,25 +67,27 @@ class Config:
 
         env_config = {}
         for key, value in os.environ.items():
-            # Split by '__' to create a path for the nested dictionary
+            # Skip keys that don't contain our nesting separator to avoid noise
+            if "__" not in key:
+                # Handle simple top-level keys
+                env_config[key] = value
+                continue
+
             path = key.split("__")
             target = env_config
-            # Traverse/create the nested dict structure
-            for i, part in enumerate(path):
-                if i == len(path) - 1:
-                    target[part] = value
-                else:
-                    target = target.setdefault(part, {})
+            for part in path[:-1]:  # Iterate through the path to create nested dicts
+                target = target.setdefault(part, {})
+                if not isinstance(target, dict):
+                    raise ImproperlyConfigured(
+                        f"Environment variable conflict. '{key}' implies '{
+                            part
+                        }' is a dictionary, "
+                        "but it was previously defined as a scalar value."
+                    )
+
+            target[path[-1]] = value
 
         return env_config
-
-    def _get_from_path(self, source: dict, path: list[str]) -> Any | None:
-        """Safely retrieves a value from a nested dict using a path list."""
-
-        try:
-            return reduce(operator.getitem, path, source)
-        except (KeyError, TypeError):
-            return None
 
     def get(
         self, key: str, *, cast: Callable[[Any], T] | None = None, required: bool = True
@@ -103,50 +113,27 @@ class Config:
 
         path = key.split(".")
 
-        default_val = self._get_from_path(self._defaults, path)
-        yaml_val = self._get_from_path(self._yaml_config, path)
-        env_val = self._get_from_path(self._env_config, path)
-
-        # Determine final value based on priority and type
-        value = None
-        if isinstance(default_val, dict):
-            # For dictionaries, perform a deep merge
-            merged_val = deepcopy(default_val)
-            if isinstance(yaml_val, dict):
-                self._deep_merge(merged_val, yaml_val)
-            if isinstance(env_val, dict):
-                self._deep_merge(merged_val, env_val)
-            value = merged_val
-        else:
-            # For scalar values, prioritize env > yaml > default
-            if env_val is not None:
-                value = env_val
-            elif yaml_val is not None:
-                value = yaml_val
-            else:
-                value = default_val
-
-        if value is None:
+        try:
+            value = reduce(operator.getitem, path, self._final_config)
+        except (KeyError, TypeError):
             if required:
                 raise ImproperlyConfigured(
                     f"Required setting '{key}' is not defined in any source."
                 )
             return None
 
-        if cast is None:
-            return value
+        if cast is not None:
+            if cast is bool and isinstance(value, str):
+                return value.lower() in ("true", "1", "yes")
+            if cast is list and isinstance(value, str):
+                return [item.strip() for item in value.split(",")]
+            try:
+                return cast(value)
+            except (ValueError, TypeError) as e:
+                raise ImproperlyConfigured(
+                    f"Failed to cast setting '{key}' with value {value!r} to {
+                        cast.__name__
+                    }. Error: {e}"
+                )
 
-        # Perform smart casting for values that are likely strings (from env)
-        if cast is bool and isinstance(value, str):
-            return value.lower() in ("true", "1", "yes")
-        if cast is list and isinstance(value, str):
-            return [item.strip() for item in value.split(",")]
-
-        try:
-            return cast(value)
-        except (ValueError, TypeError) as e:
-            raise ImproperlyConfigured(
-                f"Failed to cast setting '{key}' with value {value!r} to {
-                    cast.__name__
-                }. Error: {e}"
-            )
+        return value
