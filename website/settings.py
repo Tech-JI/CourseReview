@@ -1,27 +1,106 @@
-import os
-import json
-import logging
+from pathlib import Path
+import dj_database_url
 from dotenv import load_dotenv
+from .config import Config
 
-load_dotenv()
 
-TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-SIGNUP_QUEST_API_KEY = os.getenv("SIGNUP_QUEST_API_KEY")
-SIGNUP_QUEST_URL = os.getenv("SIGNUP_QUEST_URL")
-SIGNUP_QUEST_QUESTIONID = os.getenv("SIGNUP_QUEST_QUESTIONID")
-LOGIN_QUEST_API_KEY = os.getenv("LOGIN_QUEST_API_KEY")
-LOGIN_QUEST_URL = os.getenv("LOGIN_QUEST_URL")
-LOGIN_QUEST_QUESTIONID = os.getenv("LOGIN_QUEST_QUESTIONID")
-RESET_QUEST_API_KEY = os.getenv("RESET_QUEST_API_KEY")
-RESET_QUEST_URL = os.getenv("RESET_QUEST_URL")
-RESET_QUEST_QUESTIONID = os.getenv("RESET_QUEST_QUESTIONID")
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-FRONTEND_URL = os.getenv("FRONTEND_URL")
+# --- Default Configuration ---
+DEFAULTS = {
+    "DEBUG": True,
+    "SECRET_KEY": "a-default-secret-key-for-development-only",
+    "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
+    "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
+    "FRONTEND_URL": "http://localhost:5173",
+    "SESSION": {
+        "COOKIE_AGE": 2592000,  # 30 days
+        "SAVE_EVERY_REQUEST": True,
+    },
+    "AUTH": {
+        "OTP_TIMEOUT": 120,
+        "TEMP_TOKEN_TIMEOUT": 600,
+        "TOKEN_RATE_LIMIT": 5,
+        "TOKEN_RATE_LIMIT_TIME": 600,
+        "PASSWORD_LENGTH_MIN": 10,
+        "PASSWORD_LENGTH_MAX": 32,
+        "EMAIL_DOMAIN_NAME": "sjtu.edu.cn",
+    },
+    "DATABASE": {"URL": "sqlite:///db.sqlite3"},
+    "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
+    "QUEST": {
+        "BASE_URL": "https://wj.sjtu.edu.cn/api/v1/public/export",
+    },
+    "AUTO_IMPORT_CRAWLED_DATA": True,
+}
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+config = Config(config_path=BASE_DIR / "config.yaml", defaults=DEFAULTS)
 
-# INSTALLED_APPS
+
+# ==============================================================================
+#  MANAGED SETTINGS (env > config.yaml > defaults)
+# ==============================================================================
+
+# --- Core Security & Behavior ---
+SECRET_KEY = config.get("SECRET_KEY")
+DEBUG = config.get("DEBUG", cast=bool)
+ALLOWED_HOSTS = config.get("ALLOWED_HOSTS", cast=list)
+CORS_ALLOWED_ORIGINS = config.get("CORS_ALLOWED_ORIGINS", cast=list)
+FRONTEND_URL = config.get("FRONTEND_URL")
+
+# --- Infrastructure ---
+DATABASES = {"default": dj_database_url.parse(config.get("DATABASE.URL"))}
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config.get("REDIS.URL"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": config.get("REDIS.MAX_CONNECTIONS", cast=int)
+            },
+        },
+        "KEY_PREFIX": "coursereview",
+    }
+}
+
+# --- Session Management ---
+SESSION_COOKIE_AGE = config.get("SESSION.COOKIE_AGE", cast=int)
+SESSION_SAVE_EVERY_REQUEST = config.get("SESSION.SAVE_EVERY_REQUEST", cast=bool)
+SESSION_COOKIE_SECURE = not DEBUG
+
+# --- Application-Specific Settings ---
+AUTH = config.get("AUTH")
+TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
+AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
+
+QUEST = {
+    "BASE_URL": config.get("QUEST.BASE_URL"),
+    "SIGNUP": {
+        "API_KEY": config.get("QUEST.SIGNUP.API_KEY"),
+        "URL": config.get("QUEST.SIGNUP.URL"),
+        "QUESTIONID": config.get("QUEST.SIGNUP.QUESTIONID", cast=int),
+    },
+    "LOGIN": {
+        "API_KEY": config.get("QUEST.LOGIN.API_KEY"),
+        "URL": config.get("QUEST.LOGIN.URL"),
+        "QUESTIONID": config.get("QUEST.LOGIN.QUESTIONID", cast=int),
+    },
+    "RESET": {
+        "API_KEY": config.get("QUEST.RESET.API_KEY"),
+        "URL": config.get("QUEST.RESET.URL"),
+        "QUESTIONID": config.get("QUEST.RESET.QUESTIONID", cast=int),
+    },
+}
+
+
+# ==============================================================================
+#  DJANGO FRAMEWORK SETTINGS
+# ==============================================================================
+# These settings define the application's structure and are not meant to be
+# configured.
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -39,7 +118,6 @@ INSTALLED_APPS = [
     "apps.auth",
 ]
 
-# MIDDLEWARE
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -53,30 +131,34 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "website.urls"
-
-# TEMPLATES
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    }
-]
-
 WSGI_APPLICATION = "website.wsgi.application"
+# TEMPLATES = [
+#     {
+#         "BACKEND": "django.template.backends.django.DjangoTemplates",
+#         "DIRS": [],
+#         "APP_DIRS": True,
+#         "OPTIONS": {
+#             "context_processors": [
+#                 "django.template.context_processors.debug",
+#                 "django.template.context_processors.request",
+#                 "django.contrib.auth.context_processors.auth",
+#                 "django.contrib.messages.context_processors.messages",
+#             ]
+#         },
+#     }
+# ]
 
-# django.contrib.staticfiles requires STATIC_URL to be set. Not actually used.
-STATIC_URL = "/dummy/"
+STATIC_URL = "/dummy/"  # Required by Django staticfiles but not used in this setup
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Password validation
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "Asia/Shanghai"
+USE_I18N = True
+USE_TZ = True
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
@@ -86,89 +168,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-AUTO_IMPORT_CRAWLED_DATA = os.getenv("AUTO_IMPORT_CRAWLED_DATA", "True") == "True"
-
-# Internationalization
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
-USE_I18N = True
-USE_TZ = True
-
-# Default primary key field type
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# Session settings
-SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", "2592000"))
-SESSION_SAVE_EVERY_REQUEST = os.getenv("SESSION_SAVE_EVERY_REQUEST", "True") == "True"
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-SESSION_CACHE_ALIAS = "default"
-
-try:
-    ALLOWED_HOSTS = json.loads(os.getenv("ALLOWED_HOSTS", "[]"))
-except (json.JSONDecodeError, TypeError):
-    logging.error("Failed to parse ALLOWED_HOSTS.")
-    ALLOWED_HOSTS = []
-
-# OAuth settings
-AUTH = {
-    "OTP_TIMEOUT": int(os.getenv("OTP_TIMEOUT", "120")),
-    "TEMP_TOKEN_TIMEOUT": int(os.getenv("TEMP_TOKEN_TIMEOUT", "600")),
-    "TOKEN_RATE_LIMIT": int(os.getenv("TOKEN_RATE_LIMIT", "5")),
-    "TOKEN_RATE_LIMIT_TIME": int(os.getenv("TOKEN_RATE_LIMIT_TIME", "600")),
-    "PASSWORD_LENGTH_MIN": int(os.getenv("PASSWORD_LENGTH_MIN", "10")),
-    "PASSWORD_LENGTH_MAX": int(os.getenv("PASSWORD_LENGTH_MAX", "32")),
-    "QUEST_BASE_URL": os.getenv(
-        "QUEST_BASE_URL", "https://wj.sjtu.edu.cn/api/v1/public/export"
-    ),
-    "EMAIL_DOMAIN_NAME": os.getenv("EMAIL_DOMAIN_NAME", "sjtu.edu.cn"),
-}
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG") == "True"
-
-
-# Rest Framework
-
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    try:
-        CORS_ALLOWED_ORIGINS = json.loads(os.getenv("CORS_ALLOWED_ORIGINS", "[]"))
-    except (json.JSONDecodeError, TypeError):
-        logging.error("Failed to parse CORS_ALLOWED_ORIGINS.")
-        CORS_ALLOWED_ORIGINS = []
-
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "coursereview"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-    }
-}
-
-SESSION_COOKIE_SECURE = not DEBUG
-
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {"max_connections": 100},
-        },
-        "KEY_PREFIX": "coursereview",
-    }
-}
+    CORS_ALLOW_ALL_ORIGINS = False
