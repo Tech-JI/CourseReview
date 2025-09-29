@@ -30,11 +30,11 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 
 
 AUTH_SETTINGS = settings.AUTH
-OTP_TIMEOUT = AUTH_SETTINGS["otp_timeout"]
-TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["temp_token_timeout"]
+OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
 ACTION_LIST = ["signup", "login", "reset_password"]
-TOKEN_RATE_LIMIT = AUTH_SETTINGS["token_rate_limit"]
-TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["token_rate_limit_time"]
+TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
+TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 
 
 @api_view(["POST"])
@@ -113,10 +113,10 @@ def auth_initiate_api(request):
 
     logging.info(f"Created auth intent for action {action} with OTP and temp_token")
 
-    survey_details = utils.get_survey_details(action)
-    if not survey_details:
+    details = utils.get_survey_details(action)
+    if not details:
         return Response({"error": "Invalid action"}, status=400)
-    survey_url = survey_details.get("url")
+    survey_url = details.get("URL")
     if not survey_url:
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},

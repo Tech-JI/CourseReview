@@ -13,13 +13,13 @@ from rest_framework.response import Response
 from apps.web.models import Student
 
 AUTH_SETTINGS = settings.AUTH
-PASSWORD_LENGTH_MIN = AUTH_SETTINGS["password_length_min"]
-PASSWORD_LENGTH_MAX = AUTH_SETTINGS["password_length_max"]
-OTP_TIMEOUT = AUTH_SETTINGS["otp_timeout"]
-EMAIL_DOMAIN_NAME = AUTH_SETTINGS["email_domain_name"]
+PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
+PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
+OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
 
 QUEST_SETTINGS = settings.QUEST
-QUEST_BASE_URL = QUEST_SETTINGS["base_url"]
+QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
 
 
 def get_survey_details(action: str) -> dict[str, any] | None:
@@ -28,23 +28,23 @@ def get_survey_details(action: str) -> dict[str, any] | None:
     Valid actions: "signup", "login", "reset".
     """
 
-    action_details = QUEST_SETTINGS.get(action.lower())
+    action_details = QUEST_SETTINGS.get(action.upper())
 
     if not action_details:
         logging.error(f"Invalid quest action requested: {action}")
         return None
 
     try:
-        question_id = int(action_details.get("questionid"))
+        question_id = int(action_details.get("QUESTIONID"))
     except (ValueError, TypeError):
         logging.error(
-            f"Could not parse 'questionid' for action '{action}'. Check your settings."
+            f"Could not parse 'QUESTIONID' for action '{action}'. Check your settings."
         )
         return None
 
     return {
-        "url": action_details.get("url"),
-        "api_key": action_details.get("api_key"),
+        "url": action_details.get("URL"),
+        "api_key": action_details.get("API_KEY"),
         "question_id": question_id,
     }
 
