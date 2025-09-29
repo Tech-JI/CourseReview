@@ -31,6 +31,21 @@ DEFAULTS = {
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
     "QUEST": {
         "BASE_URL": "https://wj.sjtu.edu.cn/api/v1/public/export",
+        "SIGNUP": {
+            "API_KEY": None,
+            "URL": None,
+            "QUESTIONID": None,
+        },
+        "LOGIN": {
+            "API_KEY": None,
+            "URL": None,
+            "QUESTIONID": None,
+        },
+        "RESET": {
+            "API_KEY": None,
+            "URL": None,
+            "QUESTIONID": None,
+        },
     },
     "AUTO_IMPORT_CRAWLED_DATA": True,
 }
@@ -75,24 +90,7 @@ AUTH = config.get("AUTH")
 TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
 AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 
-QUEST = {
-    "BASE_URL": config.get("QUEST.BASE_URL"),
-    "SIGNUP": {
-        "API_KEY": config.get("QUEST.SIGNUP.API_KEY"),
-        "URL": config.get("QUEST.SIGNUP.URL"),
-        "QUESTIONID": config.get("QUEST.SIGNUP.QUESTIONID", cast=int),
-    },
-    "LOGIN": {
-        "API_KEY": config.get("QUEST.LOGIN.API_KEY"),
-        "URL": config.get("QUEST.LOGIN.URL"),
-        "QUESTIONID": config.get("QUEST.LOGIN.QUESTIONID", cast=int),
-    },
-    "RESET": {
-        "API_KEY": config.get("QUEST.RESET.API_KEY"),
-        "URL": config.get("QUEST.RESET.URL"),
-        "QUESTIONID": config.get("QUEST.RESET.QUESTIONID", cast=int),
-    },
-}
+QUEST = config.get("QUEST")
 
 
 # ==============================================================================
