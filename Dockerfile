@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.13-trixie-slim
+FROM ghcr.io/astral-sh/uv:alpine3.22
 
 # Setup a non-root user
 RUN groupadd --system --gid 999 nonroot && useradd --system --gid 999 --uid 999 --create-home nonroot
@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/root/.cache/uv --mount=type=bind,source=uv.lock,t
 COPY . /app
 
 # Make sure the entrypoint script is executable
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/scripts/entrypoint.sh
 
 # Install the project dependencies as root, then change ownership to nonroot
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev
@@ -34,4 +34,4 @@ ENTRYPOINT []
 # Use non-root user
 USER nonroot
 
-CMD ["/app/entrypoint.sh"]
+CMD ["/app/scripts/entrypoint.sh"]

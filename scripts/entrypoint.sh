@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-/bin/bash ./deploy.sh
+/bin/bash ./scripts/deploy.sh
 exec make run
