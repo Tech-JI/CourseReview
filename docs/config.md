@@ -2,7 +2,7 @@
 
 Use YAML and environment variables for robust and secure configuration. All the customizable fields can be specified in `config.yaml` and environment variables (or `.env` file at local dev).
 
-## TL;DR:
+## TL;DR
 
 1. Copy `.env.example` file to `.env`, fill in:
    - `SECRET_KEY`
@@ -14,7 +14,7 @@ Use YAML and environment variables for robust and secure configuration. All the 
 2. Copy `config.yaml.example` to `config.yaml`, fill in:
    - `DEBUG`: `true` if at dev, `false` if in production
    - `URL` and `QUESTIONID` in all actions in `QUEST`
-   - (If at production) backend domains in `ALLOWED_HOSTS`, frontend domains in `CORS_ALLOWED_ORIGINS`
+   - (If in production) backend domains in `ALLOWED_HOSTS`, frontend domains in `CORS_ALLOWED_ORIGINS`
 3. That's it!
 
 ## Priority
@@ -147,7 +147,7 @@ QUEST:
 
 - Just for example.
 - `settings.py` should **NOT** be modified by non-developers.
-- The fields whose default values are `None` indicates the fields are required either in env or in `config.yaml`.
+- The fields whose default values are `None` are mandatory, either in env or in `config.yaml`.
 
 ```python path=website/settings.py
 # --- Default Configuration ---
