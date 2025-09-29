@@ -1,11 +1,12 @@
 import os
 import yaml
+import collections.abc
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 from django.core.exceptions import ImproperlyConfigured
 from functools import reduce
 import operator
-import collections.abc
 
 # Generic TypeVar for casting function return values
 T = TypeVar("T")
@@ -19,45 +20,26 @@ class Config:
     3. Hardcoded Default Values
 
     Raises ImproperlyConfigured if a required setting is not found in any source.
+    This class respects case-sensitivity for setting keys to align with Django conventions.
     """
 
     def __init__(self, config_path: Path, defaults: dict[str, Any] | None = None):
-        # 1. Start with normalized defaults
-        self._final_config = self._normalize_keys_to_lower(defaults or {})
+        self._defaults = defaults or {}
+        self._yaml_config = self._load_yaml(config_path)
+        self._env_config = self._load_from_env()
 
-        # 2. Load and merge normalized YAML config
-        yaml_config = self._normalize_keys_to_lower(self._load_yaml(config_path))
-        self._final_config = self._deep_merge(self._final_config, yaml_config)
+    def _deep_merge(self, base: dict, new: dict) -> dict:
+        """Recursively merges `new` dict into `base` dict."""
 
-        # 3. Load and merge environment variables (already produces lowercase keys)
-        env_config = self._load_from_env()
-        self._final_config = self._deep_merge(self._final_config, env_config)
-
-    def _normalize_keys_to_lower(self, obj: Any) -> Any:
-        """Recursively converts all dictionary keys in an object to lowercase."""
-
-        if isinstance(obj, dict):
-            return {
-                str(key).lower(): self._normalize_keys_to_lower(value)
-                for key, value in obj.items()
-            }
-        if isinstance(obj, list):
-            return [self._normalize_keys_to_lower(item) for item in obj]
-
-        return obj
-
-    def _deep_merge(self, base_dict: dict, new_dict: dict) -> dict:
-        """Recursively merges new_dict into base_dict."""
-
-        for key, value in new_dict.items():
-            if isinstance(base_dict.get(key), dict) and isinstance(
+        for key, value in new.items():
+            if isinstance(base.get(key), dict) and isinstance(
                 value, collections.abc.Mapping
             ):
-                base_dict[key] = self._deep_merge(base_dict[key], value)
+                base[key] = self._deep_merge(base.get(key, {}), value)
             else:
-                base_dict[key] = value
+                base[key] = value
 
-        return base_dict
+        return base
 
     def _load_yaml(self, config_path: Path) -> dict[str, Any]:
         """Loads the YAML config file if it exists, otherwise returns an empty dict."""
@@ -78,7 +60,7 @@ class Config:
         env_config = {}
         for key, value in os.environ.items():
             # Split by '__' to create a path for the nested dictionary
-            path = key.lower().split("__")
+            path = key.split("__")
             target = env_config
             # Traverse/create the nested dict structure
             for i, part in enumerate(path):
@@ -88,6 +70,14 @@ class Config:
                     target = target.setdefault(part, {})
 
         return env_config
+
+    def _get_from_path(self, source: dict, path: list[str]) -> Any | None:
+        """Safely retrieves a value from a nested dict using a path list."""
+
+        try:
+            return reduce(operator.getitem, path, source)
+        except (KeyError, TypeError):
+            return None
 
     def get(
         self, key: str, *, cast: Callable[[Any], T] | None = None, required: bool = True
@@ -111,10 +101,32 @@ class Config:
                                   or if casting fails.
         """
 
-        path = key.lower().split(".")
-        try:
-            value = reduce(operator.getitem, path, self._final_config)
-        except (KeyError, TypeError):
+        path = key.split(".")
+
+        default_val = self._get_from_path(self._defaults, path)
+        yaml_val = self._get_from_path(self._yaml_config, path)
+        env_val = self._get_from_path(self._env_config, path)
+
+        # Determine final value based on priority and type
+        value = None
+        if isinstance(default_val, dict):
+            # For dictionaries, perform a deep merge
+            merged_val = deepcopy(default_val)
+            if isinstance(yaml_val, dict):
+                self._deep_merge(merged_val, yaml_val)
+            if isinstance(env_val, dict):
+                self._deep_merge(merged_val, env_val)
+            value = merged_val
+        else:
+            # For scalar values, prioritize env > yaml > default
+            if env_val is not None:
+                value = env_val
+            elif yaml_val is not None:
+                value = yaml_val
+            else:
+                value = default_val
+
+        if value is None:
             if required:
                 raise ImproperlyConfigured(
                     f"Required setting '{key}' is not defined in any source."
@@ -124,7 +136,7 @@ class Config:
         if cast is None:
             return value
 
-        # Since env vars are strings, perform smart casting
+        # Perform smart casting for values that are likely strings (from env)
         if cast is bool and isinstance(value, str):
             return value.lower() in ("true", "1", "yes")
         if cast is list and isinstance(value, str):
