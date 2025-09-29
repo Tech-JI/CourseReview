@@ -13,7 +13,6 @@ DEFAULTS = {
     "SECRET_KEY": "a-default-secret-key-for-development-only",
     "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
     "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
-    "FRONTEND_URL": "http://localhost:5173",
     "SESSION": {
         "COOKIE_AGE": 2592000,  # 30 days
         "SAVE_EVERY_REQUEST": True,
@@ -63,7 +62,6 @@ SECRET_KEY = config.get("SECRET_KEY")
 DEBUG = config.get("DEBUG", cast=bool)
 ALLOWED_HOSTS = config.get("ALLOWED_HOSTS", cast=list)
 CORS_ALLOWED_ORIGINS = config.get("CORS_ALLOWED_ORIGINS", cast=list)
-FRONTEND_URL = config.get("FRONTEND_URL")
 
 # --- Infrastructure ---
 DATABASES = {"default": dj_database_url.parse(config.get("DATABASE.URL"))}
