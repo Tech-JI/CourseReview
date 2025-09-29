@@ -1,6 +1,7 @@
 import os
-import yaml
 from pathlib import Path
+
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +19,7 @@ RESET_QUEST_URL = os.getenv("RESET_QUEST_URL")
 RESET_QUEST_QUESTIONID = os.getenv("RESET_QUEST_QUESTIONID")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+print(">>> FRONTEND_URL =", FRONTEND_URL)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,7 +52,6 @@ else:
         "http://127.0.0.1:8080",
         "http://localhost:8080",
     ]
-
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

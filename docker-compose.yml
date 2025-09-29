@@ -29,7 +29,6 @@ services:
 
   backend:
     image: coursereview
-    build: .
     ports:
       - "8000:8000"
     depends_on:
@@ -42,10 +41,7 @@ services:
       - DB_PORT=5432
       - REDIS_URL=redis://cache:6379/0
       - DEBUG=False
-    volumes:
-      - static_volume:/app/staticfiles
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  static_volume:

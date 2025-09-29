@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
+
+echo $whoami
 
 echo "Starting application deployment inside container..."
 
@@ -28,7 +30,7 @@ if u:
     u.is_admin = True
     u.save()
     print(f"User {u.username} has been made an admin.")
-else
+else:
     print("No user found to make admin.")
 EOF
 

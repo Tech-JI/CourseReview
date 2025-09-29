@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
-/bin/bash ./scripts/deploy.sh
-exec make run
+/bin/sh ./scripts/deploy.sh
+exec uv run manage.py runserver  0.0.0.0:8000
