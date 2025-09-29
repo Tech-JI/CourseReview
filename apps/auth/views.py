@@ -29,15 +29,12 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return
 
 
-OTP_TIMEOUT = settings.AUTH["OTP_TIMEOUT"]
-TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
-ACTION_LIST = [
-    "signup",
-    "login",
-    "reset_password",
-]
-TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
-TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
+AUTH_SETTINGS = settings.AUTH
+OTP_TIMEOUT = AUTH_SETTINGS["otp_timeout"]
+TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["temp_token_timeout"]
+ACTION_LIST = ["signup", "login", "reset_password"]
+TOKEN_RATE_LIMIT = AUTH_SETTINGS["token_rate_limit"]
+TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["token_rate_limit_time"]
 
 
 @api_view(["POST"])

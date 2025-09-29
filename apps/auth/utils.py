@@ -12,11 +12,14 @@ from rest_framework.response import Response
 
 from apps.web.models import Student
 
-PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
-PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
-OTP_TIMEOUT = settings.AUTH["OTP_TIMEOUT"]
-EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
-QUEST_BASE_URL = settings.QUEST["BASE_URL"]
+AUTH_SETTINGS = settings.AUTH
+PASSWORD_LENGTH_MIN = AUTH_SETTINGS["password_length_min"]
+PASSWORD_LENGTH_MAX = AUTH_SETTINGS["password_length_max"]
+OTP_TIMEOUT = AUTH_SETTINGS["otp_timeout"]
+EMAIL_DOMAIN_NAME = AUTH_SETTINGS["email_domain_name"]
+
+QUEST_SETTINGS = settings.QUEST
+QUEST_BASE_URL = QUEST_SETTINGS["base_url"]
 
 
 def get_survey_url(action: str) -> str | None:
