@@ -5,6 +5,7 @@ from typing import Any, Callable, TypeVar
 from django.core.exceptions import ImproperlyConfigured
 from functools import reduce
 import operator
+import collections.abc
 
 # Generic TypeVar for casting function return values
 T = TypeVar("T")
@@ -12,7 +13,7 @@ T = TypeVar("T")
 
 class Config:
     """
-    A centralized, nested configuration loader with a defined priority order:
+    A robust, nested configuration loader that deeply merges settings from three sources:
     1. Environment Variables (using `PARENT__CHILD` for nesting)
     2. YAML Configuration File (`config.yaml`)
     3. Hardcoded Default Values
@@ -21,8 +22,42 @@ class Config:
     """
 
     def __init__(self, config_path: Path, defaults: dict[str, Any] | None = None):
-        self._yaml_config = self._load_yaml(config_path)
-        self._defaults = defaults or {}
+        # 1. Start with normalized defaults
+        self._final_config = self._normalize_keys_to_lower(defaults or {})
+
+        # 2. Load and merge normalized YAML config
+        yaml_config = self._normalize_keys_to_lower(self._load_yaml(config_path))
+        self._final_config = self._deep_merge(self._final_config, yaml_config)
+
+        # 3. Load and merge environment variables (already produces lowercase keys)
+        env_config = self._load_from_env()
+        self._final_config = self._deep_merge(self._final_config, env_config)
+
+    def _normalize_keys_to_lower(self, obj: Any) -> Any:
+        """Recursively converts all dictionary keys in an object to lowercase."""
+
+        if isinstance(obj, dict):
+            return {
+                str(key).lower(): self._normalize_keys_to_lower(value)
+                for key, value in obj.items()
+            }
+        if isinstance(obj, list):
+            return [self._normalize_keys_to_lower(item) for item in obj]
+
+        return obj
+
+    def _deep_merge(self, base_dict: dict, new_dict: dict) -> dict:
+        """Recursively merges new_dict into base_dict."""
+
+        for key, value in new_dict.items():
+            if isinstance(base_dict.get(key), dict) and isinstance(
+                value, collections.abc.Mapping
+            ):
+                base_dict[key] = self._deep_merge(base_dict[key], value)
+            else:
+                base_dict[key] = value
+
+        return base_dict
 
     def _load_yaml(self, config_path: Path) -> dict[str, Any]:
         """Loads the YAML config file if it exists, otherwise returns an empty dict."""
@@ -37,15 +72,22 @@ class Config:
                 f"Error reading YAML config at {config_path}: {e}"
             )
 
-    def _get_nested_val(
-        self, source_dict: dict[str, Any], path: list[str]
-    ) -> Any | None:
-        """Safely retrieves a nested value from a dictionary using a path list."""
+    def _load_from_env(self) -> dict[str, Any]:
+        """Parses environment variables like `AUTH__OTP_TIMEOUT` into a nested dict."""
 
-        try:
-            return reduce(operator.getitem, path, source_dict)
-        except (KeyError, TypeError):
-            return None
+        env_config = {}
+        for key, value in os.environ.items():
+            # Split by '__' to create a path for the nested dictionary
+            path = key.lower().split("__")
+            target = env_config
+            # Traverse/create the nested dict structure
+            for i, part in enumerate(path):
+                if i == len(path) - 1:
+                    target[part] = value
+                else:
+                    target = target.setdefault(part, {})
+
+        return env_config
 
     def get(
         self, key: str, *, cast: Callable[[Any], T] | None = None, required: bool = True
@@ -69,41 +111,30 @@ class Config:
                                   or if casting fails.
         """
 
-        # 1. Check Environment Variables (e.g., AUTH.OTP_TIMEOUT -> AUTH__OTP_TIMEOUT)
-        env_key = key.upper().replace(".", "__")
-        if (env_val := os.environ.get(env_key)) is not None:
-            value, source = env_val, f"environment variable ({env_key})"
-        else:
-            path = key.split(".")
-            # 2. Check YAML Config
-            if (yaml_val := self._get_nested_val(self._yaml_config, path)) is not None:
-                value, source = yaml_val, "config.yaml"
-            # 3. Check Defaults
-            elif (
-                default_val := self._get_nested_val(self._defaults, path)
-            ) is not None:
-                value, source = default_val, "default value"
-            else:
-                if required:
-                    raise ImproperlyConfigured(
-                        f"Required setting '{key}' is not defined in any source."
-                    )
-                return None
+        path = key.lower().split(".")
+        try:
+            value = reduce(operator.getitem, path, self._final_config)
+        except (KeyError, TypeError):
+            if required:
+                raise ImproperlyConfigured(
+                    f"Required setting '{key}' is not defined in any source."
+                )
+            return None
 
         if cast is None:
             return value
 
-        if source.startswith("environment"):
-            if cast is bool:
-                return value.lower() in ("true", "1", "yes")
-            if cast is list:
-                return [item.strip() for item in value.split(",")]
+        # Since env vars are strings, perform smart casting
+        if cast is bool and isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        if cast is list and isinstance(value, str):
+            return [item.strip() for item in value.split(",")]
 
         try:
             return cast(value)
         except (ValueError, TypeError) as e:
             raise ImproperlyConfigured(
-                f"Failed to cast setting '{key}' from {source} with value '{
-                    value!r
-                }' to {cast.__name__}. Error: {e}"
+                f"Failed to cast setting '{key}' with value {value!r} to {
+                    cast.__name__
+                }. Error: {e}"
             )
