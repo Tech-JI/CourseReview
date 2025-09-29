@@ -116,7 +116,7 @@ def auth_initiate_api(request):
     details = utils.get_survey_details(action)
     if not details:
         return Response({"error": "Invalid action"}, status=400)
-    survey_url = details.get("URL")
+    survey_url = details.get("url")
     if not survey_url:
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
