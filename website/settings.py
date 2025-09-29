@@ -29,6 +29,7 @@ DEFAULTS = {
     },
     "DATABASE": {"URL": "sqlite:///db.sqlite3"},
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
+    "TURNSTILE_SECRET_KEY": None,
     "QUEST": {
         "BASE_URL": "https://wj.sjtu.edu.cn/api/v1/public/export",
         "SIGNUP": {
