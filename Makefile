@@ -23,7 +23,7 @@ help:
 
 run: format-backend
 	@echo "Starting Django development server..."
-	uv run manage.py runserver
+	uv run manage.py runserver --nostatic
 
 dev-frontend: format-frontend
 	@echo "Starting frontend dev server from frontend/ folder..."
