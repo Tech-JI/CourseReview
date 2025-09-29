@@ -26,20 +26,14 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    # django admin requires django.contrib.staticfiles to be in INSTALLED_APPS
+    "django.contrib.staticfiles",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",
     "django.contrib.humanize",
     "debug_toolbar",
-    "pipeline",
-    "crispy_forms",
-    "crispy_bootstrap4",
-    "django_celery_beat",
-    "django_celery_results",
     "rest_framework",
     "corsheaders",
-    "apps.analytics",
-    "apps.recommendations",
     "apps.spider",
     "apps.web",
     "apps.auth",
@@ -77,9 +71,10 @@ TEMPLATES = [
     }
 ]
 
-CRISPY_TEMPLATE_PACK = "bootstrap4"
-
 WSGI_APPLICATION = "website.wsgi.application"
+
+# django.contrib.staticfiles requires STATIC_URL to be set. Not actually used.
+STATIC_URL = "/dummy/"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -91,9 +86,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_TIMEZONE = "Asia/Shanghai"
-
 AUTO_IMPORT_CRAWLED_DATA = os.getenv("AUTO_IMPORT_CRAWLED_DATA", "True") == "True"
 
 # Internationalization
@@ -101,51 +93,6 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-
-# Static files
-STATIC_ROOT = "staticfiles"
-STATIC_URL = "/static/"
-STATICFILES_STORAGE = "pipeline.storage.ManifestStaticFilesStorage"
-STATICFILES_FINDERS = [
-    "django.contrib.staticfiles.finders.FileSystemFinder",
-    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    "pipeline.finders.PipelineFinder",
-]
-
-# Pipeline configuration
-PIPELINE = {
-    "JAVASCRIPT": {
-        "app": {
-            "source_filenames": [
-                "js/plugins.js",
-                "js/vendor/jquery.highlight-5.js",
-                "js/web/base.jsx",
-                "js/web/common.jsx",
-                "js/web/landing.jsx",
-                "js/web/current_term.jsx",
-                "js/web/course_detail.jsx",
-                "js/web/course_review_search.jsx",
-            ],
-            "output_filename": "js/app.js",
-        }
-    },
-    "STYLESHEETS": {
-        "app": {
-            "source_filenames": [
-                "css/web/base.css",
-                "css/web/current_term.css",
-                "css/web/course_detail.css",
-                "css/web/course_review_search.css",
-                "css/web/landing.css",
-                "css/web/auth.css",
-            ],
-            "output_filename": "css/app.css",
-            "extra_context": {
-                "media": "screen,projection",
-            },
-        }
-    },
-}
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -211,16 +158,6 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
-
-
-CELERY_BROKER_URL = os.getenv("REDIS_URL")
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
-
-ROOT_ASSETS_DIR = os.path.join(BASE_DIR, "root_assets")
 
 SESSION_COOKIE_SECURE = not DEBUG
 
