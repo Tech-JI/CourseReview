@@ -15,41 +15,44 @@ from apps.web.models import Student
 PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
 PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
 OTP_TIMEOUT = settings.AUTH["OTP_TIMEOUT"]
-QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
 EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
+QUEST_BASE_URL = settings.QUEST["BASE_URL"]
 
 
 def get_survey_url(action: str) -> str | None:
     """Helper function to get the survey URL based on action type"""
+
     if action == "signup":
-        return settings.SIGNUP_QUEST_URL
+        return settings.QUEST["SIGNUP"]["URL"]
     if action == "login":
-        return settings.LOGIN_QUEST_URL
+        return settings.QUEST["LOGIN"]["URL"]
     if action == "reset_password":
-        return settings.RESET_QUEST_URL
+        return settings.QUEST["RESET"]["URL"]
     return None
 
 
 def get_survey_api_key(action: str) -> str | None:
     """Helper function to get the survey API key based on action type"""
+
     if action == "signup":
-        return settings.SIGNUP_QUEST_API_KEY
+        return settings.QUEST["SIGNUP"]["API_KEY"]
     if action == "login":
-        return settings.LOGIN_QUEST_API_KEY
+        return settings.QUEST["LOGIN"]["API_KEY"]
     if action == "reset_password":
-        return settings.RESET_QUEST_API_KEY
+        return settings.QUEST["RESET"]["API_KEY"]
     return None
 
 
 def get_survey_questionid(action: str) -> int | None:
     """Helper function to get the survey question ID for the verification code based on action type"""
+
     question_id_str = None
     if action == "signup":
-        question_id_str = settings.SIGNUP_QUEST_QUESTIONID
+        question_id_str = settings.QUEST["SIGNUP"]["QUESTIONID"]
     elif action == "login":
-        question_id_str = settings.LOGIN_QUEST_QUESTIONID
+        question_id_str = settings.QUEST["LOGIN"]["QUESTIONID"]
     elif action == "reset_password":
-        question_id_str = settings.RESET_QUEST_QUESTIONID
+        question_id_str = settings.QUEST["RESET"]["QUESTIONID"]
 
     if question_id_str:
         try:
@@ -99,6 +102,7 @@ async def get_latest_answer(
     `filtered_data` contains: id, submitted_at, user.account, and otp.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
+
     quest_api = get_survey_api_key(action)
     if not quest_api:
         return None, Response({"error": "Invalid action"}, status=400)
@@ -159,7 +163,8 @@ async def get_latest_answer(
         and full_data["data"].get("rows")
         and len(full_data["data"]["rows"]) > 0
     ):
-        latest_answer = full_data["data"]["rows"][0]  # Get the first (latest) row
+        # Get the first (latest) row
+        latest_answer = full_data["data"]["rows"][0]
 
         # Find the otp by matching the question ID
         otp = None
@@ -259,6 +264,7 @@ def create_user_session(
     `user` is the user object on success, otherwise None.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
+
     try:
         # Ensure session exists - create one if it doesn't exist
         if not request.session.session_key:
