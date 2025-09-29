@@ -90,7 +90,9 @@ def auth_initiate_api(request):
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logging.info(
-                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}"
+                    f"Cleaned up existing temp_token_state for action {
+                        existing_state.get('action', 'unknown')
+                    }"
                 )
         except Exception as e:
             logging.warning(f"Error cleaning up existing temp_token: {e}")
@@ -111,7 +113,10 @@ def auth_initiate_api(request):
 
     logging.info(f"Created auth intent for action {action} with OTP and temp_token")
 
-    survey_url = utils.get_survey_url(action)
+    survey_details = utils.get_survey_details(action)
+    if not survey_details:
+        return Response({"error": "Invalid action"}, status=400)
+    survey_url = survey_details.get("url")
     if not survey_url:
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
@@ -273,7 +278,11 @@ def verify_callback_api(request):
         if user is None:
             if error_response:
                 logging.error(
-                    f"Failed to create session for login: {getattr(error_response, 'data', {}).get('error', 'Unknown error')}",
+                    f"Failed to create session for login: {
+                        getattr(error_response, 'data', {}).get(
+                            'error', 'Unknown error'
+                        )
+                    }",
                 )
                 return error_response
             else:
@@ -289,7 +298,9 @@ def verify_callback_api(request):
             r.delete(state_key)
         except Exception as e:
             logging.exception(
-                f"Error during login session creation or cleanup for user {account}: {e}",
+                f"Error during login session creation or cleanup for user {account}: {
+                    e
+                }",
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
 

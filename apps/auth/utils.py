@@ -22,47 +22,31 @@ QUEST_SETTINGS = settings.QUEST
 QUEST_BASE_URL = QUEST_SETTINGS["base_url"]
 
 
-def get_survey_url(action: str) -> str | None:
-    """Helper function to get the survey URL based on action type"""
+def get_survey_details(action: str) -> dict[str, any] | None:
+    """
+    A single, clean function to get all survey details for a given action.
+    Valid actions: "signup", "login", "reset".
+    """
 
-    if action == "signup":
-        return settings.QUEST["SIGNUP"]["URL"]
-    if action == "login":
-        return settings.QUEST["LOGIN"]["URL"]
-    if action == "reset_password":
-        return settings.QUEST["RESET"]["URL"]
-    return None
+    action_details = QUEST_SETTINGS.get(action.lower())
 
+    if not action_details:
+        logging.error(f"Invalid quest action requested: {action}")
+        return None
 
-def get_survey_api_key(action: str) -> str | None:
-    """Helper function to get the survey API key based on action type"""
+    try:
+        question_id = int(action_details.get("questionid"))
+    except (ValueError, TypeError):
+        logging.error(
+            f"Could not parse 'questionid' for action '{action}'. Check your settings."
+        )
+        return None
 
-    if action == "signup":
-        return settings.QUEST["SIGNUP"]["API_KEY"]
-    if action == "login":
-        return settings.QUEST["LOGIN"]["API_KEY"]
-    if action == "reset_password":
-        return settings.QUEST["RESET"]["API_KEY"]
-    return None
-
-
-def get_survey_questionid(action: str) -> int | None:
-    """Helper function to get the survey question ID for the verification code based on action type"""
-
-    question_id_str = None
-    if action == "signup":
-        question_id_str = settings.QUEST["SIGNUP"]["QUESTIONID"]
-    elif action == "login":
-        question_id_str = settings.QUEST["LOGIN"]["QUESTIONID"]
-    elif action == "reset_password":
-        question_id_str = settings.QUEST["RESET"]["QUESTIONID"]
-
-    if question_id_str:
-        try:
-            return int(question_id_str)
-        except (ValueError, TypeError):
-            return None
-    return None
+    return {
+        "url": action_details.get("url"),
+        "api_key": action_details.get("api_key"),
+        "question_id": question_id,
+    }
 
 
 async def verify_turnstile_token(
@@ -106,12 +90,15 @@ async def get_latest_answer(
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
 
-    quest_api = get_survey_api_key(action)
+    details = get_survey_details(action)
+    if not details:
+        return None, Response({"error": "Invalid action"}, status=400)
+    quest_api = details.get("api_key")
     if not quest_api:
         return None, Response({"error": "Invalid action"}, status=400)
 
     # Get the target question ID for the verification code
-    question_id = get_survey_questionid(action)
+    question_id = details.get("question_id")
     if not question_id:
         return None, Response(
             {"error": "Configuration error: question ID not found for action"},
