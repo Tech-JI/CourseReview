@@ -29,11 +29,12 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return
 
 
-OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
-TEMP_TOKEN_TIMEOUT = settings.AUTH["TEMP_TOKEN_TIMEOUT"]
-ACTION_LIST = settings.AUTH["ACTION_LIST"]
-TOKEN_RATE_LIMIT = settings.AUTH["TOKEN_RATE_LIMIT"]
-TOKEN_RATE_LIMIT_TIME = settings.AUTH["TOKEN_RATE_LIMIT_TIME"]
+AUTH_SETTINGS = settings.AUTH
+OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
+ACTION_LIST = ["signup", "login", "reset_password"]
+TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
+TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 
 
 @api_view(["POST"])
@@ -89,7 +90,9 @@ def auth_initiate_api(request):
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logging.info(
-                    f"Cleaned up existing temp_token_state for action {existing_state.get('action', 'unknown')}"
+                    f"Cleaned up existing temp_token_state for action {
+                        existing_state.get('action', 'unknown')
+                    }"
                 )
         except Exception as e:
             logging.warning(f"Error cleaning up existing temp_token: {e}")
@@ -97,7 +100,7 @@ def auth_initiate_api(request):
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
     otp_data = {"temp_token": temp_token, "initiated_at": current_time}
-    r.setex(f"otp:{otp}", OTP_TIME_OUT, json.dumps(otp_data))
+    r.setex(f"otp:{otp}", OTP_TIMEOUT, json.dumps(otp_data))
 
     # Store temp_token with SHA256 hash as key, and status of pending as well as action
     temp_token_hash = hashlib.sha256(temp_token.encode()).hexdigest()
@@ -110,7 +113,10 @@ def auth_initiate_api(request):
 
     logging.info(f"Created auth intent for action {action} with OTP and temp_token")
 
-    survey_url = utils.get_survey_url(action)
+    details = utils.get_survey_details(action)
+    if not details:
+        return Response({"error": "Invalid action"}, status=400)
+    survey_url = details.get("url")
     if not survey_url:
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
@@ -236,7 +242,7 @@ def verify_callback_api(request):
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
         # Additional validation: check submission is after initiation and within window
-        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIME_OUT:
+        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIMEOUT:
             return Response(
                 {"error": "Submission timestamp outside validity window"},
                 status=401,
@@ -272,7 +278,11 @@ def verify_callback_api(request):
         if user is None:
             if error_response:
                 logging.error(
-                    f"Failed to create session for login: {getattr(error_response, 'data', {}).get('error', 'Unknown error')}",
+                    f"Failed to create session for login: {
+                        getattr(error_response, 'data', {}).get(
+                            'error', 'Unknown error'
+                        )
+                    }",
                 )
                 return error_response
             else:
@@ -288,7 +298,9 @@ def verify_callback_api(request):
             r.delete(state_key)
         except Exception as e:
             logging.exception(
-                f"Error during login session creation or cleanup for user {account}: {e}",
+                f"Error during login session creation or cleanup for user {account}: {
+                    e
+                }",
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
 

@@ -4,8 +4,6 @@ from django.urls import re_path
 
 
 from apps.auth import views as auth_views
-from apps.analytics import views as aviews
-from apps.recommendations import views as rviews
 from apps.spider import views as spider_views
 from apps.web import views
 
@@ -40,15 +38,6 @@ urlpatterns = [
     # administrative
     re_path(r"^admin/", admin.site.urls),
     re_path(r"^api/user/status/?", views.user_status, name="user_status"),
-    re_path(r"^analytics/$", aviews.home, name="analytics_home"),
-    re_path(
-        r"^eligible_for_recommendations/$",
-        aviews.eligible_for_recommendations,
-        name="eligible_for_recommendations",
-    ),
-    re_path(
-        r"^sentiment_labeler/$", aviews.sentiment_labeler, name="sentiment_labeler"
-    ),
     # spider
     re_path(r"^spider/data/$", spider_views.crawled_data_list, name="crawled_datas"),
     re_path(
@@ -107,6 +96,4 @@ urlpatterns = [
         views.course_review_search_api,
         name="course_review_search_api",
     ),
-    # recommendations
-    re_path(r"^recommendations/?", rviews.recommendations, name="recommendations"),
 ]
