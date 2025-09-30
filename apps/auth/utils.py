@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from typing import Any
 
 import httpx
 from django.conf import settings
@@ -8,55 +9,54 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 
 from apps.web.models import Student
 
-PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
-PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
-OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
-QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
-EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
+logger = logging.getLogger(__name__)
+
+AUTH_SETTINGS = settings.AUTH
+PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
+PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
+OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
+
+QUEST_SETTINGS = settings.QUEST
+QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
 
 
-def get_survey_url(action: str) -> str | None:
-    """Helper function to get the survey URL based on action type"""
-    if action == "signup":
-        return settings.SIGNUP_QUEST_URL
-    if action == "login":
-        return settings.LOGIN_QUEST_URL
-    if action == "reset_password":
-        return settings.RESET_QUEST_URL
-    return None
+class CSRFCheckSessionAuthentication(SessionAuthentication):
+    def authenticate(self, request):
+        super().enforce_csrf(request)
+        return super().authenticate(request)
 
 
-def get_survey_api_key(action: str) -> str | None:
-    """Helper function to get the survey API key based on action type"""
-    if action == "signup":
-        return settings.SIGNUP_QUEST_API_KEY
-    if action == "login":
-        return settings.LOGIN_QUEST_API_KEY
-    if action == "reset_password":
-        return settings.RESET_QUEST_API_KEY
-    return None
+def get_survey_details(action: str) -> dict[str, Any] | None:
+    """
+    A single, clean function to get all survey details for a given action.
+    Valid actions: "signup", "login", "reset_password".
+    """
 
+    action_details = QUEST_SETTINGS.get(action.upper())
 
-def get_survey_questionid(action: str) -> int | None:
-    """Helper function to get the survey question ID for the verification code based on action type"""
-    question_id_str = None
-    if action == "signup":
-        question_id_str = settings.SIGNUP_QUEST_QUESTIONID
-    elif action == "login":
-        question_id_str = settings.LOGIN_QUEST_QUESTIONID
-    elif action == "reset_password":
-        question_id_str = settings.RESET_QUEST_QUESTIONID
+    if not action_details:
+        logger.error("Invalid quest action requested: %s", action)
+        return None
 
-    if question_id_str:
-        try:
-            return int(question_id_str)
-        except (ValueError, TypeError):
-            return None
-    return None
+    try:
+        question_id = int(action_details.get("QUESTIONID"))
+    except (ValueError, TypeError):
+        logger.error(
+            "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
+        )
+        return None
+
+    return {
+        "url": action_details.get("URL"),
+        "api_key": action_details.get("API_KEY"),
+        "question_id": question_id,
+    }
 
 
 async def verify_turnstile_token(
@@ -65,7 +65,7 @@ async def verify_turnstile_token(
     """Helper function to verify Turnstile token with Cloudflare's API"""
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.post(
                 "https://challenges.cloudflare.com/turnstile/v0/siteverify",
                 data={
@@ -75,18 +75,18 @@ async def verify_turnstile_token(
                 },
             )
         if not response.json().get("success"):
-            logging.warning(f"Turnstile verification failed: {response.json()}")
+            logger.warning("Turnstile verification failed: %s", response.json())
             return False, Response(
                 {"error": "Turnstile verification failed"}, status=403
             )
         return True, None
     except httpx.TimeoutException:
-        logging.error("Turnstile verification timed out")
+        logger.error("Turnstile verification timed out")
         return False, Response(
             {"error": "Turnstile verification timed out"}, status=504
         )
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
+    except Exception:
+        logger.error("Turnstile verification error")
         return False, Response({"error": "Turnstile verification error"}, status=500)
 
 
@@ -99,12 +99,16 @@ async def get_latest_answer(
     `filtered_data` contains: id, submitted_at, user.account, and otp.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
-    quest_api = get_survey_api_key(action)
+
+    details = get_survey_details(action)
+    if not details:
+        return None, Response({"error": "Invalid action"}, status=400)
+    quest_api = details.get("api_key")
     if not quest_api:
         return None, Response({"error": "Invalid action"}, status=400)
 
     # Get the target question ID for the verification code
-    question_id = get_survey_questionid(action)
+    question_id = details.get("question_id")
     if not question_id:
         return None, Response(
             {"error": "Configuration error: question ID not found for action"},
@@ -129,7 +133,7 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,
@@ -137,19 +141,19 @@ async def get_latest_answer(
             response.raise_for_status()  # Raise an exception for bad status codes
             full_data = response.json()
     except httpx.TimeoutException:
-        logging.exception("Questionnaire API query timed out")
+        logger.error("Questionnaire API query timed out")
         return None, Response(
             {"error": "Questionnaire API query timed out"},
             status=504,
         )
-    except httpx.RequestError as e:
-        logging.exception(f"Error querying questionnaire API: {e}")
+    except httpx.RequestError:
+        logger.error("Error querying questionnaire API")
         return None, Response(
             {"error": "Failed to query questionnaire API"},
             status=500,
         )
-    except Exception as e:
-        logging.exception(f"An unexpected error occurred: {e}")
+    except Exception:
+        logger.error("An unexpected error occurred")
         return None, Response({"error": "An unexpected error occurred"}, status=500)
 
     # Filter and return only the required fields from the first row
@@ -159,7 +163,8 @@ async def get_latest_answer(
         and full_data["data"].get("rows")
         and len(full_data["data"]["rows"]) > 0
     ):
-        latest_answer = full_data["data"]["rows"][0]  # Get the first (latest) row
+        # Get the first (latest) row
+        latest_answer = full_data["data"]["rows"][0]
 
         # Find the otp by matching the question ID
         otp = None
@@ -184,7 +189,7 @@ async def get_latest_answer(
             key in filtered_data and filtered_data[key] is not None
             for key in ["id", "submitted_at", "account", "otp"]
         ):
-            logging.warning("Missing required field(s) in questionnaire response")
+            logger.warning("Missing required field(s) in questionnaire response")
             return None, Response(
                 {"error": "Missing required field(s) in questionnaire response"},
                 status=400,
@@ -215,7 +220,8 @@ def rate_password_strength(password: str) -> int:
     if re.search(r"[^a-zA-Z0-9\s]", password):
         score += 1
 
-    length_step = (PASSWORD_LENGTH_MAX - PASSWORD_LENGTH_MIN) // 10
+    length_range = max(1, PASSWORD_LENGTH_MAX - PASSWORD_LENGTH_MIN)
+    length_step = max(1, length_range // 10)
 
     score += (len(password) - PASSWORD_LENGTH_MIN) // length_step
 
@@ -259,6 +265,7 @@ def create_user_session(
     `user` is the user object on success, otherwise None.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
+
     try:
         # Ensure session exists - create one if it doesn't exist
         if not request.session.session_key:

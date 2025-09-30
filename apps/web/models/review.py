@@ -2,31 +2,55 @@ from __future__ import unicode_literals
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Count, OuterRef, Q, Subquery
 
 
 class ReviewManager(models.Manager):
     def user_can_write_review(self, user, course):
         return not self.filter(user=user, course=course).exists()
 
-    def num_reviews_for_user(self, user):
+    def review_count_for_user(self, user):
         return self.filter(user=user).count()
 
-    def delete_reviews_for_user_course(self, user, course):
-        self.filter(course=course, user=user).delete()
+    def with_votes(self, vote_user=None, **kwargs):
+        """
+        Return queryset with annotated vote counts (kudos, dislike) and user's vote.
 
-    def get_user_review_for_course(self, user, course):
+        Args:
+            vote_user: User object for user vote annotations
+            **kwargs: Additional filter parameters for queryset
         """
-        Get the review written by a user for a specific course.
-        Returns the Review object if found, None otherwise.
-        If multiple reviews exist, returns the most recent one.
+        queryset = self.filter(**kwargs).annotate(
+            kudos_count=Count("votes", filter=Q(votes__is_kudos=True), distinct=True),
+            dislike_count=Count(
+                "votes", filter=Q(votes__is_kudos=False), distinct=True
+            ),
+        )
+
+        if vote_user and vote_user.is_authenticated:
+            from .vote_for_review import ReviewVote
+
+            # Define subquery: get the is_kudos value for current user's vote on this review
+            vote_subquery = ReviewVote.objects.filter(
+                review=OuterRef("pk"), user=vote_user
+            ).values("is_kudos")[:1]
+
+            queryset = queryset.annotate(
+                user_vote=Subquery(
+                    vote_subquery, output_field=models.BooleanField(null=True)
+                )
+            )
+
+        return queryset
+
+    def raw_queryset(self, **kwargs):
         """
-        try:
-            return self.get(user=user, course=course)
-        except self.model.DoesNotExist:
-            return None
-        except self.model.MultipleObjectsReturned:
-            # If somehow there are multiple reviews, return the most recent one
-            return self.filter(user=user, course=course).order_by("-created_at").first()
+        Return base queryset without vote annotations for better performance when votes aren't needed.
+
+        Args:
+            **kwargs: Additional filter parameters
+        """
+        return self.filter(**kwargs)
 
 
 class Review(models.Model):
@@ -56,11 +80,6 @@ class Review(models.Model):
     )
     difficulty_sentiment = models.FloatField(default=None, null=True, blank=True)
     quality_sentiment = models.FloatField(default=None, null=True, blank=True)
-
-    # Kudos and dislike counts
-    kudos_count = models.PositiveIntegerField(default=0, db_index=True)
-    dislike_count = models.PositiveIntegerField(default=0, db_index=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

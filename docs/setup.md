@@ -30,7 +30,7 @@ Environment:
 - python >= 3.12
 
 
----
+## Backend
 
 1. `git clone ssh://git@github.com/Tech-JI/CourseReview.git `
 
@@ -38,9 +38,9 @@ Environment:
 
 3. `git checkout dev`
 
-4. `uv venv .venv` and `uv sync`
+4. `uv sync --all-groups`
 
-5. `uv run pre-commit install` (for installing git hook in .git)
+5. `uv run prek install` (for installing git hook in .git)
 
 6. Make directory for builds of static files: `mkdir staticfiles`
 
@@ -58,14 +58,10 @@ Environment:
    OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
    ```
 
-Fill in other secret configs manually.  
-
 8. Build static files: `make collect`
 
 9. Configure database
-
    1. Install Postgres:
-
       - `sudo apt update`
 
       - `sudo apt install postgresql`
@@ -79,7 +75,6 @@ Fill in other secret configs manually.
    5. Switch to user postgres: `sudo -iu postgres`
 
    6. `psql`
-
       1. Initialize coursereview database, user and privileges
 
          ```sql
@@ -120,7 +115,6 @@ Fill in other secret configs manually.
 11. `make run` and visit <http://127.0.0.1:8000/>
 
 12. Add local admin:
-
     1. `make createsuperuser`. The email can be blank. Use a strong password in production.
 
     2. Enter interactive python shell: `make shell`. (Different from directly running `python` from shell.)
@@ -137,8 +131,7 @@ Fill in other secret configs manually.
        ```
 ## Fetch Data(test)
 
-1. Crawl data from JI official website:
-
+13. Crawl data from JI official website:
     1. Edit `COURSE_DETAIL_URL_PREFIX` in `apps/spider/crawlers/orc.py`: Add a number after url param `id` like this: `...?id=23`, so only course id starting from 23 (e.g. 230-239, 2300) will be crawled, so as to save time during development. Remember not to commit this change.
 
     2. Enter interactive python shell: `make shell`.
@@ -150,6 +143,22 @@ Fill in other secret configs manually.
        crawl_and_import_data()
        ```
 
-# Local Development
+## Frontend
+Two ways to run/develop the frontend:
 
-run `make run` to run the backend.  
+1. Git submodule (in `CourseReview/frontend`):
+   - `cd CourseReview` and run `git submodule update --init --recursive`
+   - Dev server: `make dev-frontend` (visit http://127.0.0.1:5173/)
+   - Development workflow: `cd CourseReview/frontend` (treat it like a normal repo)
+
+2. Separate repo (frontend only):
+   - `cd <your-projects-dir>` and run `git clone git@github.com:Tech-JI/CourseFront.git`
+   - Dev server: `cd CourseFront` then `bun run dev` (visit http://127.0.0.1:5173/)
+
+### Set up
+From the frontend directory (`CourseReview/frontend` or `CourseFront`):
+1. `cp .env.example .env`
+
+2. `bun install`
+
+3. `bun run prek install` (set up git hooks)

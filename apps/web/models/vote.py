@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from django.contrib.auth.models import User
 from django.db import models, transaction
+from django.db.models import Avg
 
 from .course import Course
 
@@ -9,20 +10,8 @@ from .course import Course
 class VoteManager(models.Manager):
     @transaction.atomic
     def vote(self, value, course_id, category, user):
-        is_unvote = False
-
-        if value > 5 or value < 1:
-            return None, is_unvote, None
-
-        course = Course.objects.get(id=course_id)
+        course = Course.objects.select_for_update().get(id=course_id)
         vote, created = self.get_or_create(course=course, category=category, user=user)
-
-        # if previously voted, reverse the old value of the vote
-        if not created:
-            if category == Vote.CATEGORIES.QUALITY:
-                course.quality_score -= vote.value
-            elif category == Vote.CATEGORIES.DIFFICULTY:
-                course.difficulty_score -= vote.value
 
         is_unvote = not created and vote.value == value
 
@@ -33,23 +22,16 @@ class VoteManager(models.Manager):
             vote.save()
 
         new_score = self._calculate_average_score(course, category)
-        if category == Vote.CATEGORIES.QUALITY:
-            course.quality_score = new_score
-        elif category == Vote.CATEGORIES.DIFFICULTY:
-            course.difficulty_score = new_score
-        course.save()
-        return new_score, is_unvote, self.get_vote_count(course, category)
+        vote_count = self.get_vote_count(course, category)
+
+        return new_score, is_unvote, vote_count
 
     def _calculate_average_score(self, course, category):
-        """Calculate the average score for a course in a specific category"""
-        votes = self.filter(course=course, category=category)
-        if not votes.exists():
-            return 0
-
-        total_score = sum(vote.value for vote in votes)
-        vote_count = votes.count()
-        # Return average rounded to 1 decimal place
-        return round(total_score / vote_count, 1)
+        result = self.filter(course=course, category=category).aggregate(
+            avg_score=Avg("value")
+        )
+        avg = result["avg_score"]
+        return round(avg, 1) if avg is not None else 0
 
     def get_vote_count(self, course, category):
         """Get the vote count for a course in a specific category"""
@@ -116,6 +98,9 @@ class Vote(models.Model):
 
     class Meta:
         unique_together = ("course", "user", "category")
+        indexes = [
+            models.Index(fields=["course", "category", "value"]),
+        ]
 
     def __unicode__(self):
         return "{} for {} by {}".format(
