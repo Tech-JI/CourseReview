@@ -12,51 +12,41 @@ from rest_framework.response import Response
 
 from apps.web.models import Student
 
-PASSWORD_LENGTH_MIN = settings.AUTH["PASSWORD_LENGTH_MIN"]
-PASSWORD_LENGTH_MAX = settings.AUTH["PASSWORD_LENGTH_MAX"]
-OTP_TIME_OUT = settings.AUTH["OTP_TIME_OUT"]
-QUEST_BASE_URL = settings.AUTH["QUEST_BASE_URL"]
-EMAIL_DOMAIN_NAME = settings.AUTH["EMAIL_DOMAIN_NAME"]
+AUTH_SETTINGS = settings.AUTH
+PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
+PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
+OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
+
+QUEST_SETTINGS = settings.QUEST
+QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
 
 
-def get_survey_url(action: str) -> str | None:
-    """Helper function to get the survey URL based on action type"""
-    if action == "signup":
-        return settings.SIGNUP_QUEST_URL
-    if action == "login":
-        return settings.LOGIN_QUEST_URL
-    if action == "reset_password":
-        return settings.RESET_QUEST_URL
-    return None
+def get_survey_details(action: str) -> dict[str, any] | None:
+    """
+    A single, clean function to get all survey details for a given action.
+    Valid actions: "signup", "login", "reset".
+    """
 
+    action_details = QUEST_SETTINGS.get(action.upper())
 
-def get_survey_api_key(action: str) -> str | None:
-    """Helper function to get the survey API key based on action type"""
-    if action == "signup":
-        return settings.SIGNUP_QUEST_API_KEY
-    if action == "login":
-        return settings.LOGIN_QUEST_API_KEY
-    if action == "reset_password":
-        return settings.RESET_QUEST_API_KEY
-    return None
+    if not action_details:
+        logging.error(f"Invalid quest action requested: {action}")
+        return None
 
+    try:
+        question_id = int(action_details.get("QUESTIONID"))
+    except (ValueError, TypeError):
+        logging.error(
+            f"Could not parse 'QUESTIONID' for action '{action}'. Check your settings."
+        )
+        return None
 
-def get_survey_questionid(action: str) -> int | None:
-    """Helper function to get the survey question ID for the verification code based on action type"""
-    question_id_str = None
-    if action == "signup":
-        question_id_str = settings.SIGNUP_QUEST_QUESTIONID
-    elif action == "login":
-        question_id_str = settings.LOGIN_QUEST_QUESTIONID
-    elif action == "reset_password":
-        question_id_str = settings.RESET_QUEST_QUESTIONID
-
-    if question_id_str:
-        try:
-            return int(question_id_str)
-        except (ValueError, TypeError):
-            return None
-    return None
+    return {
+        "url": action_details.get("URL"),
+        "api_key": action_details.get("API_KEY"),
+        "question_id": question_id,
+    }
 
 
 async def verify_turnstile_token(
@@ -65,7 +55,7 @@ async def verify_turnstile_token(
     """Helper function to verify Turnstile token with Cloudflare's API"""
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.post(
                 "https://challenges.cloudflare.com/turnstile/v0/siteverify",
                 data={
@@ -99,12 +89,16 @@ async def get_latest_answer(
     `filtered_data` contains: id, submitted_at, user.account, and otp.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
-    quest_api = get_survey_api_key(action)
+
+    details = get_survey_details(action)
+    if not details:
+        return None, Response({"error": "Invalid action"}, status=400)
+    quest_api = details.get("api_key")
     if not quest_api:
         return None, Response({"error": "Invalid action"}, status=400)
 
     # Get the target question ID for the verification code
-    question_id = get_survey_questionid(action)
+    question_id = details.get("question_id")
     if not question_id:
         return None, Response(
             {"error": "Configuration error: question ID not found for action"},
@@ -129,7 +123,7 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIME_OUT) as client:
+        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,
@@ -159,7 +153,8 @@ async def get_latest_answer(
         and full_data["data"].get("rows")
         and len(full_data["data"]["rows"]) > 0
     ):
-        latest_answer = full_data["data"]["rows"][0]  # Get the first (latest) row
+        # Get the first (latest) row
+        latest_answer = full_data["data"]["rows"][0]
 
         # Find the otp by matching the question ID
         otp = None
@@ -259,6 +254,7 @@ def create_user_session(
     `user` is the user object on success, otherwise None.
     `error_response` is a DRF Response object if an error occurs, otherwise None.
     """
+
     try:
         # Ensure session exists - create one if it doesn't exist
         if not request.session.session_key:
