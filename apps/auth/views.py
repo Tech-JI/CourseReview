@@ -317,7 +317,7 @@ def verify_callback_api(request):
     return response
 
 
-def verify_psd_checker(request, action: str) -> tuple[dict | None, Response | None]:
+def verify_token_pwd(request, action: str) -> tuple[dict | None, Response | None]:
     # Get temp_token from HttpOnly cookie
     temp_token = request.COOKIES.get("temp_token")
     if not temp_token:
@@ -368,7 +368,7 @@ def auth_signup_api(request) -> Response:
     Handles user signup using verified temp_token.
     """
     try:
-        verification_data, error_response = verify_psd_checker(request, action="signup")
+        verification_data, error_response = verify_token_pwd(request, action="signup")
         if verification_data is None:
             return error_response or Response(
                 {"error": "Verification failed"}, status=400
@@ -411,7 +411,7 @@ def auth_reset_password_api(request) -> Response:
     Handles password reset using verified temp_token.
     """
     try:
-        verification_data, error_response = verify_psd_checker(
+        verification_data, error_response = verify_token_pwd(
             request,
             action="reset_password",
         )
