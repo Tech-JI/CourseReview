@@ -33,7 +33,7 @@ collect:
 	@echo "Collecting Django static files (confirming 'yes')..."
 	echo 'yes' | uv run manage.py collectstatic
 
-format: format-backend format-frontend
+format: format-backend
 	@echo "All code formatted successfully!"
 
 format-backend:

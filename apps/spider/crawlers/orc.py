@@ -1,14 +1,18 @@
 import re
 import urllib.parse
 import logging
-
+import asyncio
+import aiohttp
 import json
+from datetime import datetime
+
 import requests
 import time
 from collections import defaultdict
 from urllib.parse import urljoin
 
 from apps.spider.utils import retrieve_soup
+from apps.spider.manager import CourseDataCache
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
@@ -75,16 +79,43 @@ class CourseSelCrawler:
         self._initialized = True
         logger.info("Crawler initialized successfully!")
 
-    def get_all_courses(self):
+    def get_all_courses(self, use_cache=True, save_cache=True):
         """
         Get all course data from multiple APIs and official website
+
+        Args:
+            use_cache: Whether to use cached data
+            save_cache: Whether to save data to cache
 
         Returns:
             list: Course data with prerequisites, descriptions, and instructors
         """
-        # Ask user which data sources to use
+        cache_manager = CourseDataCache()
+
+        # If using cache, check for available cache files first
+        if use_cache:
+            cache_files = cache_manager.list_cache_files()
+            if cache_files:
+                print(f"Found {len(cache_files)} cache files")
+                choice = input("Use existing cache? (y/n/list): ").strip().lower()
+
+                if choice == "list":
+                    # Show cache file list for selection
+                    from apps.spider.manager import interactive_cache_manager
+
+                    selected_file = interactive_cache_manager()
+                    if selected_file:
+                        print(f"Loading cache file: {selected_file.name}")
+                        return cache_manager.load_from_jsonl(selected_file)
+                elif choice in ["y", "yes"]:
+                    # Use the latest cache file
+                    latest_file = cache_files[0]
+                    print(f"Loading latest cache: {latest_file.name}")
+                    return cache_manager.load_from_jsonl(latest_file)
+
+        # Ask user to choose data sources
         use_coursesel = self._ask_user_choice(
-            "Crawl course selection system data? (y/n): ", default="y"
+            "Crawl course selection system data? (y/n): ", default="n"
         )
         use_official = self._ask_user_choice(
             "Crawl official website data? (y/n): ", default="y"
@@ -97,24 +128,57 @@ class CourseSelCrawler:
 
         if use_coursesel:
             self._ensure_initialized()  # Make sure crawler is initialized
-            print("Crawling course selection system data...")
+            print("🌐 爬取课程选择系统数据...")
             # Get data from course selection APIs
             courses_data = self._get_lesson_tasks()
             course_details = self._get_course_catalog()
             prerequisites = self._get_prerequisites()
         else:
-            print("Skipping course selection system data")
+            print("⏭️ 跳过课程选择系统数据")
 
         if use_official:
-            print("Crawling official website data...")
+            print("🌐 爬取官网数据...")
             # Get official website data for enhanced descriptions
             official_data = self._get_official_website_data()
         else:
             print("Skipping official website data")
 
-        return self._integrate_course_data(
+        # Integrate data
+        integrated_data = self._integrate_course_data(
             courses_data, course_details, prerequisites, official_data
         )
+
+        # Save to cache
+        if save_cache and integrated_data:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            data_sources = []
+            if use_coursesel:
+                data_sources.append("coursesel")
+            if use_official:
+                data_sources.append("official")
+
+            cache_filename = f"courses_{'_'.join(data_sources)}_{timestamp}"
+            cache_filepath = cache_manager.save_to_jsonl(
+                integrated_data, cache_filename
+            )
+
+            print(f"Data cached to: {cache_filepath}")
+
+            # Ask whether to import to database immediately
+            from apps.spider.manager import preview_data_before_import
+
+            if preview_data_before_import(cache_filepath, limit=5):
+                print("Starting database import...")
+                try:
+                    import_department(integrated_data)
+                    print("Data import successful!")
+                except Exception as e:
+                    print(f"Data import failed: {str(e)}")
+                    print("Data saved to cache, can be imported manually later")
+            else:
+                print("Skipping database import, data saved to cache")
+
+        return integrated_data
 
     def _ask_user_choice(self, prompt, default="y"):
         """Ask user for yes/no choice with default value"""
@@ -256,47 +320,90 @@ class CourseSelCrawler:
         logger.info("Fetching course data from official website")
 
         try:
-            # Get all course URLs from official website
-            official_urls = self._get_official_course_urls()
-            official_data = {}
-
-            for url in official_urls:
-                course_data = self._crawl_official_course_data(url)
-                if course_data and course_data.get("course_code"):
-                    official_data[course_data["course_code"]] = course_data
-
-            logger.info(f"Fetched official data for {len(official_data)} courses")
-            return official_data
-
+            # Run the async crawler
+            return asyncio.run(self._get_official_website_data_async())
         except Exception as e:
             logger.error(f"Error fetching official website data: {str(e)}")
             return {}
 
-    def _get_official_course_urls(self):
-        """Get all course URLs from official website"""
-        try:
-            soup = retrieve_soup(OFFICIAL_UNDERGRAD_URL)
-            linked_urls = [
-                urljoin(OFFICIAL_BASE_URL, a["href"])
-                for a in soup.find_all("a", href=True)
+    async def _get_official_website_data_async(self):
+        """Async version of official website data fetching with concurrency"""
+        # Get all course URLs from official website
+        official_urls = self._get_official_course_urls()
+
+        if not official_urls:
+            logger.warning("No official course URLs found")
+            return {}
+
+        logger.info(f"Found {len(official_urls)} course URLs to crawl")
+
+        # Create aiohttp session with timeout and headers
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            # Create semaphore to limit concurrent requests
+            semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
+
+            # Create tasks for all URLs
+            tasks = [
+                self._crawl_official_course_data_async(session, semaphore, url)
+                for url in official_urls
             ]
-            return set(
-                linked_url
-                for linked_url in linked_urls
-                if self._is_official_course_url(linked_url)
+
+            # Execute all tasks concurrently with progress tracking
+            official_data = {}
+            completed = 0
+            total = len(tasks)
+
+            for coro in asyncio.as_completed(tasks):
+                try:
+                    course_data = await coro
+                    completed += 1
+
+                    if completed % 5 == 0 or completed == total:
+                        logger.info(f"Progress: {completed}/{total} courses crawled")
+
+                    if course_data and course_data.get("course_code"):
+                        official_data[course_data["course_code"]] = course_data
+
+                except Exception as e:
+                    logger.warning(f"Failed to crawl one course: {str(e)}")
+                    completed += 1
+
+            logger.info(
+                f"Successfully fetched official data for {len(official_data)} courses"
             )
-        except Exception as e:
-            logger.error(f"Error getting official course URLs: {str(e)}")
-            return set()
+            return official_data
 
-    def _is_official_course_url(self, candidate_url):
-        """Check if URL is a valid official course detail URL"""
-        return candidate_url.startswith(OFFICIAL_COURSE_DETAIL_URL_PREFIX)
+    async def _crawl_official_course_data_async(self, session, semaphore, course_url):
+        """Async crawl single course data from official website"""
+        async with semaphore:  # Limit concurrent requests
+            try:
+                async with session.get(course_url) as response:
+                    if response.status != 200:
+                        logger.warning(f"HTTP {response.status} for {course_url}")
+                        return None
 
-    def _crawl_official_course_data(self, course_url):
-        """Crawl single course data from official website"""
+                    html_content = await response.text()
+                    return self._parse_official_course_html(html_content, course_url)
+
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout for {course_url}")
+                return None
+            except Exception as e:
+                logger.warning(f"Error crawling {course_url}: {str(e)}")
+                return None
+
+    def _parse_official_course_html(self, html_content, course_url):
+        """Parse HTML content to extract course data"""
         try:
-            soup = retrieve_soup(course_url)
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(html_content, "html.parser")
+
             course_heading = soup.find("h2")
             if not course_heading:
                 return None
@@ -309,7 +416,12 @@ class CourseSelCrawler:
             if len(split_course_heading) < 2:
                 return None
 
-            children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
+            # Find course content sections
+            text_inner_sections = soup.find_all(class_="et_pb_text_inner")
+            if len(text_inner_sections) < 4:
+                return None
+
+            children = list(text_inner_sections[3].children)
 
             course_code = split_course_heading[0]
             course_title = split_course_heading[1]
@@ -324,19 +436,17 @@ class CourseSelCrawler:
                     description = (
                         children[i + 2].get_text(strip=True)
                         if i + 2 < len(children)
+                        and hasattr(children[i + 2], "get_text")
                         else ""
                     )
                     if description == "\n" or "Course Topics" in description:
                         description = ""
                 elif "Course Topics:" in text:
-                    course_topics = (
-                        [
+                    if i + 2 < len(children) and hasattr(children[i + 2], "find_all"):
+                        course_topics = [
                             li.get_text(strip=True)
                             for li in children[i + 2].find_all("li")
                         ]
-                        if i + 2 < len(children)
-                        else []
-                    )
 
             return {
                 "course_code": course_code,
@@ -347,10 +457,37 @@ class CourseSelCrawler:
             }
 
         except Exception as e:
-            logger.error(
-                f"Error crawling official course data from {course_url}: {str(e)}"
-            )
+            logger.warning(f"Error parsing course HTML from {course_url}: {str(e)}")
             return None
+
+    def _get_official_course_urls(self):
+        """Get all course URLs from official website"""
+        try:
+            from bs4 import Tag
+
+            soup = retrieve_soup(OFFICIAL_UNDERGRAD_URL)
+            linked_urls = []
+
+            for a in soup.find_all("a", href=True):
+                # Check if it's a Tag element and has href attribute
+                if isinstance(a, Tag) and a.has_attr("href"):
+                    href = a["href"]
+                    if href and isinstance(href, str):
+                        full_url = urljoin(OFFICIAL_BASE_URL, href)
+                        linked_urls.append(full_url)
+
+            return {
+                linked_url
+                for linked_url in linked_urls
+                if self._is_official_course_url(linked_url)
+            }
+        except Exception as e:
+            logger.error(f"Error getting official course URLs: {str(e)}")
+            return set()
+
+    def _is_official_course_url(self, candidate_url):
+        """Check if URL is a valid official course detail URL"""
+        return candidate_url.startswith(OFFICIAL_COURSE_DETAIL_URL_PREFIX)
 
     def _integrate_course_data(
         self, courses_data, course_details, prerequisites, official_data=None
@@ -608,6 +745,7 @@ class CourseSelCrawler:
 
 
 _crawler = None
+_course_data_cache = {}
 
 
 def _get_crawler():
@@ -620,68 +758,109 @@ def _get_crawler():
 
 def crawl_program_urls():
     """Get all course URLs (legacy interface)"""
+    global _course_data_cache
+
     crawler = _get_crawler()
     courses = crawler.get_all_courses()
 
     course_urls = []
+    _course_data_cache = {}  # Reset cache
+
     for course in courses:
         if course.get("url"):
             course_urls.append(course["url"])
-
-    if not hasattr(crawl_program_urls, "_course_data_cache"):
-        crawl_program_urls._course_data_cache = {}
-
-    for course in courses:
-        if course.get("url"):
-            crawl_program_urls._course_data_cache[course["url"]] = course
+            _course_data_cache[course["url"]] = course
 
     return course_urls
 
 
 def _crawl_course_data(course_url):
     """Crawl single course data (legacy interface)"""
-    if hasattr(crawl_program_urls, "_course_data_cache"):
-        course_data = crawl_program_urls._course_data_cache.get(course_url)
-        if course_data:
-            return course_data
+    global _course_data_cache
+
+    course_data = _course_data_cache.get(course_url)
+    if course_data:
+        return course_data
 
     return {}
 
 
 def import_department(department_data):
-    """Import course data to database"""
+    """Import course data to database with improved error handling"""
+    success_count = 0
+    error_count = 0
+
     for course_data in department_data:
-        # Prepare defaults dict with all available fields
-        defaults = {
-            "course_title": course_data["course_title"],
-            "department": course_data["department"],
-            "number": course_data["number"],
-            "course_credits": course_data["course_credits"],
-            "pre_requisites": course_data["pre_requisites"],
-            "description": course_data["description"],
-            "course_topics": course_data["course_topics"],
-            "url": course_data["url"],
-        }
+        try:
+            # 验证必要字段
+            required_fields = ["course_code", "course_title"]
+            missing_fields = [
+                field for field in required_fields if not course_data.get(field)
+            ]
 
-        # Add official_url if available
-        if "official_url" in course_data:
-            defaults["official_url"] = course_data["official_url"]
-
-        course, _ = Course.objects.update_or_create(
-            course_code=course_data["course_code"],
-            defaults=defaults,
-        )
-
-        if "instructors" in course_data and course_data["instructors"]:
-            for instructor_name in course_data["instructors"]:
-                instructor, _ = Instructor.objects.get_or_create(name=instructor_name)
-
-                offering, _ = CourseOffering.objects.get_or_create(
-                    course=course,
-                    term=CURRENT_TERM,
-                    defaults={"section": 1, "period": ""},
+            if missing_fields:
+                logger.warning(
+                    f"Skipping course due to missing required fields: {missing_fields}"
                 )
-                offering.instructors.add(instructor)
+                error_count += 1
+                continue
+
+            # 准备默认值，处理可能缺失的字段
+            defaults = {
+                "course_title": course_data.get("course_title", ""),
+                "department": course_data.get("department", ""),
+                "number": course_data.get("number", 0),
+                "course_credits": course_data.get("course_credits", 0),
+                "pre_requisites": course_data.get("pre_requisites", ""),
+                "description": course_data.get("description", ""),
+                "course_topics": course_data.get("course_topics", []),
+                "url": course_data.get("url", ""),
+            }
+
+            # 注意：official_url 字段不存在于Course模型中，所以不包含它
+
+            # 创建或更新课程
+            course, created = Course.objects.update_or_create(
+                course_code=course_data["course_code"],
+                defaults=defaults,
+            )
+
+            # 处理教师信息
+            instructors = course_data.get("instructors", [])
+            if instructors:
+                for instructor_name in instructors:
+                    if instructor_name.strip():  # 确保教师名字不为空
+                        try:
+                            instructor, _ = Instructor.objects.get_or_create(
+                                name=instructor_name.strip()
+                            )
+
+                            offering, _ = CourseOffering.objects.get_or_create(
+                                course=course,
+                                term=CURRENT_TERM,
+                                defaults={"section": 1, "period": ""},
+                            )
+                            offering.instructors.add(instructor)
+                        except Exception as e:
+                            logger.warning(
+                                f"Error creating instructor {instructor_name}: {str(e)}"
+                            )
+
+            success_count += 1
+            if created:
+                logger.info(f"Created new course: {course_data['course_code']}")
+            else:
+                logger.info(f"Updated course: {course_data['course_code']}")
+
+        except Exception as e:
+            error_count += 1
+            course_code = course_data.get("course_code", "Unknown")
+            error_msg = str(e)
+            print(f"Error importing course {course_code}: {error_msg}")
+            logger.error(f"Error importing course {course_code}: {error_msg}")
+
+    logger.info(f"Import completed: {success_count} successful, {error_count} errors")
+    return {"success": success_count, "errors": error_count}
 
 
 def extract_prerequisites(pre_requisites):

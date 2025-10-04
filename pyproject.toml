@@ -18,6 +18,7 @@ dependencies = [
     "pytz>=2025.1",
     "redis>=5.2.1",
     "requests>=2.32.3",
+    "aiohttp>=3.10.0",
     "bpython>=0.25",
     "ptpython>=3.0.29",
     "djangorestframework>=3.16.0",
