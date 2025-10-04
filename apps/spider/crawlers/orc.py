@@ -148,6 +148,11 @@ class CourseSelCrawler:
             courses_data, course_details, prerequisites, official_data
         )
 
+        print(
+            f"DEBUG: Integrated data count: {len(integrated_data) if integrated_data else 0}"
+        )
+        print(f"DEBUG: Save cache enabled: {save_cache}")
+
         # Save to cache
         if save_cache and integrated_data:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -157,9 +162,9 @@ class CourseSelCrawler:
             if use_official:
                 data_sources.append("official")
 
-            cache_filename = f"courses_{'_'.join(data_sources)}_{timestamp}"
+            cache_filename = f"courses_{'_'.join(data_sources)}"
             cache_filepath = cache_manager.save_to_jsonl(
-                integrated_data, cache_filename
+                integrated_data, cache_filename, timestamp
             )
 
             print(f"Data cached to: {cache_filepath}")
@@ -327,9 +332,11 @@ class CourseSelCrawler:
             return {}
 
     async def _get_official_website_data_async(self):
-        """Async version of official website data fetching with concurrency"""
+        """Optimized async version of official website data fetching with enhanced concurrency"""
         # Get all course URLs from official website
         official_urls = self._get_official_course_urls()
+
+        print(f"DEBUG: Found {len(official_urls)} official course URLs")
 
         if not official_urls:
             logger.warning("No official course URLs found")
@@ -337,15 +344,36 @@ class CourseSelCrawler:
 
         logger.info(f"Found {len(official_urls)} course URLs to crawl")
 
-        # Create aiohttp session with timeout and headers
-        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        # Optimized timeout and session settings for maximum speed
+        timeout = aiohttp.ClientTimeout(total=15, connect=3, sock_read=10)
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Cache-Control": "max-age=0",
         }
 
-        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-            # Create semaphore to limit concurrent requests
-            semaphore = asyncio.Semaphore(10)  # Max 10 concurrent requests
+        # Create connector with balanced performance and stability settings
+        connector = aiohttp.TCPConnector(
+            limit=50,  # Reduced total connection pool size
+            limit_per_host=25,  # Reduced connections per host
+            ttl_dns_cache=600,  # Longer DNS cache for 10 minutes
+            use_dns_cache=True,
+            keepalive_timeout=30,  # Shorter keepalive to prevent hangs
+            enable_cleanup_closed=True,
+        )
+
+        async with aiohttp.ClientSession(
+            timeout=timeout,
+            headers=headers,
+            connector=connector,
+            read_bufsize=32768,  # Smaller read buffer for stability
+        ) as session:
+            # Balanced concurrent requests for stability
+            semaphore = asyncio.Semaphore(20)  # Reduced to 20 concurrent requests
 
             # Create tasks for all URLs
             tasks = [
@@ -353,111 +381,197 @@ class CourseSelCrawler:
                 for url in official_urls
             ]
 
-            # Execute all tasks concurrently with progress tracking
+            # Execute all tasks concurrently with better progress tracking
             official_data = {}
             completed = 0
             total = len(tasks)
 
-            for coro in asyncio.as_completed(tasks):
-                try:
-                    course_data = await coro
+            # Use gather for better performance than as_completed
+            try:
+                print(
+                    f"DEBUG: Starting to crawl {total} URLs with 20 concurrent requests..."
+                )
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                print(f"DEBUG: Received {len(results)} results")
+
+                successful = 0
+                failed = 0
+
+                for i, result in enumerate(results):
                     completed += 1
 
-                    if completed % 5 == 0 or completed == total:
-                        logger.info(f"Progress: {completed}/{total} courses crawled")
+                    # More frequent progress reporting for better visibility
+                    if completed % 20 == 0 or completed == total:
+                        print(
+                            f"DEBUG: Progress: {completed}/{total} ({completed / total * 100:.1f}%) - Success: {successful}, Failed: {failed}"
+                        )
+                        logger.info(
+                            f"Progress: {completed}/{total} courses processed ({completed / total * 100:.1f}%)"
+                        )
 
-                    if course_data and course_data.get("course_code"):
-                        official_data[course_data["course_code"]] = course_data
+                    if isinstance(result, Exception):
+                        failed += 1
+                        logger.warning(f"Failed to crawl course {i + 1}: {str(result)}")
+                        continue
 
-                except Exception as e:
-                    logger.warning(f"Failed to crawl one course: {str(e)}")
-                    completed += 1
+                    if (
+                        result
+                        and isinstance(result, dict)
+                        and result.get("course_code")
+                    ):
+                        successful += 1
+                        official_data[result["course_code"]] = result
+                    else:
+                        failed += 1
 
+            except Exception as e:
+                print(f"DEBUG: Batch crawling failed: {str(e)}")
+                logger.error(f"Batch crawling failed: {str(e)}")
+                return {}
+
+            print(
+                f"DEBUG: Successfully extracted {len(official_data)} courses from {total} URLs"
+            )
+            print(f"DEBUG: Final stats - Success: {successful}, Failed: {failed}")
             logger.info(
-                f"Successfully fetched official data for {len(official_data)} courses"
+                f"Successfully fetched official data for {len(official_data)} courses out of {total} total"
             )
             return official_data
 
     async def _crawl_official_course_data_async(self, session, semaphore, course_url):
-        """Async crawl single course data from official website"""
+        """Ultra-optimized async crawl single course data from official website"""
         async with semaphore:  # Limit concurrent requests
             try:
-                async with session.get(course_url) as response:
-                    if response.status != 200:
-                        logger.warning(f"HTTP {response.status} for {course_url}")
-                        return None
+                # Balanced retry logic for stability
+                max_retries = 2  # Increased retries for stability
+                retry_delay = 1.0  # Longer retry delay
 
-                    html_content = await response.text()
-                    return self._parse_official_course_html(html_content, course_url)
+                for attempt in range(max_retries + 1):
+                    try:
+                        async with session.get(course_url) as response:
+                            if response.status == 200:
+                                html_content = await response.text()
+                                return self._parse_official_course_html(
+                                    html_content, course_url
+                                )
+                            elif response.status in [
+                                429,
+                                503,
+                                502,
+                                504,
+                            ]:  # Retry on server errors
+                                if attempt < max_retries:
+                                    await asyncio.sleep(
+                                        retry_delay * (attempt + 1)
+                                    )  # Exponential backoff
+                                    continue
+                            # Don't retry on other errors, fail fast
+                            return None
 
-            except asyncio.TimeoutError:
-                logger.warning(f"Timeout for {course_url}")
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                        if attempt < max_retries:
+                            await asyncio.sleep(retry_delay * (attempt + 1))
+                            continue
+                        else:
+                            logger.debug(
+                                f"Failed to fetch {course_url} after {max_retries + 1} attempts: {str(e)}"
+                            )
+                            return None
+
                 return None
+
             except Exception as e:
-                logger.warning(f"Error crawling {course_url}: {str(e)}")
+                logger.debug(f"Unexpected error fetching {course_url}: {str(e)}")
                 return None
 
     def _parse_official_course_html(self, html_content, course_url):
-        """Parse HTML content to extract course data"""
+        """Ultra-fast HTML parsing for course data extraction"""
         try:
             from bs4 import BeautifulSoup
 
-            soup = BeautifulSoup(html_content, "html.parser")
+            # Use faster lxml parser for better performance
+            soup = BeautifulSoup(html_content, "lxml")
 
             course_heading = soup.find("h2")
             if not course_heading:
+                print(f"DEBUG: No h2 heading found in {course_url}")
                 return None
 
             course_heading_text = course_heading.get_text()
             if not course_heading_text:
+                print(f"DEBUG: Empty h2 text in {course_url}")
                 return None
 
             split_course_heading = course_heading_text.split(" – ")
             if len(split_course_heading) < 2:
+                print(
+                    f"DEBUG: Invalid heading format '{course_heading_text}' in {course_url}"
+                )
                 return None
 
-            # Find course content sections
+            # Fast extraction with minimal processing
             text_inner_sections = soup.find_all(class_="et_pb_text_inner")
             if len(text_inner_sections) < 4:
+                print(
+                    f"DEBUG: Insufficient text sections ({len(text_inner_sections)}) in {course_url}"
+                )
                 return None
-
-            children = list(text_inner_sections[3].children)
 
             course_code = split_course_heading[0]
             course_title = split_course_heading[1]
 
+            print(f"DEBUG: Successfully parsed {course_code} - {course_title}")
+
+            # Fast description and topics extraction
             description = ""
             course_topics = []
-            official_url = course_url
 
-            for i, child in enumerate(children):
-                text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
-                if "Description:" in text:
-                    description = (
-                        children[i + 2].get_text(strip=True)
-                        if i + 2 < len(children)
-                        and hasattr(children[i + 2], "get_text")
-                        else ""
+            # Get all text content at once for faster processing
+            content_section = text_inner_sections[3]
+            all_text = content_section.get_text(separator="\n", strip=True)
+
+            # Simple text processing for speed
+            lines = [line.strip() for line in all_text.split("\n") if line.strip()]
+
+            in_description = False
+            in_topics = False
+
+            for i, line in enumerate(lines):
+                if "Description:" in line:
+                    in_description = True
+                    continue
+                elif "Course Topics:" in line or "Course topics:" in line:
+                    in_description = False
+                    in_topics = True
+                    continue
+                elif (
+                    in_description
+                    and line
+                    and not any(
+                        x in line for x in ["Course Topics", "Lectures", "Seminars"]
                     )
-                    if description == "\n" or "Course Topics" in description:
-                        description = ""
-                elif "Course Topics:" in text:
-                    if i + 2 < len(children) and hasattr(children[i + 2], "find_all"):
-                        course_topics = [
-                            li.get_text(strip=True)
-                            for li in children[i + 2].find_all("li")
-                        ]
+                ):
+                    if description:
+                        description += " " + line
+                    else:
+                        description = line
+                elif in_topics and line:
+                    # Simple topic extraction
+                    clean_line = line.lstrip("•-*").strip()
+                    if clean_line and len(course_topics) < 10:  # Limit for performance
+                        course_topics.append(clean_line)
 
             return {
                 "course_code": course_code,
                 "course_title": course_title,
-                "description": description,
+                "description": description.strip(),
                 "course_topics": course_topics,
-                "official_url": official_url,
+                "official_url": course_url,
             }
 
-        except Exception as e:
-            logger.warning(f"Error parsing course HTML from {course_url}: {str(e)}")
+        except Exception:
+            # Fast fail for maximum performance
             return None
 
     def _get_official_course_urls(self):
@@ -465,7 +579,13 @@ class CourseSelCrawler:
         try:
             from bs4 import Tag
 
+            print(f"DEBUG: Fetching course URLs from {OFFICIAL_UNDERGRAD_URL}")
             soup = retrieve_soup(OFFICIAL_UNDERGRAD_URL)
+
+            if not soup:
+                print("DEBUG: Failed to retrieve soup from official website")
+                return set()
+
             linked_urls = []
 
             for a in soup.find_all("a", href=True):
@@ -476,12 +596,22 @@ class CourseSelCrawler:
                         full_url = urljoin(OFFICIAL_BASE_URL, href)
                         linked_urls.append(full_url)
 
-            return {
+            print(f"DEBUG: Found {len(linked_urls)} total links")
+
+            course_urls = {
                 linked_url
                 for linked_url in linked_urls
                 if self._is_official_course_url(linked_url)
             }
+
+            print(f"DEBUG: Filtered to {len(course_urls)} course URLs")
+            if len(course_urls) > 0:
+                print(f"DEBUG: Sample course URL: {list(course_urls)[0]}")
+
+            return course_urls
+
         except Exception as e:
+            print(f"DEBUG: Error getting official course URLs: {str(e)}")
             logger.error(f"Error getting official course URLs: {str(e)}")
             return set()
 
@@ -504,7 +634,7 @@ class CourseSelCrawler:
         courses_with_prereqs = 0
 
         # If we have course selection data, process it
-        if courses_data:
+        if courses_data and len(courses_data) > 0:
             courses_by_code = defaultdict(list)
             for course in courses_data:
                 course_code = course.get("courseCode")
@@ -535,7 +665,7 @@ class CourseSelCrawler:
                     integrated_courses.append(course_data)
 
         # If we only have official data (no course selection data), create courses from official data
-        elif official_data:
+        if (not courses_data or len(courses_data) == 0) and official_data:
             logger.info("Creating courses from official website data only")
             for course_code, official_info in official_data.items():
                 # Create empty main_data for courses that only exist in official website
