@@ -27,6 +27,20 @@ class CourseDataCache:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
 
+    def save_to_json(self, data, data_type):
+        """Save data to json file with overwrite (no timestamp)"""
+        filename = f"{data_type}.json"
+        filepath = self.cache_dir / filename
+
+        print(f"Saving data to: {filepath}")
+        print(f"Data count: {len(data) if isinstance(data, list) else 1}")
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        print(f"Data saved to: {filepath}")
+        return filepath
+
     def save_to_jsonl(self, data, data_type):
         """Save data to jsonl file with overwrite (no timestamp)"""
         filename = f"{data_type}.jsonl"
@@ -48,15 +62,15 @@ class CourseDataCache:
         return filepath
 
     def save_coursesel_data(self, lesson_tasks, course_catalog, prerequisites):
-        """Save course selection system data to separate jsonl files with overwrite"""
+        """Save course selection system data to separate files with overwrite"""
         saved_files = {}
 
-        # Save lesson tasks data
+        # Save lesson tasks data as JSON
         if lesson_tasks:
-            filepath = self.save_to_jsonl(lesson_tasks, "coursesel_lesson_tasks")
+            filepath = self.save_to_json(lesson_tasks, "coursesel_lesson_tasks")
             saved_files["lesson_tasks"] = filepath
 
-        # Save course catalog data
+        # Save course catalog data as JSONL
         if course_catalog:
             # Convert dict to list for consistent format
             catalog_list = (
@@ -67,7 +81,7 @@ class CourseDataCache:
             filepath = self.save_to_jsonl(catalog_list, "coursesel_course_catalog")
             saved_files["course_catalog"] = filepath
 
-        # Save prerequisites data
+        # Save prerequisites data as JSONL
         if prerequisites:
             # Convert defaultdict to regular dict, then to list
             prereq_list = []
@@ -79,6 +93,11 @@ class CourseDataCache:
 
         return saved_files
 
+    def load_from_json(self, filepath):
+        """Load data from json file"""
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+
     def load_from_jsonl(self, filepath):
         """Load data from jsonl file"""
         data = []
@@ -88,16 +107,27 @@ class CourseDataCache:
                     data.append(json.loads(line))
         return data
 
+    def load_data_file(self, filepath):
+        """Load data from either JSON or JSONL file based on extension"""
+        if filepath.suffix.lower() == ".json":
+            return self.load_from_json(filepath)
+        elif filepath.suffix.lower() == ".jsonl":
+            return self.load_from_jsonl(filepath)
+        else:
+            raise ValueError(f"Unsupported file format: {filepath.suffix}")
+
     def list_cache_files(self):
-        """List all cache files"""
-        files = list(self.cache_dir.glob("*.jsonl"))
+        """List all cache files (both .json and .jsonl)"""
+        files = list(self.cache_dir.glob("*.jsonl")) + list(
+            self.cache_dir.glob("*.json")
+        )
         files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
         return files
 
     def get_cache_info(self, filepath):
         """Get cache file information"""
         stat = filepath.stat()
-        data = self.load_from_jsonl(filepath)
+        data = self.load_data_file(filepath)
 
         return {
             "filename": filepath.name,
@@ -172,7 +202,7 @@ def interactive_cache_manager():
 def preview_data_before_import(filepath, limit=10):
     """Preview data before import"""
     cache = CourseDataCache()
-    data = cache.load_from_jsonl(filepath)
+    data = cache.load_data_file(filepath)
 
     print("=" * 60)
     print(f"Data Preview ({filepath.name})")
@@ -309,7 +339,7 @@ def import_from_cache():
 
     try:
         cache = CourseDataCache()
-        data = cache.load_from_jsonl(selected_file)
+        data = cache.load_data_file(selected_file)
 
         # Preview and confirm import
         if preview_data_before_import(selected_file, limit=10):
@@ -651,11 +681,17 @@ def integrate_and_import_data(cache):
 
     for filepath in files:
         filename = filepath.name
-        data = cache.load_from_jsonl(filepath)
+        data = cache.load_data_file(filepath)
 
         if "coursesel_lesson_tasks" in filename:
-            lesson_tasks_data = data
-            print(f"[+] Loaded lesson tasks: {len(data)} records")
+            # Handle JSON format with nested structure
+            if isinstance(data, dict) and "data" in data:
+                lesson_tasks_data = data["data"].get("lessonTasks", [])
+            elif isinstance(data, list):
+                lesson_tasks_data = data
+            else:
+                lesson_tasks_data = []
+            print(f"[+] Loaded lesson tasks: {len(lesson_tasks_data)} records")
         elif "coursesel_course_catalog" in filename:
             # Convert list back to dict
             course_catalog_data = {
@@ -705,11 +741,15 @@ def integrate_and_import_data(cache):
     if import_choice in ["y", "yes"]:
         try:
             print("\n[*] Importing to database...")
-            # Here you would call the actual database import function
-            # For now, just print the action
-            print(
-                "[+] Data import completed (placeholder - implement actual database import)"
-            )
+            # Use the actual database import function
+            from apps.spider.crawlers.orc import import_department
+
+            result = import_department(integrated_data)
+
+            print(f"[+] Database import completed!")
+            print(f"    Success: {result['success']} courses")
+            print(f"    Errors: {result['errors']} courses")
+            print(f"    Total processed: {result['success'] + result['errors']}")
         except Exception as e:
             print(f"[-] Database import failed: {str(e)}")
 

@@ -212,10 +212,6 @@ class CourseSelCrawler:
         """Get prerequisite data with course requirements and logic"""
         url = f"{BASE_URL}/tpm/findAll_PrerequisiteCourse.action"
 
-    def _get_prerequisites(self):
-        """Get prerequisite data with course requirements and logic"""
-        url = f"{BASE_URL}/tpm/findAll_PrerequisiteCourse.action"
-
         try:
             logger.info(f"Requesting Prerequisites API: {url}")
             logger.info(f"Session cookies: {dict(self.session.cookies)}")
@@ -562,69 +558,111 @@ class CourseSelCrawler:
         return candidate_url.startswith(OFFICIAL_COURSE_DETAIL_URL_PREFIX)
 
     def _integrate_course_data(
-        self, courses_data, course_details, prerequisites, official_data=None
+        self,
+        lesson_tasks_data,
+        course_catalog_data,
+        prerequisites_data,
+        official_data=None,
     ):
-        """Integrate course data from multiple sources"""
+        """Integrate course data with course catalog as primary source"""
         if official_data is None:
             official_data = {}
 
         logger.info(
-            f"Starting integration with {len(courses_data)} courses, {len(prerequisites)} prereq groups, {len(official_data)} official records"
+            f"Starting integration with {len(lesson_tasks_data)} lesson tasks, {len(course_catalog_data)} catalog courses, {len(prerequisites_data)} prereq groups, {len(official_data)} official records"
         )
 
         integrated_courses = []
         courses_with_prereqs = 0
 
-        # If we have course selection data, process it
-        if courses_data and len(courses_data) > 0:
-            courses_by_code = defaultdict(list)
-            for course in courses_data:
+        # Create index of lesson tasks by course code
+        lesson_tasks_by_code = defaultdict(list)
+        if lesson_tasks_data:
+            for course in lesson_tasks_data:
                 course_code = course.get("courseCode")
                 if course_code:
-                    courses_by_code[course_code].append(course)
+                    lesson_tasks_by_code[course_code].append(course)
 
-            for course_code, course_list in courses_by_code.items():
-                merged = self._merge_course_sections(course_list)
-                if not merged:
-                    continue
-
-                course_id = merged.get("courseId")
-                catalog_info = course_details.get(course_id, {})
-                prereq_info = prerequisites.get(course_id, [])
-                official_info = official_data.get(course_code, {})
-
-                if prereq_info:
-                    courses_with_prereqs += 1
-                    logger.debug(
-                        f"Course {course_code} (ID: {course_id}) has {len(prereq_info)} prereqs"
-                    )
-
-                course_data = self._build_course_record(
-                    course_code, merged, catalog_info, prereq_info, official_info
-                )
-
-                if course_data:
-                    integrated_courses.append(course_data)
-
-        # If we only have official data (no course selection data), create courses from official data
-        if (not courses_data or len(courses_data) == 0) and official_data:
-            logger.info("Creating courses from official website data only")
+        # Create index of official data by course code
+        official_by_code = {}
+        if official_data:
             for course_code, official_info in official_data.items():
-                # Create empty main_data for courses that only exist in official website
-                empty_main_data = {}
-                empty_catalog_data = {}
-                empty_prereq_data = []
+                official_by_code[course_code] = official_info
 
-                course_data = self._build_course_record(
-                    course_code,
-                    empty_main_data,
-                    empty_catalog_data,
-                    empty_prereq_data,
-                    official_info,
+        # Create index of prerequisites by course code
+        prereq_by_code = {}
+        if prerequisites_data:
+            for course_id, prereq_list in prerequisites_data.items():
+                # Find course code for this course_id from catalog
+                if isinstance(course_catalog_data, dict):
+                    catalog_info = course_catalog_data.get(course_id)
+                    if catalog_info:
+                        course_code = catalog_info.get("courseCode")
+                        if course_code:
+                            prereq_by_code[course_code] = prereq_list
+
+        # Get all course codes from course catalog (primary source)
+        all_course_codes = set()
+        if isinstance(course_catalog_data, dict):
+            # If course_catalog_data is dict {courseId: course_info}
+            for course_id, catalog_info in course_catalog_data.items():
+                course_code = catalog_info.get("courseCode")
+                if course_code:
+                    all_course_codes.add(course_code)
+        elif isinstance(course_catalog_data, list):
+            # If course_catalog_data is list [course_info, ...]
+            for catalog_info in course_catalog_data:
+                course_code = catalog_info.get("courseCode")
+                if course_code:
+                    all_course_codes.add(course_code)
+
+        # Add course codes that only exist in official data
+        all_course_codes.update(official_by_code.keys())
+
+        logger.info(f"Processing {len(all_course_codes)} unique course codes")
+
+        # Process each course code
+        for course_code in all_course_codes:
+            # Get catalog info for this course code
+            catalog_info = {}
+            if isinstance(course_catalog_data, dict):
+                for course_id, info in course_catalog_data.items():
+                    if info.get("courseCode") == course_code:
+                        catalog_info = info
+                        break
+            elif isinstance(course_catalog_data, list):
+                for info in course_catalog_data:
+                    if info.get("courseCode") == course_code:
+                        catalog_info = info
+                        break
+
+            # Get data from other sources
+            lesson_tasks_list = lesson_tasks_by_code.get(course_code, [])
+            official_info = official_by_code.get(course_code, {})
+            prereq_info = prereq_by_code.get(course_code, [])
+
+            # Merge lesson tasks sections if available
+            merged_lesson_tasks = {}
+            if lesson_tasks_list:
+                merged_lesson_tasks = self._merge_course_sections(lesson_tasks_list)
+
+            if prereq_info:
+                courses_with_prereqs += 1
+                logger.debug(
+                    f"Course {course_code} has {len(prereq_info)} prerequisites"
                 )
 
-                if course_data:
-                    integrated_courses.append(course_data)
+            # Build course record (catalog data as base, supplemented by others)
+            course_data = self._build_course_record(
+                course_code,
+                merged_lesson_tasks,
+                catalog_info,
+                prereq_info,
+                official_info,
+            )
+
+            if course_data:
+                integrated_courses.append(course_data)
 
         logger.info(
             f"Integration complete: {courses_with_prereqs} courses have prerequisites, {len(integrated_courses)} total courses"
@@ -652,7 +690,7 @@ class CourseSelCrawler:
     def _build_course_record(
         self, course_code, main_data, catalog_data, prereq_data, official_data=None
     ):
-        """Build standardized course record with official website data integration"""
+        """Build standardized course record with official website data as primary source"""
         if official_data is None:
             official_data = {}
 
@@ -665,11 +703,15 @@ class CourseSelCrawler:
         department, number = self._parse_course_code(course_code)
         course_credits = self._extract_course_credits(main_data, catalog_data)
         prerequisites = self._build_prerequisites_string(course_code, prereq_data)
-        description = self._extract_description(official_data)
+
+        # Description and topics only from official data
+        # If course only exists in course selection system, these will be empty
+        description = self._extract_description(official_data) if official_data else ""
+        course_topics = official_data.get("course_topics", []) if official_data else []
+        official_url = official_data.get("official_url", "") if official_data else ""
+
+        # Instructors from course selection data (more current)
         instructors = self._extract_instructors(main_data, catalog_data)
-        # Get course topics and official URL from official website data
-        course_topics = official_data.get("course_topics", [])
-        official_url = official_data.get("official_url", "")
 
         # Use official URL as primary URL, fallback to API URL if not available
         course_url = official_url or self._build_course_url(main_data)
@@ -681,11 +723,11 @@ class CourseSelCrawler:
             "number": number,
             "course_credits": course_credits,
             "pre_requisites": prerequisites,
-            "description": description,
-            "course_topics": course_topics,
+            "description": description,  # Empty if only coursesel data
+            "course_topics": course_topics,  # Empty if only coursesel data
             "instructors": instructors,
             "url": course_url,
-            "official_url": official_url,
+            "official_url": official_url,  # Empty if only coursesel data
         }
 
     def _extract_course_title(self, main_data, catalog_data, official_data=None):
@@ -710,11 +752,33 @@ class CourseSelCrawler:
         number = 0
 
         if course_code:
-            # Match DEPT###(#)?J? (3 or 4 digits, J is optional)
-            match = re.match(r"^([A-Z]{2,4})(\d{3,4})J?$", course_code)
+            # Convert to uppercase for consistent matching
+            code_upper = course_code.upper()
+
+            # Try standard format first: DEPT###(#)?J? (3 or 4 digits, J is optional)
+            match = re.match(r"^([A-Z]{2,4})(\d{3,4})J?$", code_upper)
             if match:
                 department = match.group(1)
                 number = int(match.group(2))
+            else:
+                # Try alternative formats for course codes that don't follow standard pattern
+                # Format: Letter(s) + Numbers (e.g., C032710, F034546, X413515)
+                alt_match = re.match(r"^([A-Z]+)(\d+)$", code_upper)
+                if alt_match:
+                    department = alt_match.group(1)
+                    try:
+                        number = int(alt_match.group(2))
+                    except ValueError:
+                        number = 0
+                else:
+                    # For complex codes like "VE507(5002)", extract the main part
+                    complex_match = re.match(r"^([A-Z]{2,4})(\d{3,4})", code_upper)
+                    if complex_match:
+                        department = complex_match.group(1)
+                        try:
+                            number = int(complex_match.group(2))
+                        except ValueError:
+                            number = 0
 
         return department, number
 
@@ -768,9 +832,26 @@ class CourseSelCrawler:
         if not prerequisites_text:
             return ""
 
-        # For now, return as-is since we removed Chinese translations
-        # Can be enhanced later to handle specific text transformations
-        return prerequisites_text
+        # Dictionary for Chinese to English translations
+        translations = {
+            "已获学分": "Obtained Credit",
+            "已提交学分": "Credits Submitted",
+            "学分": "Credit",
+            "先修": "Prerequisite",
+            "课程": "Course",
+            "或": "or",
+            "且": "and",
+            "以上": "above",
+            "学期": "Semester",
+            "年级": "Grade",
+        }
+
+        # Apply translations
+        normalized_text = prerequisites_text
+        for chinese_term, english_term in translations.items():
+            normalized_text = normalized_text.replace(chinese_term, english_term)
+
+        return normalized_text
 
     def _extract_description(self, official_data=None):
         """Extract course description (only from official website)"""
@@ -786,13 +867,33 @@ class CourseSelCrawler:
         if catalog_data is None:
             catalog_data = {}
 
-        instructors = main_data.get("all_instructors", [])
-        teacher_name = catalog_data.get("teacherName", "")
+        instructors = []
 
+        # Extract from lesson tasks data (main_data)
+        # Check for lessonTaskTeam field (string format)
+        lesson_task_team = main_data.get("lessonTaskTeam", "").strip()
+        if lesson_task_team:
+            instructors.append(lesson_task_team)
+
+        # Check for firstSpeakerName field
+        first_speaker = main_data.get("firstSpeakerName", "").strip()
+        if first_speaker and first_speaker not in instructors:
+            instructors.append(first_speaker)
+
+        # Check for all_instructors field (backward compatibility)
+        all_instructors = main_data.get("all_instructors", [])
+        if isinstance(all_instructors, list):
+            for instructor in all_instructors:
+                if instructor.strip() and instructor.strip() not in instructors:
+                    instructors.append(instructor.strip())
+
+        # Extract from catalog data (teacherName field)
+        teacher_name = catalog_data.get("teacherName", "").strip()
         if teacher_name:
             for teacher in re.split(r"[,;]", teacher_name):
-                if teacher.strip() and teacher.strip() not in instructors:
-                    instructors.append(teacher.strip())
+                teacher = teacher.strip()
+                if teacher and teacher not in instructors:
+                    instructors.append(teacher)
 
         return instructors
 
