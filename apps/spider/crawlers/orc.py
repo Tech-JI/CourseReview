@@ -79,124 +79,50 @@ class CourseSelCrawler:
         self._initialized = True
         logger.info("Crawler initialized successfully!")
 
-    def get_all_courses(self, use_cache=True, save_cache=True):
+    def get_all_course_data(self, include_coursesel=True, include_official=True):
         """
         Get all course data from multiple APIs and official website
+        Pure data extraction without user interaction
 
         Args:
-            use_cache: Whether to use cached data
-            save_cache: Whether to save data to cache
+            include_coursesel: Whether to include course selection system data
+            include_official: Whether to include official website data
 
         Returns:
             list: Course data with prerequisites, descriptions, and instructors
         """
-        cache_manager = CourseDataCache()
-
-        # If using cache, check for available cache files first
-        if use_cache:
-            cache_files = cache_manager.list_cache_files()
-            if cache_files:
-                print(f"Found {len(cache_files)} cache files")
-                choice = input("Use existing cache? (y/n/list): ").strip().lower()
-
-                if choice == "list":
-                    # Show cache file list for selection
-                    from apps.spider.manager import interactive_cache_manager
-
-                    selected_file = interactive_cache_manager()
-                    if selected_file:
-                        print(f"Loading cache file: {selected_file.name}")
-                        return cache_manager.load_from_jsonl(selected_file)
-                elif choice in ["y", "yes"]:
-                    # Use the latest cache file
-                    latest_file = cache_files[0]
-                    print(f"Loading latest cache: {latest_file.name}")
-                    return cache_manager.load_from_jsonl(latest_file)
-
-        # Ask user to choose data sources
-        use_coursesel = self._ask_user_choice(
-            "Crawl course selection system data? (y/n): ", default="n"
-        )
-        use_official = self._ask_user_choice(
-            "Crawl official website data? (y/n): ", default="y"
-        )
-
         courses_data = []
         course_details = {}
         prerequisites = {}
         official_data = {}
 
-        if use_coursesel:
+        if include_coursesel:
             self._ensure_initialized()  # Make sure crawler is initialized
-            print("🌐 爬取课程选择系统数据...")
+            logger.info("Crawling course selection system data...")
             # Get data from course selection APIs
             courses_data = self._get_lesson_tasks()
             course_details = self._get_course_catalog()
             prerequisites = self._get_prerequisites()
         else:
-            print("⏭️ 跳过课程选择系统数据")
+            logger.info("Skipping course selection system data")
 
-        if use_official:
-            print("🌐 爬取官网数据...")
+        if include_official:
+            logger.info("Crawling official website data...")
             # Get official website data for enhanced descriptions
             official_data = self._get_official_website_data()
         else:
-            print("Skipping official website data")
+            logger.info("Skipping official website data")
 
         # Integrate data
         integrated_data = self._integrate_course_data(
             courses_data, course_details, prerequisites, official_data
         )
 
-        print(
-            f"DEBUG: Integrated data count: {len(integrated_data) if integrated_data else 0}"
+        logger.info(
+            f"Integrated data count: {len(integrated_data) if integrated_data else 0}"
         )
-        print(f"DEBUG: Save cache enabled: {save_cache}")
-
-        # Save to cache
-        if save_cache and integrated_data:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            data_sources = []
-            if use_coursesel:
-                data_sources.append("coursesel")
-            if use_official:
-                data_sources.append("official")
-
-            cache_filename = f"courses_{'_'.join(data_sources)}"
-            cache_filepath = cache_manager.save_to_jsonl(
-                integrated_data, cache_filename, timestamp
-            )
-
-            print(f"Data cached to: {cache_filepath}")
-
-            # Ask whether to import to database immediately
-            from apps.spider.manager import preview_data_before_import
-
-            if preview_data_before_import(cache_filepath, limit=5):
-                print("Starting database import...")
-                try:
-                    import_department(integrated_data)
-                    print("Data import successful!")
-                except Exception as e:
-                    print(f"Data import failed: {str(e)}")
-                    print("Data saved to cache, can be imported manually later")
-            else:
-                print("Skipping database import, data saved to cache")
 
         return integrated_data
-
-    def _ask_user_choice(self, prompt, default="y"):
-        """Ask user for yes/no choice with default value"""
-        while True:
-            response = input(prompt).strip().lower()
-            if not response:
-                response = default.lower()
-            if response in ["y", "yes", "true"]:
-                return True
-            elif response in ["n", "no", "false"]:
-                return False
-            else:
-                print("Please enter y/yes or n/no")
 
     def _get_current_elect_turn_id(self):
         """Get current election turn ID dynamically"""
@@ -286,9 +212,25 @@ class CourseSelCrawler:
         """Get prerequisite data with course requirements and logic"""
         url = f"{BASE_URL}/tpm/findAll_PrerequisiteCourse.action"
 
+    def _get_prerequisites(self):
+        """Get prerequisite data with course requirements and logic"""
+        url = f"{BASE_URL}/tpm/findAll_PrerequisiteCourse.action"
+
         try:
-            response = self.session.post(url, params={"_t": int(time.time() * 1000)})
+            logger.info(f"Requesting Prerequisites API: {url}")
+            logger.info(f"Session cookies: {dict(self.session.cookies)}")
+            response = self.session.post(url, json={})
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content length: {len(response.content)}")
+            logger.info(f"Response content (first 500 chars): {response.text[:500]}")
+
             response.raise_for_status()
+
+            if not response.text.strip():
+                logger.warning("Prerequisites API returned empty response")
+                return {}
+
             data = response.json()
 
             logger.debug(f"Prerequisites API response: success={data.get('success')}")
@@ -503,7 +445,7 @@ class CourseSelCrawler:
                 print(f"DEBUG: Empty h2 text in {course_url}")
                 return None
 
-            split_course_heading = course_heading_text.split(" – ")
+            split_course_heading = course_heading_text.split(" – ")  # Using em dash
             if len(split_course_heading) < 2:
                 print(
                     f"DEBUG: Invalid heading format '{course_heading_text}' in {course_url}"
@@ -558,7 +500,7 @@ class CourseSelCrawler:
                         description = line
                 elif in_topics and line:
                     # Simple topic extraction
-                    clean_line = line.lstrip("•-*").strip()
+                    clean_line = line.lstrip("-*").strip()
                     if clean_line and len(course_topics) < 10:  # Limit for performance
                         course_topics.append(clean_line)
 
@@ -700,7 +642,7 @@ class CourseSelCrawler:
         for course in course_list:
             teachers = course.get("lessonTaskTeam", "")
             if teachers:
-                for teacher in re.split(r"[,;，；、]", teachers):
+                for teacher in re.split(r"[,;]", teachers):
                     if teacher.strip():
                         all_instructors.add(teacher.strip())
 
@@ -826,21 +768,9 @@ class CourseSelCrawler:
         if not prerequisites_text:
             return ""
 
-        # Define translation mapping
-        translations = {
-            "已获学分": "Obtained Credit",
-            "已提交学分": "Credits Submitted",
-            "获得学分": "Obtained Credit",
-            "提交学分": "Credits Submitted",
-            "学分": "Credit",
-        }
-
-        # Apply translations
-        normalized = prerequisites_text
-        for chinese, english in translations.items():
-            normalized = normalized.replace(chinese, english)
-
-        return normalized
+        # For now, return as-is since we removed Chinese translations
+        # Can be enhanced later to handle specific text transformations
+        return prerequisites_text
 
     def _extract_description(self, official_data=None):
         """Extract course description (only from official website)"""
@@ -860,7 +790,7 @@ class CourseSelCrawler:
         teacher_name = catalog_data.get("teacherName", "")
 
         if teacher_name:
-            for teacher in re.split(r"[,;，；、]", teacher_name):
+            for teacher in re.split(r"[,;]", teacher_name):
                 if teacher.strip() and teacher.strip() not in instructors:
                     instructors.append(teacher.strip())
 
@@ -891,7 +821,7 @@ def crawl_program_urls():
     global _course_data_cache
 
     crawler = _get_crawler()
-    courses = crawler.get_all_courses()
+    courses = crawler.get_all_course_data()
 
     course_urls = []
     _course_data_cache = {}  # Reset cache
@@ -922,7 +852,7 @@ def import_department(department_data):
 
     for course_data in department_data:
         try:
-            # 验证必要字段
+            # Validate required fields
             required_fields = ["course_code", "course_title"]
             missing_fields = [
                 field for field in required_fields if not course_data.get(field)
@@ -935,7 +865,7 @@ def import_department(department_data):
                 error_count += 1
                 continue
 
-            # 准备默认值，处理可能缺失的字段
+            # Prepare default values, handle potentially missing fields
             defaults = {
                 "course_title": course_data.get("course_title", ""),
                 "department": course_data.get("department", ""),
@@ -947,19 +877,19 @@ def import_department(department_data):
                 "url": course_data.get("url", ""),
             }
 
-            # 注意：official_url 字段不存在于Course模型中，所以不包含它
+            # Note: official_url field does not exist in Course model, so it's not included
 
-            # 创建或更新课程
+            # Create or update course
             course, created = Course.objects.update_or_create(
                 course_code=course_data["course_code"],
                 defaults=defaults,
             )
 
-            # 处理教师信息
+            # Handle instructor information
             instructors = course_data.get("instructors", [])
             if instructors:
                 for instructor_name in instructors:
-                    if instructor_name.strip():  # 确保教师名字不为空
+                    if instructor_name.strip():  # Ensure instructor name is not empty
                         try:
                             instructor, _ = Instructor.objects.get_or_create(
                                 name=instructor_name.strip()

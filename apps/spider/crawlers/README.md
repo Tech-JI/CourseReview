@@ -7,6 +7,7 @@
 - `courseId`
 - `courseName`
 - `courseNameEn`
+- `courseTypeId`
 - `credit`
 - `hour`
 - `isCompulsory`
@@ -124,7 +125,8 @@
 - courseId
 - prerequisiteRule
 - prerequisiteRuleDesc
-### Sample 
+
+### Sample Response
 ```json
 [
     {
@@ -329,3 +331,10 @@
     }
 ]
 ```
+
+## https://coursesel.umji.sjtu.edu.cn/tpm/findLessonTasksPreview_ElectTurn.action
+
+### Data Fields
+- electTurn
+- courseType
+- lessonTask

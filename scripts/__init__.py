@@ -11,31 +11,31 @@ from website.celery import app
 
 
 def crawl_and_import_data():
-    old_task_always_eager = app.conf.task_always_eager
-    app.conf.task_always_eager = True
+    """
+    Interactive course data crawling and import using the new manager system
 
-    # ORC crawling takes a long time, especially when run synchronously.
-    # If the ORC is not crawled, the course selection will only be limited,
-    # but this should not interfere with development
-    print("Crawling ORC. This will take a while.")
-    crawl_orc()
+    This function provides an interactive workflow for:
+    1. Crawling course selection system data (with JSESSIONID authentication)
+    2. Crawling official website data
+    3. Integrating and importing data to database
+    """
+    print("=" * 60)
+    print("Interactive Course Data Crawling and Import")
+    print("=" * 60)
+    print("Using the new unified spider management system...")
+    print()
 
-    # print("Crawling timetable")
-    # crawl_timetable()
+    # Import and use the new manager system
+    from apps.spider.manager import interactive_spider_manager
 
-    # print("Crawling medians")
-    # crawl_medians()
-
-    print("Importing ORC")
-    _import_crawled_datas(CrawledData.ORC_DEPARTMENT_COURSES)
-
-    # print("Importing timetable")
-    # _import_crawled_datas(CrawledData.COURSE_TIMETABLE)
-
-    # print("Importing medians")
-    # _import_crawled_datas(CrawledData.MEDIANS)
-
-    app.conf.task_always_eager = old_task_always_eager
+    try:
+        # Launch the interactive spider manager
+        interactive_spider_manager()
+    except KeyboardInterrupt:
+        print("\nCrawl and import cancelled by user")
+    except Exception as e:
+        print(f"Error during crawl and import: {str(e)}")
+        raise
 
 
 def _import_crawled_datas(data_type):
