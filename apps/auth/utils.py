@@ -9,6 +9,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
+from typing import Any
 
 from apps.web.models import Student
 
@@ -22,7 +23,7 @@ QUEST_SETTINGS = settings.QUEST
 QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
 
 
-def get_survey_details(action: str) -> dict[str, any] | None:
+def get_survey_details(action: str) -> dict[str, Any] | None:
     """
     A single, clean function to get all survey details for a given action.
     Valid actions: "signup", "login", "reset".
