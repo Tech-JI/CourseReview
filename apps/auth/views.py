@@ -448,7 +448,7 @@ def auth_reset_password_api(request) -> Response:
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
-    account = request.data.get("account", "")
+    account = request.data.get("account", "").strip()
     password = request.data.get("password", "")
     turnstile_token = request.data.get("turnstile_token", "")
 
@@ -463,20 +463,22 @@ def auth_login_api(request) -> Response:
         or request.META.get("REMOTE_ADDR")
     )
 
-    # Verify Turnstile token
     success, error_response = asyncio.run(
         utils.verify_turnstile_token(turnstile_token, client_ip)
     )
     if not success:
-        return error_response
+        return error_response or Response(
+            {"error": "Turnstile verification failed"}, status=502
+        )
 
     user = authenticate(username=account, password=password)
+    if user is None or not user.is_active:
+        return Response({"error": "Invalid account or password"}, status=401)
 
-    if user is not None and user.is_active:
-        login(request, user)
-        Student.objects.get_or_create(user=user)
-        return Response({"message": "Login successfully"}, status=200)
-    return Response({"error": "Invalid account or password"}, status=401)
+    login(request, user)
+    Student.objects.get_or_create(user=user)
+
+    return Response({"message": "Login successfully"}, status=200)
 
 
 @api_view(["POST"])
