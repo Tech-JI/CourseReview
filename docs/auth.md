@@ -16,7 +16,7 @@ The process is designed as a linear, redirect-based flow that is compatible acro
 
 2. **OTP Generation and User Redirection**
 
-   The backend validates the Turnstile response, generates a cryptographically secure 8-digit OTP, and associates it with a short-lived (10-minute) `temp_token`. The backend sets this `temp_token` in a secure, `HttpOnly` cookie and returns the OTP and the relevant pre-configured questionnaire URL. (Use different questionnaires for different actions.) The frontend prominently displays the OTP and a copy button. When the user clicks this button, the OTP is copied to their clipboard, frontend shows "Copied!", and they are automatically redirected to the questionnaire URL within the current tab after 1 second. The OTP is also appended to the URL as a `otp_hint` parameter for user convenience.
+   The backend validates the Turnstile response, generates a cryptographically secure 8-digit OTP, and associates it with a short-lived (10-minute) `temp_token`. The backend sets this `temp_token` in a secure, `HttpOnly` cookie and returns the OTP and the relevant pre-configured questionnaire URL. (Use different questionnaires for different actions.) The frontend prominently displays the OTP and a copy button. When the user clicks this button, the OTP is copied to their clipboard, frontend shows "Copied!", and they are automatically redirected to the questionnaire URL within the current tab after 1 second (no countdown or displaying remaining seconds). The OTP is also appended to the URL as a `otp_hint` parameter for user convenience.
 
 3. **Identity Assertion via Questionnaire**
 
@@ -83,7 +83,7 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
 
 ##### `Login.vue` (`/login`)
 
-Redirect to `/` if already logged in. Multiple login methods, including password login and questionnaire login. Renders `<AuthInitiate action="login" />`. The flow completes at the callback, which redirects to the homepage directly.
+Redirect to `/` if already logged in. Multiple login methods, including password login and questionnaire login, may be more in the future. Both requires passing Turnstile. Uncareful handling of Turnstile widget may cause conflicts. If questionnaire, render `<AuthInitiate action="login" />`. The flow completes at the callback, which redirects to the homepage directly.
 
 ##### `ResetPassword.vue` (`/reset`)
 
@@ -92,7 +92,7 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
 - **If not found**: Renders `<AuthInitiate action="reset_password" />`.
 - **If found**: Renders `<SetPasswordForm action="reset_password" />`.
 
-#### `AuthCallback.vue` (`/callback`):
+#### `AuthCallback.vue` (`/callback`)
 
 - **Logic**: A transient component.
   1. On mount, parses `account`, `answer_id`, and `action` from the URL query.
@@ -103,7 +103,7 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
 #### `SetPasswordForm.vue` (Reusable Component)
 
 - **Props**: `action` (String: `signup`, `reset_password`).
-- **Logic**: Renders password fields. On submit, it sends the new password to `POST /api/auth/signup` or `POST /api/auth/password` (for password reset) based on action. The browser automatically attaches the `HttpOnly` `temp_token` cookie to the request. The frontend does not handle the token. Delete OTP and the auth flow state from `localStorage` on success and redirect to `/`.
+- **Logic**: Renders password fields. (password and re-type-password only. Backend fetches username and other info directly from questionnaire platform.) On submit, it sends the new password to `POST /api/auth/signup` or `POST /api/auth/password` (for password reset) based on action. The browser automatically attaches the `HttpOnly` `temp_token` cookie to the request. The frontend does not handle the token. Delete OTP and the auth flow state from `localStorage` on success and redirect to `/`.
 
 ### Detailed Backend Process
 
