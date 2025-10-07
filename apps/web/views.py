@@ -1,4 +1,5 @@
 import datetime
+import logging
 import uuid
 
 import dateutil.parser
@@ -30,6 +31,8 @@ from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
 
+logger = logging.getLogger(__name__)
+
 LIMITS = {
     "courses": 20,
     "reviews": 5,
@@ -40,18 +43,11 @@ LIMITS = {
 @api_view(["GET"])
 def user_status(request):
     if request.user.is_authenticated:
+        logger.info("User is authenticated")
         return Response({"isAuthenticated": True, "username": request.user.username})
     else:
+        logger.info("User is not authenticated")
         return Response({"isAuthenticated": False})
-
-
-def get_session_id(request):
-    if "user_id" not in request.session:
-        if not request.user.is_authenticated:
-            request.session["user_id"] = uuid.uuid4().hex
-        else:
-            request.session["user_id"] = request.user.username
-    return request.session["user_id"]
 
 
 @api_view(["GET"])
@@ -63,24 +59,6 @@ def landing_api(request):
             "review_count": Review.objects.count(),
         }
     )
-
-
-def get_prior_course_id(request, current_course_id):
-    prior_course_id = None
-    if (
-        "prior_course_id" in request.session
-        and "prior_course_timestamp" in request.session
-    ):
-        prior_course_timestamp = request.session["prior_course_timestamp"]
-        if (
-            dateutil.parser.parse(prior_course_timestamp)
-            + datetime.timedelta(minutes=10)
-            >= datetime.datetime.now()
-        ):
-            prior_course_id = request.session["prior_course_id"]
-    request.session["prior_course_id"] = current_course_id
-    request.session["prior_course_timestamp"] = datetime.datetime.now().isoformat()
-    return prior_course_id
 
 
 @api_view(["GET"])
@@ -165,6 +143,7 @@ def course_detail_api(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
     except Course.DoesNotExist:
+        logger.warning(f"Course with id {course_id} does not exist")
         return Response(status=404)
 
     if request.method == "GET":
@@ -172,9 +151,13 @@ def course_detail_api(request, course_id):
         return Response(serializer.data)
     elif request.method == "POST":
         if not request.user.is_authenticated:
+            logger.warning("Authentication required for posting review")
             return Response({"detail": "Authentication required"}, status=403)
 
         if not Review.objects.user_can_write_review(request.user.id, course_id):
+            logger.warning(
+                f"User {request.user.id} cannot write review for course {course_id}"
+            )
             return Response({"detail": "User cannot write review"}, status=403)
 
         form = ReviewForm(request.data)
@@ -187,6 +170,7 @@ def course_detail_api(request, course_id):
                 course, context={"request": request}
             )  # re-serialize with new data
             return Response(serializer.data, status=201)
+        logger.warning(f"Review form errors: {form.errors}")
         return Response(form.errors, status=400)
 
 
@@ -250,6 +234,7 @@ def course_review_search_api(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
     except Course.DoesNotExist:
+        logger.warning(f"Course with id {course_id} not found for review search")
         return Response({"detail": "Course not found"}, status=404)
 
     query = request.GET.get("q", "").strip()
@@ -342,6 +327,7 @@ def course_instructors(request, course_id):
             {"instructors": [instructor.name for instructor in instructors]}, status=200
         )
     except Course.DoesNotExist:
+        logger.warning(f"Course with id {course_id} not found for instructors API")
         return Response({"error": "Course not found"}, status=404)
 
 
@@ -352,6 +338,9 @@ def course_vote_api(request, course_id):
         value = request.data["value"]
         forLayup = request.data["forLayup"]
     except KeyError:
+        logger.warning(
+            f"Missing required fields in course vote API for course {course_id}"
+        )
         return Response(
             {"detail": "Missing required fields: value, forLayup"}, status=400
         )
@@ -390,6 +379,7 @@ def review_vote_api(request, review_id):
         is_kudos = request.data.get("is_kudos")
 
         if is_kudos is None:
+            logger.warning("is_kudos field is required for review vote API")
             return Response({"detail": "is_kudos field is required"}, status=400)
 
         is_kudos = bool(is_kudos)
@@ -401,6 +391,7 @@ def review_vote_api(request, review_id):
 
         if kudos_count is None or dislike_count is None:
             # Review doesn't exist
+            logger.warning(f"Review {review_id} not found for voting")
             return Response({"detail": "Review not found"}, status=404)
 
         return Response(
@@ -435,12 +426,16 @@ def get_user_review_api(request, course_id):
         try:
             course = Course.objects.get(id=course_id)
         except Course.DoesNotExist:
+            logger.warning(f"Course {course_id} not found for get_user_review_api")
             return Response({"detail": "Course not found"}, status=404)
 
         # Get the user's review for this course
         review = Review.objects.get_user_review_for_course(request.user, course)
 
         if review is None:
+            logger.info(
+                f"No user review found for course {course_id} and user {request.user}"
+            )
             return Response(
                 {"detail": "No user review found for this course"}, status=404
             )

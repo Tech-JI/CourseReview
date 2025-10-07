@@ -13,6 +13,8 @@ from rest_framework.response import Response
 
 from apps.web.models import Student
 
+logger = logging.getLogger(__name__)
+
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
 PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
@@ -32,13 +34,13 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
     action_details = QUEST_SETTINGS.get(action.upper())
 
     if not action_details:
-        logging.error("Invalid quest action requested: %s", action)
+        logger.error("Invalid quest action requested: %s", action)
         return None
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
     except (ValueError, TypeError):
-        logging.error(
+        logger.error(
             "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )
         return None
@@ -66,18 +68,18 @@ async def verify_turnstile_token(
                 },
             )
         if not response.json().get("success"):
-            logging.warning("Turnstile verification failed: %s", response.json())
+            logger.warning("Turnstile verification failed: %s", response.json())
             return False, Response(
                 {"error": "Turnstile verification failed"}, status=403
             )
         return True, None
     except httpx.TimeoutException:
-        logging.error("Turnstile verification timed out")
+        logger.error("Turnstile verification timed out")
         return False, Response(
             {"error": "Turnstile verification timed out"}, status=504
         )
-    except Exception as e:
-        logging.error(f"Error verifying Turnstile token: {e}")
+    except Exception:
+        logger.error("Turnstile verification error")
         return False, Response({"error": "Turnstile verification error"}, status=500)
 
 
@@ -132,19 +134,19 @@ async def get_latest_answer(
             response.raise_for_status()  # Raise an exception for bad status codes
             full_data = response.json()
     except httpx.TimeoutException:
-        logging.exception("Questionnaire API query timed out")
+        logger.error("Questionnaire API query timed out")
         return None, Response(
             {"error": "Questionnaire API query timed out"},
             status=504,
         )
-    except httpx.RequestError as e:
-        logging.exception(f"Error querying questionnaire API: {e}")
+    except httpx.RequestError:
+        logger.error("Error querying questionnaire API")
         return None, Response(
             {"error": "Failed to query questionnaire API"},
             status=500,
         )
-    except Exception as e:
-        logging.exception(f"An unexpected error occurred: {e}")
+    except Exception:
+        logger.error("An unexpected error occurred")
         return None, Response({"error": "An unexpected error occurred"}, status=500)
 
     # Filter and return only the required fields from the first row
@@ -180,7 +182,7 @@ async def get_latest_answer(
             key in filtered_data and filtered_data[key] is not None
             for key in ["id", "submitted_at", "account", "otp"]
         ):
-            logging.warning("Missing required field(s) in questionnaire response")
+            logger.warning("Missing required field(s) in questionnaire response")
             return None, Response(
                 {"error": "Missing required field(s) in questionnaire response"},
                 status=400,
