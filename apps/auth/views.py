@@ -32,7 +32,7 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 AUTH_SETTINGS = settings.AUTH
 OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
 TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
-ACTION_LIST = ["signup", "login", "reset_password"]
+ACTION_LIST = AUTH_SETTINGS["ACTION_LIST"]
 TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 
@@ -41,7 +41,7 @@ TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_initiate_api(request):
-    """Step 1: Authentication Initiation (/api/auth/initiate)
+    """Step 1: Authentication Initiation (/api/auth/init)
 
     1. Receives action and turnstile_token from frontend
     2. Verifies Turnstile token with Cloudflare's API
@@ -432,7 +432,7 @@ def auth_reset_password_api(request) -> Response:
     try:
         verification_data, error_response = verify_token_pwd(
             request,
-            action="reset_password",
+            action="reset",
         )
         if verification_data is None:
             return error_response or Response(
