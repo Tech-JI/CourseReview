@@ -6,9 +6,8 @@ from apps.spider import views as spider_views
 from apps.web import views
 
 urlpatterns = [
-    # OAuth
     re_path(
-        r"^api/auth/initiate/$",
+        r"^api/auth/init/$",
         auth_views.auth_initiate_api,
         name="auth_initiate_api",
     ),
@@ -16,12 +15,6 @@ urlpatterns = [
         r"^api/auth/verify/$",
         auth_views.verify_callback_api,
         name="verify_callback_api",
-    ),
-    # Backwards-compatible alias (some front-end code calls verify-callback)
-    re_path(
-        r"^api/auth/verify-callback/$",
-        auth_views.verify_callback_api,
-        name="verify_callback_api_alias",
     ),
     re_path(
         r"^api/auth/password/$",
@@ -47,7 +40,7 @@ urlpatterns = [
     re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/$",
-        views.course_detail_api,
+        views.CourseDetailAPI.as_view(),
         name="course_detail_api",
     ),
     re_path(
@@ -70,11 +63,11 @@ urlpatterns = [
     ),
     re_path(
         r"^api/course/(?P<course_id>[0-9]+)/review/$",
-        views.delete_review_api,
-        name="delete_review_api",
+        views.CourseReviewAPI.as_view(),
+        name="course_review_api",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9]+)/my-review/$",
+        r"^api/course/(?P<course_id>[0-9]+)/review/my/$",
         views.get_user_review_api,
         name="get_user_review_api",
     ),
@@ -88,10 +81,5 @@ urlpatterns = [
         views.departments_api,
         name="departments_api",
     ),
-    re_path(r"^api/courses/$", views.courses_api, name="courses_api"),
-    re_path(
-        r"^api/course/(?P<course_id>[0-9]+)/review_search/$",
-        views.course_review_search_api,
-        name="course_review_search_api",
-    ),
+    re_path(r"^api/courses/$", views.CoursesListAPI.as_view(), name="courses_api"),
 ]
