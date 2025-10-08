@@ -1,4 +1,12 @@
-FROM ghcr.io/astral-sh/uv:alpine3.22
+FROM astral/uv:0.8-python3.13-alpine
+
+RUN apk add --no-cache \
+    build-base \
+    postgresql-dev \
+    python3-dev \
+    libffi-dev \
+    musl-dev \
+    linux-headers
 
 # Setup a non-root user
 RUN addgroup -S nonroot && adduser -S nonroot -G nonroot -h /home/nonroot
@@ -6,12 +14,21 @@ RUN addgroup -S nonroot && adduser -S nonroot -G nonroot -h /home/nonroot
 WORKDIR /app
 
 # Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
-ENV UV_TOOL_BIN_DIR=/usr/local/bin
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
 
 # Add project source
 COPY . /app
+
+# RUN apk add --no-cache postgresql-dev
+
+# Install the project dependencies as root, then change ownership to nonroot
+RUN uv venv  .venv
+
+RUN uv sync --locked --no-dev
+
 
 # Change ownership of the app directory to nonroot user so it can run the application
 RUN chown -R nonroot:nonroot /app
@@ -25,9 +42,6 @@ USER nonroot
 
 RUN mkdir -p /app/website/static
 
-
-# Install the project dependencies as root, then change ownership to nonroot
-RUN --mount=type=cache,target=/root/.cache/uv --mount=type=bind,source=uv.lock,target=uv.lock --mount=type=bind,source=pyproject.toml,target=pyproject.toml uv sync --locked --no-install-project --no-dev
 
 # Place executables in PATH
 ENV PATH="/app/.venv/bin:$PATH"

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from .config import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 load_dotenv(BASE_DIR / ".env")
 
 # --- Default Configuration ---
