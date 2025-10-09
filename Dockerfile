@@ -1,37 +1,38 @@
-FROM astral/uv:0.8-python3.13-alpine
-
-RUN apk add --no-cache \
-    postgresql-dev
-
-# Setup a non-root user
-RUN addgroup -S nonroot && adduser -S nonroot -G nonroot -h /home/nonroot
+# --- STAGE 1: Builder ---
+FROM debian:13-slim AS builder
 
 WORKDIR /app
 
-# Enable bytecode compilation
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy \
-    UV_PROJECT_ENVIRONMENT=/app/.venv
-
-# Add project source
 COPY . /app
 
-# Install the project dependencies as root, then change ownership to nonroot
-RUN uv sync --locked --no-dev
+RUN --mount=type=bind,source=.,target=/app \
+    --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/usr/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    <<EOF
 
-# Change ownership of the app directory to nonroot user so it can run the application
-RUN chown -R nonroot:nonroot /app
+    set -Eeux
 
-# Make sure the entrypoint script is executable
-RUN chmod +x /app/scripts/entrypoint.sh
-RUN chmod +x /app/scripts/deploy.sh
+    uv python install 3.13 --install-dir=/tmp/python
 
-# Use non-root user
+    (cd /tmp/python/* && tar -cf- .) | (cd /usr/local && tar -xf-)
+    rm -r /tmp/python
+
+    export UV_PROJECT_ENVIRONMENT=/usr/local
+    uv sync --project=/app --frozen --compile-bytecode --no-dev --no-editable --no-managed-python
+EOF
+
+FROM gcr.io/distroless/base-debian13:nonroot
+
+ARG CHIPSET_ARCH=x86_64-linux-gnu
+
+COPY --from=builder /lib/${CHIPSET_ARCH}/libz.so.1 /lib/${CHIPSET_ARCH}/
+
+COPY --from=builder /usr/local /usr/local
+
+COPY --from=builder /app /app
+
+WORKDIR /app
+
 USER nonroot
 
-# Reset entrypoint
-ENTRYPOINT []
-
-
-CMD ["/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["python", "/app/scripts/entrypoint.py"]
