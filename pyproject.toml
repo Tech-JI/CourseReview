@@ -1,13 +1,14 @@
 [project]
 name = ""
 version = "0.0.1"
+requires-python = "==3.13.*"
 dependencies = [
+    "psycopg2-binary>=2.9.10",
     "beautifulsoup4>=4.13.3",
     "dj-database-url>=2.3.0",
     "django>=5.1.6",
     "django-debug-toolbar>=5.0.1",
     "httpx>=0.28.1",
-    "psycopg2-binary>=2.9.10",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.1",
     "pytz>=2025.1",
@@ -19,7 +20,9 @@ dependencies = [
     "django-cors-headers>=4.7.0",
     "django-redis",
     "pyyaml>=6.0.2",
+		"gunicorn>=23.0.0"
 ]
+
 
 [tool.uv]
 package = false
