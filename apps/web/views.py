@@ -127,7 +127,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         return self.list(request, *args, **kwargs)
 
 
-class CourseDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
+class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
     """API endpoint for retrieving course details."""
 
     serializer_class = CourseSerializer
@@ -146,79 +146,118 @@ class CourseDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
         return self.retrieve(request, *args, **kwargs)
 
 
-class CourseReviewAPI(generics.GenericAPIView):
-    """API endpoint for course reviews - GET (search), POST (create), DELETE (delete)."""
+class CoursesReviewsAPI(
+    generics.GenericAPIView, mixins.ListModelMixin, mixins.CreateModelMixin
+):
+    """API endpoint for course reviews - GET (list/search), POST (create)."""
 
+    serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Course.objects.all()
-
-    def get_object(self):
-        """Get course object for review operations."""
+        """Get reviews for the specified course."""
         course_id = self.kwargs.get("course_id")
         try:
-            return Course.objects.get(id=course_id)
+            course = Course.objects.get(id=course_id)
+            return Review.objects.filter(course=course)
         except Course.DoesNotExist:
             logger.warning(f"Course with id {course_id} does not exist")
-            return None
+            return Review.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        """List reviews with optional filtering."""
+        queryset = self.get_queryset()
+
+        # Handle all query parameters here
+        query = request.query_params.get("q", "").strip()
+        if query:
+            course_id = self.kwargs.get("course_id")
+            try:
+                course = Course.objects.get(id=course_id)
+                queryset = course.search_reviews(query)
+            except Course.DoesNotExist:
+                return Response(
+                    {"detail": "Course not found"}, status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Apply author filter
+        if request.query_params.get("author") == "me":
+            queryset = queryset.filter(user=request.user)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get(self, request, *args, **kwargs):
-        """Search reviews for a course."""
-        course = self.get_object()
-        if course is None:
-            return Response({"detail": "Course not found"}, status=404)
-
-        query = request.GET.get("q", "").strip()
-        reviews = course.search_reviews(query)
-        review_count = reviews.count()
-
-        serializer = ReviewSerializer(reviews, many=True, context={"request": request})
-
-        return Response(
-            {
-                "query": query,
-                "course_id": course.id,
-                "course_short_name": course.short_name(),
-                "reviews_full_count": review_count,
-                "remaining": 0,  # No remaining since user is authenticated
-                "reviews": serializer.data,
-            }
-        )
+        """Get list of reviews."""
+        return self.list(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
         """Create a new review for a course."""
-        course = self.get_object()
-        if course is None:
-            return Response({"detail": "Course not found"}, status=404)
+        course_id = self.kwargs.get("course_id")
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {"detail": "Course not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
+        # Check if user can write review
         if not Review.objects.user_can_write_review(request.user.id, course.id):
             logger.warning(
                 f"User {request.user.id} cannot write review for course {course.id}"
             )
-            return Response({"detail": "User cannot write review"}, status=403)
+            return Response(
+                {"detail": "User cannot write review"}, status=status.HTTP_403_FORBIDDEN
+            )
 
+        # Validate and save review
         form = ReviewForm(request.data)
-        if form.is_valid():
-            review = form.save(commit=False)
-            review.course = course
-            review.user = request.user
-            review.save()
-            serializer = CourseSerializer(course, context={"request": request})
-            return Response(serializer.data, status=201)
+        if not form.is_valid():
+            logger.warning(f"Review form errors: {form.errors}")
+            return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        logger.warning(f"Review form errors: {form.errors}")
-        return Response(form.errors, status=400)
+        review = form.save(commit=False)
+        review.course = course
+        review.user = request.user
+        review.save()
+
+        # Return the created review
+        serializer = self.get_serializer(review)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class UserReviewsAPI(
+    generics.GenericAPIView,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+):
+    """API endpoint for user review operations - LIST, GET, PUT, DELETE."""
+
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    lookup_url_kwarg = "review_id"
+
+    def get_queryset(self):
+        """Only reviews belonging to the authenticated user."""
+        return Review.objects.filter(user=self.request.user)
+
+    def get(self, request, *args, **kwargs):
+        """Handle both list (no id) and retrieve (with id) operations."""
+        if "review_id" in kwargs:
+            return self.retrieve(request, *args, **kwargs)
+        else:
+            return self.list(request, *args, **kwargs)
+
+    def put(self, request, *args, **kwargs):
+        """Update a specific review."""
+        return self.update(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
-        """Delete user's review for a course."""
-        course = self.get_object()
-        if course is None:
-            return Response({"detail": "Course not found"}, status=404)
-
-        Review.objects.delete_reviews_for_user_course(user=request.user, course=course)
-        serializer = CourseSerializer(course, context={"request": request})
-        return Response(serializer.data, status=200)
+        """Delete a specific review."""
+        return self.destroy(request, *args, **kwargs)
 
 
 @api_view(["GET"])
@@ -348,7 +387,7 @@ def review_vote_api(request, review_id):
     """
     API endpoint for voting on reviews (kudos/dislike).
 
-    URL: /api/review/{review_id}/vote/
+    URL: /api/reviews/{review_id}/vote/
     POST data:
     - is_kudos: boolean (True for kudos, False for dislike)
 
@@ -384,48 +423,6 @@ def review_vote_api(request, review_id):
                 "user_vote": user_vote,
             }
         )
-
-    except Exception:
-        return Response(
-            {"detail": "An error occurred processing your request"},
-            status=500,
-        )
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_user_review_api(request, course_id):
-    """
-    API endpoint to get the authenticated user's review for a specific course.
-
-    Returns:
-    - Review data if the user has written a review for this course
-    - 404 if no review found
-    - 403 if user is not authenticated
-    """
-
-    try:
-        # Get the course
-        try:
-            course = Course.objects.get(id=course_id)
-        except Course.DoesNotExist:
-            logger.warning(f"Course {course_id} not found for get_user_review_api")
-            return Response({"detail": "Course not found"}, status=404)
-
-        # Get the user's review for this course
-        review = Review.objects.get_user_review_for_course(request.user, course)
-
-        if review is None:
-            logger.info(
-                f"No user review found for course {course_id} and user {request.user}"
-            )
-            return Response(
-                {"detail": "No user review found for this course"}, status=404
-            )
-
-        # Serialize and return the review
-        serializer = ReviewSerializer(review)
-        return Response(serializer.data)
 
     except Exception:
         return Response(
