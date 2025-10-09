@@ -20,6 +20,7 @@ dependencies = [
     "django-cors-headers>=4.7.0",
     "django-redis",
     "pyyaml>=6.0.2",
+		"gunicorn>=23.0.0"
 ]
 
 

@@ -6,10 +6,6 @@ echo $whoami
 
 echo "Starting application deployment inside container..."
 
-echo "Build static files"
-
-echo 'yes' | uv run manage.py collectstatic
-
 # Run Django migrations
 echo "[INFO] Running database migrations..."
 uv run manage.py migrate
