@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import re_path
+from django.urls import include, re_path
 
 from apps.auth import views as auth_views
 from apps.spider import views as spider_views
@@ -39,40 +39,45 @@ urlpatterns = [
     # primary views
     re_path(r"^api/landing/$", views.landing_api, name="landing_api"),
     re_path(
-        r"^api/course/(?P<course_id>[0-9]+)/$",
-        views.CourseDetailAPI.as_view(),
+        r"^api/courses/(?P<course_id>[0-9]+)/$",
+        views.CoursesDetailAPI.as_view(),
         name="course_detail_api",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/instructors?/?",
+        r"^api/courses/(?P<course_id>[0-9].*)/instructors?/?",
         views.course_instructors,
         name="course_instructors",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
+        r"^api/courses/(?P<course_id>[0-9].*)/medians", views.medians, name="medians"
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/professors?/?",
+        r"^api/courses/(?P<course_id>[0-9].*)/professors?/?",
         views.course_professors,
         name="course_professors",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9].*)/vote",
+        r"^api/courses/(?P<course_id>[0-9].*)/vote",
         views.course_vote_api,
         name="course_vote_api",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9]+)/review/$",
-        views.CourseReviewAPI.as_view(),
+        r"^api/courses/(?P<course_id>[0-9]+)/reviews/$",
+        views.CoursesReviewsAPI.as_view(),
         name="course_review_api",
     ),
     re_path(
-        r"^api/course/(?P<course_id>[0-9]+)/review/my/$",
-        views.get_user_review_api,
-        name="get_user_review_api",
+        r"^api/reviews/?$",
+        views.UserReviewsAPI.as_view(),
+        name="user_reviews_api",
     ),
     re_path(
-        r"^api/review/(?P<review_id>[0-9]+)/vote/$",
+        r"^api/reviews/(?P<review_id>[0-9]+)/$",
+        views.UserReviewsAPI.as_view(),
+        name="user_review_api",
+    ),
+    re_path(
+        r"^api/reviews/(?P<review_id>[0-9]+)/vote/$",
         views.review_vote_api,
         name="review_vote_api",
     ),
