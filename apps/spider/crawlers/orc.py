@@ -136,17 +136,6 @@ class CourseSelAPICrawler:
         self._initialized = True
         logger.info("CourseSelAPICrawler initialized successfully")
 
-    def set_session_id(self, jsessionid):
-        """
-        Set or update the session ID
-
-        Args:
-            jsessionid (str): New session ID
-        """
-        self.jsessionid = jsessionid
-        self._initialized = False
-        self._ensure_initialized()
-
     def crawl_lesson_tasks(self):
         """
         Crawl lesson task data from the course selection API
@@ -334,8 +323,6 @@ class OfficialWebsiteCrawler:
         """
         # Get all course URLs from official website
         official_urls = self._get_official_course_urls()
-
-        logger.info(f"Found {len(official_urls)} official course URLs")
 
         if not official_urls:
             logger.warning("No official course URLs found")
