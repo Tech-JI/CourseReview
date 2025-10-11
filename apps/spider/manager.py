@@ -125,11 +125,11 @@ class CrawlerManager:
             dict: Dictionary with official website data
         """
         if not self.website_crawler:
-            print("[-] Official website crawler not available")
+            print(MessageConstants.OFFICIAL_WEBSITE_CRAWLER_NOT_AVAILABLE)
             return {}
 
         try:
-            print("[*] Crawling official website...")
+            print(MessageConstants.CRAWLING_OFFICIAL_WEBSITE)
             official_data = asyncio.run(self.website_crawler.crawl_official_data())
             print(f"[+] Retrieved {len(official_data)} courses from official website")
 
@@ -137,16 +137,18 @@ class CrawlerManager:
             if official_data:
                 official_list = []
                 for course_code, course_info in official_data.items():
-                    course_info["course_code"] = course_code
+                    course_info[FieldConstants.COURSE_CODE] = course_code
                     official_list.append(course_info)
 
-                filepath = self.cache.save_to_jsonl(official_list, "official")
+                filepath = self.cache.save_to_jsonl(
+                    official_list, FileConstants.OFFICIAL
+                )
                 print(f"[+] Saved to cache: {Path(filepath).name}")
 
             return official_data
 
         except Exception as e:
-            print(f"[-] Official website crawling failed: {e}")
+            print(MessageConstants.OFFICIAL_WEBSITE_CRAWLING_FAILED.format(e))
             return {}
 
     def integrate_and_import_data(self, import_to_db=True):

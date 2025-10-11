@@ -3,7 +3,6 @@ from django.db import transaction
 from apps.spider.models import CrawledData
 
 # from apps.spider.tasks import crawl_medians, crawl_orc, crawl_timetable
-from apps.spider.tasks import crawl_orc
 from apps.spider.utils import retrieve_soup
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM

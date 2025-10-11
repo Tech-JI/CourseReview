@@ -18,6 +18,7 @@ from lib.constants import CURRENT_TERM
 
 # Set up logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class CrawlerConfig:
@@ -86,15 +87,6 @@ class CrawlerConfig:
     }
 
 
-# Legacy constants for backward compatibility
-BASE_URL = CrawlerConfig.COURSESEL_BASE_URL
-COURSE_DETAIL_URL_PREFIX = urllib.parse.urljoin(BASE_URL, "/course/")
-OFFICIAL_BASE_URL = CrawlerConfig.OFFICIAL_BASE_URL
-OFFICIAL_ORC_BASE_URL = CrawlerConfig.OFFICIAL_ORC_BASE_URL
-OFFICIAL_COURSE_DETAIL_URL_PREFIX = CrawlerConfig.OFFICIAL_COURSE_DETAIL_URL_PREFIX
-OFFICIAL_UNDERGRAD_URL = OFFICIAL_ORC_BASE_URL
-
-
 class CourseSelAPICrawler:
     """
     Course Selection System API Crawler
@@ -154,35 +146,6 @@ class CourseSelAPICrawler:
         self.jsessionid = jsessionid
         self._initialized = False
         self._ensure_initialized()
-
-    def crawl_all_apis(self, apis=None):
-        """
-        Crawl data from all or specified APIs
-
-        Args:
-            apis (list, optional): List of API names to crawl.
-                                 If None, crawl all APIs.
-
-        Returns:
-            dict: Dictionary containing data from each API
-        """
-        if apis is None:
-            apis = CrawlerConfig.COURSESEL_APIS
-
-        self._ensure_initialized()
-
-        results = {}
-
-        if "lesson_tasks" in apis:
-            results["lesson_tasks"] = self.crawl_lesson_tasks()
-
-        if "course_catalog" in apis:
-            results["course_catalog"] = self.crawl_course_catalog()
-
-        if "prerequisites" in apis:
-            results["prerequisites"] = self.crawl_prerequisites()
-
-        return results
 
     def crawl_lesson_tasks(self):
         """
@@ -1149,4 +1112,8 @@ class CourseDataIntegrator:
         if main_data is None:
             main_data = {}
         course_id = main_data.get("courseId")
-        return f"{COURSE_DETAIL_URL_PREFIX}{course_id}" if course_id else ""
+        return (
+            f"{CrawlerConfig.COURSESEL_BASE_URL}/course/{course_id}"
+            if course_id
+            else ""
+        )
