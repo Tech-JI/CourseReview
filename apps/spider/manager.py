@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import django
+import asyncio
 from datetime import datetime
 from pathlib import Path
 
@@ -15,6 +16,299 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
 django.setup()
+
+
+class CrawlerManager:
+    """
+    Unified crawler management system
+
+    Coordinates between different crawler components and provides
+    a clean interface for data extraction and integration.
+    """
+
+    def __init__(self, cache_dir=None):
+        self.cache = CourseDataCache(cache_dir)
+        self.config = None
+        self.api_crawler = None
+        self.website_crawler = None
+        self.integrator = None
+        self._initialize_components()
+
+    def _initialize_components(self):
+        """Initialize crawler components with lazy loading"""
+        try:
+            from apps.spider.crawlers.orc import (
+                CrawlerConfig,
+                CourseSelAPICrawler,
+                OfficialWebsiteCrawler,
+                CourseDataIntegrator,
+            )
+
+            self.config = CrawlerConfig()
+            self.website_crawler = OfficialWebsiteCrawler()
+            self.integrator = CourseDataIntegrator()
+        except ImportError as e:
+            print(f"Warning: Could not import crawler components: {e}")
+
+    def create_api_crawler(self, jsessionid):
+        """Create API crawler with authentication"""
+        try:
+            from apps.spider.crawlers.orc import CourseSelAPICrawler
+
+            self.api_crawler = CourseSelAPICrawler(jsessionid)
+            return self.api_crawler
+        except ImportError as e:
+            print(f"Error: Could not import CourseSelAPICrawler: {e}")
+            return None
+
+    def crawl_coursesel_data(self, jsessionid, apis=None):
+        """
+        Crawl data from course selection system
+
+        Args:
+            jsessionid: Authentication session ID
+            apis: List of APIs to crawl ('lesson_tasks', 'course_catalog', 'prerequisites')
+                 If None, crawls all APIs
+
+        Returns:
+            dict: Dictionary with crawled data
+        """
+        if apis is None:
+            apis = ["lesson_tasks", "course_catalog", "prerequisites"]
+
+        api_crawler = self.create_api_crawler(jsessionid)
+        if not api_crawler:
+            return {}
+
+        results = {}
+
+        try:
+            if "lesson_tasks" in apis:
+                print("[*] Crawling lesson tasks...")
+                results["lesson_tasks"] = api_crawler.crawl_lesson_tasks()
+                print(f"[+] Retrieved {len(results['lesson_tasks'])} lesson tasks")
+
+            if "course_catalog" in apis:
+                print("[*] Crawling course catalog...")
+                results["course_catalog"] = api_crawler.crawl_course_catalog()
+                print(
+                    f"[+] Retrieved {len(results['course_catalog'])} courses from catalog"
+                )
+
+            if "prerequisites" in apis:
+                print("[*] Crawling prerequisites...")
+                results["prerequisites"] = api_crawler.crawl_prerequisites()
+                print(
+                    f"[+] Retrieved prerequisites for {len(results['prerequisites'])} courses"
+                )
+
+            # Save to cache
+            if results:
+                saved_files = self.cache.save_coursesel_data(
+                    results.get("lesson_tasks"),
+                    results.get("course_catalog"),
+                    results.get("prerequisites"),
+                )
+                print(f"[+] Saved {len(saved_files)} cache files")
+
+            return results
+
+        except Exception as e:
+            print(f"[-] Course selection crawling failed: {e}")
+            return {}
+
+    def crawl_official_data(self):
+        """
+        Crawl data from official website
+
+        Returns:
+            dict: Dictionary with official website data
+        """
+        if not self.website_crawler:
+            print("[-] Official website crawler not available")
+            return {}
+
+        try:
+            print("[*] Crawling official website...")
+            official_data = asyncio.run(self.website_crawler.crawl_official_data())
+            print(f"[+] Retrieved {len(official_data)} courses from official website")
+
+            # Convert to list format and save to cache
+            if official_data:
+                official_list = []
+                for course_code, course_info in official_data.items():
+                    course_info["course_code"] = course_code
+                    official_list.append(course_info)
+
+                filepath = self.cache.save_to_jsonl(official_list, "official")
+                print(f"[+] Saved to cache: {Path(filepath).name}")
+
+            return official_data
+
+        except Exception as e:
+            print(f"[-] Official website crawling failed: {e}")
+            return {}
+
+    def integrate_and_import_data(self, import_to_db=True):
+        """
+        Integrate cached data and optionally import to database
+
+        Args:
+            import_to_db: Whether to import integrated data to database
+
+        Returns:
+            dict: Integration and import results
+        """
+        if not self.integrator:
+            print("[-] Data integrator not available")
+            return {}
+
+        # Load cached data
+        cached_data = self._load_cached_data()
+        if not any(cached_data.values()):
+            print("[-] No cached data found to integrate")
+            return {}
+
+        try:
+            # Integrate data
+            print("[*] Integrating data...")
+            integrated_data = self.integrator.integrate_data(
+                cached_data["lesson_tasks"],
+                cached_data["course_catalog"],
+                cached_data["prerequisites"],
+                cached_data["official_data"],
+            )
+
+            print(f"[+] Integrated {len(integrated_data)} course records")
+
+            # Save integrated data
+            if integrated_data:
+                filepath = self.cache.save_to_jsonl(integrated_data, "integrated")
+                print(f"[+] Saved integrated data: {Path(filepath).name}")
+
+            # Import to database if requested
+            results = {"integrated_count": len(integrated_data)}
+            if import_to_db and integrated_data:
+                print("[*] Importing to database...")
+                import_results = self._import_to_database(integrated_data)
+                results.update(import_results)
+
+            return results
+
+        except Exception as e:
+            print(f"[-] Integration failed: {e}")
+            return {}
+
+    def _load_cached_data(self):
+        """Load data from cache files"""
+        files = self.cache.list_cache_files()
+
+        data = {
+            "lesson_tasks": [],
+            "course_catalog": {},
+            "prerequisites": {},
+            "official_data": {},
+        }
+
+        for filepath in files:
+            filename = filepath.name
+            file_data = self.cache.load_data_file(filepath)
+
+            if "coursesel_lesson_tasks" in filename:
+                data["lesson_tasks"] = file_data
+            elif "coursesel_course_catalog" in filename:
+                data["course_catalog"] = {
+                    item.get("courseId"): item
+                    for item in file_data
+                    if item.get("courseId")
+                }
+            elif "coursesel_prerequisites" in filename:
+                from collections import defaultdict
+
+                prerequisites = defaultdict(list)
+                for item in file_data:
+                    course_id = item.get("courseId")
+                    if course_id:
+                        prerequisites[course_id].append(item)
+                data["prerequisites"] = prerequisites
+            elif "official" in filename:
+                for item in file_data:
+                    course_code = item.get("course_code")
+                    if course_code:
+                        data["official_data"][course_code] = item
+
+        return data
+
+    def _import_to_database(self, integrated_data):
+        """Import integrated data to database"""
+        try:
+            # Import the database models
+            from apps.web.models import Course, CourseOffering, Instructor
+            from lib.constants import CURRENT_TERM
+
+            success_count = 0
+            error_count = 0
+
+            for course_data in integrated_data:
+                try:
+                    # Create or update course
+                    course_defaults = {
+                        "course_title": course_data.get("course_title", ""),
+                        "course_credits": course_data.get("course_credits", 0),
+                        "pre_requisites": course_data.get("pre_requisites", ""),
+                        "description": course_data.get("description", ""),
+                        "url": course_data.get("url", ""),
+                        "department": course_data.get("department", ""),
+                        "number": course_data.get("number", 0),
+                    }
+
+                    course, _ = Course.objects.update_or_create(
+                        course_code=course_data.get("course_code", ""),
+                        defaults=course_defaults,
+                    )
+
+                    # Handle instructors
+                    instructors = course_data.get("instructors", [])
+                    if instructors:
+                        course_offering, _ = CourseOffering.objects.get_or_create(
+                            course=course, term=CURRENT_TERM
+                        )
+
+                        for instructor_name in instructors:
+                            if instructor_name.strip():
+                                instructor, _ = Instructor.objects.get_or_create(
+                                    name=instructor_name.strip()
+                                )
+                                course_offering.instructors.add(instructor)
+
+                    success_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    print(
+                        f"[-] Error importing {course_data.get('course_code', 'Unknown')}: {e}"
+                    )
+
+            return {
+                "success": success_count,
+                "errors": error_count,
+                "total": success_count + error_count,
+            }
+
+        except ImportError as e:
+            print(f"[-] Database import failed - missing dependencies: {e}")
+            return {
+                "success": 0,
+                "errors": len(integrated_data),
+                "total": len(integrated_data),
+            }
+        except Exception as e:
+            print(f"[-] Database import failed: {e}")
+            return {
+                "success": 0,
+                "errors": len(integrated_data),
+                "total": len(integrated_data),
+            }
 
 
 class CourseDataCache:
@@ -285,12 +579,25 @@ def run_crawler():
     print("=" * 60)
 
     try:
-        from apps.spider.crawlers.orc import CourseSelCrawler
+        manager = CrawlerManager()
 
-        crawler = CourseSelCrawler()
-        data = crawler.get_all_courses(use_cache=False, save_cache=True)
+        # Get JSESSIONID for course selection system
+        print("Course Selection System requires authentication.")
+        print("Please enter your JSESSIONID cookie:")
+        jsessionid = input("JSESSIONID: ").strip()
 
-        print(f"Crawler execution completed, collected {len(data)} courses")
+        if jsessionid:
+            # Crawl course selection data
+            manager.crawl_coursesel_data(jsessionid)
+            print("Course selection crawling completed")
+
+        # Crawl official website data
+        manager.crawl_official_data()
+        print("Official website crawling completed")
+
+        # Integrate and import data
+        results = manager.integrate_and_import_data(import_to_db=True)
+        print(f"Data integration and import completed: {results}")
 
     except Exception as e:
         print(f"Crawler execution failed: {str(e)}")
@@ -345,14 +652,21 @@ def import_from_cache():
         if preview_data_before_import(selected_file, limit=10):
             print("Starting database import...")
 
-            from apps.spider.crawlers.orc import import_department
+            # Use CrawlerManager for database import
+            manager = CrawlerManager()
 
-            # Use batch import and get statistics
-            result = import_department(data)
+            # Check if this is integrated data or needs integration
+            if "integrated" in selected_file.name:
+                # Direct import of integrated data
+                result = manager._import_to_database(data)
+            else:
+                # Single file data needs integration first
+                print("Single file detected, integrating with other cached data...")
+                result = manager.integrate_and_import_data(import_to_db=True)
 
             print("\nImport completed!")
-            print(f"Success: {result['success']} items")
-            print(f"Failed: {result['errors']} items")
+            print(f"Success: {result.get('success', 0)} items")
+            print(f"Failed: {result.get('errors', 0)} items")
 
         else:
             print("Import cancelled")
@@ -395,9 +709,6 @@ def clean_cache():
 
 def interactive_spider_manager():
     """Interactive spider management system"""
-    import asyncio
-    from apps.spider.crawlers.orc import CourseSelCrawler
-
     print("=" * 60)
     print("Interactive Spider Management System")
     print("=" * 60)
@@ -434,9 +745,6 @@ def interactive_spider_manager():
 
 def crawl_workflow(cache):
     """Crawling workflow"""
-    import asyncio
-    from apps.spider.crawlers.orc import CourseSelCrawler
-
     print("\n" + "=" * 40)
     print("Data Crawling Workflow")
     print("=" * 40)
@@ -462,9 +770,6 @@ def crawl_workflow(cache):
 
 def crawl_coursesel_workflow(cache):
     """Course selection system crawling workflow"""
-    import asyncio
-    from apps.spider.crawlers.orc import CourseSelCrawler
-
     print("\n" + "=" * 40)
     print("Course Selection System Crawling")
     print("=" * 40)
@@ -514,38 +819,24 @@ def crawl_coursesel_workflow(cache):
 
     print(f"\nSelected APIs: {', '.join(sorted(selected_apis))}")
 
-    # Initialize crawler with JSESSIONID
-    crawler = CourseSelCrawler(jsessionid=jsessionid)
-    crawler._ensure_initialized()
+    # Map choices to API names
+    api_mapping = {"1": "lesson_tasks", "2": "course_catalog", "3": "prerequisites"}
 
-    lesson_tasks = None
-    course_catalog = None
-    prerequisites = None
+    apis_to_crawl = [
+        api_mapping[choice] for choice in selected_apis if choice in api_mapping
+    ]
 
     try:
-        if "1" in selected_apis:
-            print("\n[*] Crawling Lesson Tasks...")
-            lesson_tasks = crawler._get_lesson_tasks()
-            print(f"[+] Retrieved {len(lesson_tasks)} lesson tasks")
+        # Use CrawlerManager for organized crawling
+        manager = CrawlerManager(cache.cache_dir)
+        results = manager.crawl_coursesel_data(jsessionid, apis_to_crawl)
 
-        if "2" in selected_apis:
-            print("\n[*] Crawling Course Catalog...")
-            course_catalog = crawler._get_course_catalog()
-            print(f"[+] Retrieved {len(course_catalog)} courses from catalog")
-
-        if "3" in selected_apis:
-            print("\n[*] Crawling Prerequisites...")
-            prerequisites = crawler._get_prerequisites()
-            print(f"[+] Retrieved prerequisites for {len(prerequisites)} courses")
-
-        # Save data to separate jsonl files
-        saved_files = cache.save_coursesel_data(
-            lesson_tasks, course_catalog, prerequisites
-        )
-
-        print(f"\n[+] Successfully saved {len(saved_files)} files:")
-        for data_type, filepath in saved_files.items():
-            print(f"  - {data_type}: {Path(filepath).name}")
+        if results:
+            print(f"\n[+] Successfully crawled {len(results)} API endpoints")
+            for api_name, data in results.items():
+                print(f"  - {api_name}: {len(data) if data else 0} records")
+        else:
+            print("[-] No data was crawled")
 
     except Exception as e:
         print(f"[-] Crawling failed: {str(e)}")
@@ -556,31 +847,23 @@ def crawl_coursesel_workflow(cache):
 
 def crawl_official_workflow(cache):
     """Official website crawling workflow"""
-    import asyncio
-    from apps.spider.crawlers.orc import CourseSelCrawler
-
     print("\n" + "=" * 40)
     print("Official Website Crawling")
     print("=" * 40)
 
     print("\n[*] Crawling official website data...")
 
-    crawler = CourseSelCrawler()
-
     try:
-        # Get official website data (async)
-        official_data = asyncio.run(crawler._get_official_website_data_async())
-        print(f"[+] Retrieved {len(official_data)} courses from official website")
+        # Use CrawlerManager for organized crawling
+        manager = CrawlerManager(cache.cache_dir)
+        official_data = manager.crawl_official_data()
 
-        # Convert to list format for saving
-        official_list = []
-        for course_code, course_info in official_data.items():
-            course_info["course_code"] = course_code
-            official_list.append(course_info)
-
-        # Save to jsonl file
-        filepath = cache.save_to_jsonl(official_list, "official")
-        print(f"[+] Successfully saved to: {Path(filepath).name}")
+        if official_data:
+            print(
+                f"[+] Successfully crawled {len(official_data)} courses from official website"
+            )
+        else:
+            print("[-] No data was crawled from official website")
 
     except Exception as e:
         print(f"[-] Official website crawling failed: {str(e)}")
@@ -663,95 +946,43 @@ def import_workflow(cache):
 
 def integrate_and_import_data(cache):
     """Integrate data from multiple cache files and import to database"""
-    from apps.spider.crawlers.orc import CourseSelCrawler
-
     print("\n" + "=" * 40)
     print("Data Integration and Import")
     print("=" * 40)
 
-    files = cache.list_cache_files()
+    try:
+        # Use CrawlerManager for organized integration
+        manager = CrawlerManager(cache.cache_dir)
 
-    # Load the most recent files of each type
-    lesson_tasks_data = []
-    course_catalog_data = {}
-    prerequisites_data = {}
-    official_data = {}
+        # Check if we have any cached data
+        files = cache.list_cache_files()
+        if not files:
+            print("[-] No cache files found to integrate")
+            return
 
-    print("\n[*] Loading cache files...")
+        print(f"[*] Found {len(files)} cache files")
+        for filepath in files:
+            print(f"  - {filepath.name}")
 
-    for filepath in files:
-        filename = filepath.name
-        data = cache.load_data_file(filepath)
+        # Integrate and import data
+        print("\n[*] Starting integration and import process...")
+        results = manager.integrate_and_import_data(import_to_db=True)
 
-        if "coursesel_lesson_tasks" in filename:
-            # Handle JSON format with nested structure
-            if isinstance(data, dict) and "data" in data:
-                lesson_tasks_data = data["data"].get("lessonTasks", [])
-            elif isinstance(data, list):
-                lesson_tasks_data = data
-            else:
-                lesson_tasks_data = []
-            print(f"[+] Loaded lesson tasks: {len(lesson_tasks_data)} records")
-        elif "coursesel_course_catalog" in filename:
-            # Convert list back to dict
-            course_catalog_data = {
-                item.get("courseId"): item for item in data if item.get("courseId")
-            }
-            print(f"[+] Loaded course catalog: {len(data)} records")
-        elif "coursesel_prerequisites" in filename:
-            # Group prerequisites by courseId
-            from collections import defaultdict
+        if results:
+            print("\n[+] Integration and import completed!")
+            print(f"    Integrated courses: {results.get('integrated_count', 0)}")
+            if "success" in results:
+                print(f"    Database import - Success: {results['success']}")
+                print(f"    Database import - Errors: {results['errors']}")
+                print(f"    Database import - Total: {results['total']}")
+        else:
+            print("[-] Integration failed or no data to process")
 
-            prerequisites_data = defaultdict(list)
-            for item in data:
-                course_id = item.get("courseId")
-                if course_id:
-                    prerequisites_data[course_id].append(item)
-            print(f"[+] Loaded prerequisites: {len(data)} records")
-        elif "official" in filename:
-            # Convert list back to dict
-            for item in data:
-                course_code = item.get("course_code")
-                if course_code:
-                    official_data[course_code] = item
-            print(f"[+] Loaded official data: {len(data)} records")
+    except Exception as e:
+        print(f"[-] Integration and import failed: {str(e)}")
+        import traceback
 
-    if not any(
-        [lesson_tasks_data, course_catalog_data, prerequisites_data, official_data]
-    ):
-        print("[-] No valid data found to integrate")
-        return
-
-    print("\n[*] Integrating data...")
-
-    # Use the crawler's integration logic
-    crawler = CourseSelCrawler()
-    integrated_data = crawler._integrate_course_data(
-        lesson_tasks_data, course_catalog_data, prerequisites_data, official_data
-    )
-
-    print(f"[+] Integrated {len(integrated_data)} course records")
-
-    # Save integrated data
-    integrated_filepath = cache.save_to_jsonl(integrated_data, "integrated")
-    print(f"[+] Saved integrated data to: {Path(integrated_filepath).name}")
-
-    # Ask user if they want to import to database
-    import_choice = input("\nImport to database? (y/n): ").strip().lower()
-    if import_choice in ["y", "yes"]:
-        try:
-            print("\n[*] Importing to database...")
-            # Use the actual database import function
-            from apps.spider.crawlers.orc import import_department
-
-            result = import_department(integrated_data)
-
-            print(f"[+] Database import completed!")
-            print(f"    Success: {result['success']} courses")
-            print(f"    Errors: {result['errors']} courses")
-            print(f"    Total processed: {result['success'] + result['errors']}")
-        except Exception as e:
-            print(f"[-] Database import failed: {str(e)}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

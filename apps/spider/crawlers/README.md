@@ -335,6 +335,8 @@
 ## https://coursesel.umji.sjtu.edu.cn/tpm/findLessonTasksPreview_ElectTurn.action
 
 ### Data Fields
-- electTurn
-- courseType
-- lessonTask
+- electTurn(uniquely identifying this selection round)
+- courseType(maybe useful)
+- lessonTask(courseCode,faculty,maxNum,termIdm,termName)
+- lessonCalenderConflict(maybe useful)
+- lessonCalenderWeek(couseId)

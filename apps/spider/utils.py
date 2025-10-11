@@ -35,3 +35,16 @@ def retrieve_soup(url, data=None, preprocess=lambda x: x):
         data = data.encode("utf-8")
     with urllib_request.urlopen(url, data=data) as response:
         return BeautifulSoup(preprocess(response.read().decode("utf-8")), "html.parser")
+
+
+def extract_prerequisites(pre_requisites):
+    """Process prerequisite string format (legacy function)"""
+    result = pre_requisites
+
+    result = result.replace("Pre-requisites:", "").strip()
+    result = result.replace("Obtained Credit", "obtained_credit").strip()
+    result = result.replace("Credits Submitted", "credits_submitted").strip()
+    result = result.replace("&&", " && ").strip()
+    result = result.replace("||", " || ").strip()
+
+    return result
