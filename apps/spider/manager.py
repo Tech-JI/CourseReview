@@ -11,12 +11,6 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
-# Setup Django environment
-project_root = Path(__file__).parent.parent.parent
-sys.path.append(str(project_root))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
-django.setup()
-
 
 class CrawlerManager:
     """
@@ -125,11 +119,11 @@ class CrawlerManager:
             dict: Dictionary with official website data
         """
         if not self.website_crawler:
-            print(MessageConstants.OFFICIAL_WEBSITE_CRAWLER_NOT_AVAILABLE)
+            print("[-] Official website crawler not available")
             return {}
 
         try:
-            print(MessageConstants.CRAWLING_OFFICIAL_WEBSITE)
+            print("[*] Crawling official website...")
             official_data = asyncio.run(self.website_crawler.crawl_official_data())
             print(f"[+] Retrieved {len(official_data)} courses from official website")
 
@@ -137,18 +131,16 @@ class CrawlerManager:
             if official_data:
                 official_list = []
                 for course_code, course_info in official_data.items():
-                    course_info[FieldConstants.COURSE_CODE] = course_code
+                    course_info["course_code"] = course_code
                     official_list.append(course_info)
 
-                filepath = self.cache.save_to_jsonl(
-                    official_list, FileConstants.OFFICIAL
-                )
+                filepath = self.cache.save_to_jsonl(official_list, "official")
                 print(f"[+] Saved to cache: {Path(filepath).name}")
 
             return official_data
 
         except Exception as e:
-            print(MessageConstants.OFFICIAL_WEBSITE_CRAWLING_FAILED.format(e))
+            print(f"[-] Official website crawling failed: {e}")
             return {}
 
     def integrate_and_import_data(self, import_to_db=True):
