@@ -804,7 +804,7 @@ def crawl_coursesel_workflow(cache):
     else:
         # Split by comma (both English and Chinese commas) and clean up
         api_choice = api_choice.replace(
-            ",", ","
+            "，", ","
         )  # Replace Chinese comma with English comma
         choices = [choice.strip() for choice in api_choice.split(",")]
         for choice in choices:
