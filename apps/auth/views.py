@@ -317,7 +317,7 @@ def verify_callback_api(request):
     return response
 
 
-def verify_psd_checker(request, action: str) -> tuple[dict | None, Response | None]:
+def verify_token_pwd(request, action: str) -> tuple[dict | None, Response | None]:
     # Get temp_token from HttpOnly cookie
     temp_token = request.COOKIES.get("temp_token")
     if not temp_token:
@@ -368,7 +368,7 @@ def auth_signup_api(request) -> Response:
     Handles user signup using verified temp_token.
     """
     try:
-        verification_data, error_response = verify_psd_checker(request, action="signup")
+        verification_data, error_response = verify_token_pwd(request, action="signup")
         if verification_data is None:
             return error_response or Response(
                 {"error": "Verification failed"}, status=400
@@ -411,7 +411,7 @@ def auth_reset_password_api(request) -> Response:
     Handles password reset using verified temp_token.
     """
     try:
-        verification_data, error_response = verify_psd_checker(
+        verification_data, error_response = verify_token_pwd(
             request,
             action="reset_password",
         )
@@ -448,7 +448,7 @@ def auth_reset_password_api(request) -> Response:
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
-    account = request.data.get("account", "")
+    account = request.data.get("account", "").strip()
     password = request.data.get("password", "")
     turnstile_token = request.data.get("turnstile_token", "")
 
@@ -463,20 +463,22 @@ def auth_login_api(request) -> Response:
         or request.META.get("REMOTE_ADDR")
     )
 
-    # Verify Turnstile token
     success, error_response = asyncio.run(
         utils.verify_turnstile_token(turnstile_token, client_ip)
     )
     if not success:
-        return error_response
+        return error_response or Response(
+            {"error": "Turnstile verification failed"}, status=502
+        )
 
     user = authenticate(username=account, password=password)
+    if user is None or not user.is_active:
+        return Response({"error": "Invalid account or password"}, status=401)
 
-    if user is not None and user.is_active:
-        login(request, user)
-        Student.objects.get_or_create(user=user)
-        return Response({"message": "Login successfully"}, status=200)
-    return Response({"error": "Invalid account or password"}, status=401)
+    login(request, user)
+    Student.objects.get_or_create(user=user)
+
+    return Response({"message": "Login successfully"}, status=200)
 
 
 @api_view(["POST"])
