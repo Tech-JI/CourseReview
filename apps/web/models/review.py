@@ -25,6 +25,20 @@ class ReviewManager(models.Manager):
             # If somehow there are multiple reviews, return the most recent one
             return self.filter(user=user, course=course).order_by("-created_at").first()
 
+    def get_kudos_count(self, review_id):
+        """Get the number of kudos for a specific review"""
+        return self.get(id=review_id).votes.filter(is_kudos=True).count()
+
+    def get_dislike_count(self, review_id):
+        """Get the number of dislikes for a specific review"""
+        return self.get(id=review_id).votes.filter(is_kudos=False).count()
+
+    def get_vote_counts(self, review_id):
+        """Get both kudos and dislike counts for a specific review"""
+        kudos_count = self.get_kudos_count(review_id)
+        dislike_count = self.get_dislike_count(review_id)
+        return kudos_count, dislike_count
+
 
 class Review(models.Model):
     objects = ReviewManager()
@@ -53,11 +67,6 @@ class Review(models.Model):
     )
     difficulty_sentiment = models.FloatField(default=None, null=True, blank=True)
     quality_sentiment = models.FloatField(default=None, null=True, blank=True)
-
-    # Kudos and dislike counts
-    kudos_count = models.PositiveIntegerField(default=0, db_index=True)
-    dislike_count = models.PositiveIntegerField(default=0, db_index=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

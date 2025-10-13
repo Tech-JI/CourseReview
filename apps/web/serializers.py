@@ -13,6 +13,7 @@ from apps.web.models import (
     ReviewVote,
 )
 from lib import constants
+from lib.terms import is_valid_term
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):
@@ -34,6 +35,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     term = serializers.CharField()
     professor = serializers.CharField()
     user_vote = serializers.SerializerMethodField()
+    kudos_count = serializers.SerializerMethodField()
+    dislike_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -49,6 +52,21 @@ class ReviewSerializer(serializers.ModelSerializer):
             "created_at",
             "user_vote",
         )
+        read_only_fields = (
+            "id",
+            "kudos_count",
+            "dislike_count",
+            "created_at",
+            "user_vote",
+        )
+
+    def get_kudos_count(self, obj):
+        """Get the number of kudos for this review"""
+        return Review.objects.get_kudos_count(obj.id)
+
+    def get_dislike_count(self, obj):
+        """Get the number of dislikes for this review"""
+        return Review.objects.get_dislike_count(obj.id)
 
     def get_user_vote(self, obj):
         """Get the current user's vote for this review"""
@@ -61,6 +79,41 @@ class ReviewSerializer(serializers.ModelSerializer):
             return vote.is_kudos  # True for kudos, False for dislike
         except ReviewVote.DoesNotExist:
             return None
+
+    def validate_term(self, value):
+        """Validate term format"""
+        term = value.upper()
+
+        if is_valid_term(term):
+            return term
+        else:
+            raise serializers.ValidationError(
+                "Please use a valid term, e.g. {}".format(constants.CURRENT_TERM)
+            )
+
+    def validate_professor(self, value):
+        """Validate professor name format"""
+        names = value.split(" ")
+
+        if len(names) < 2:
+            raise serializers.ValidationError(
+                "Please use a valid professor name, e.g. John Smith"
+            )
+
+        return " ".join([n.capitalize() for n in names])
+
+    def validate_comments(self, value):
+        """Validate review minimum length"""
+        REVIEW_MINIMUM_LENGTH = 30
+
+        if len(value) < REVIEW_MINIMUM_LENGTH:
+            raise serializers.ValidationError(
+                "Please write a longer review (at least {} characters)".format(
+                    REVIEW_MINIMUM_LENGTH
+                )
+            )
+
+        return value
 
 
 class DepartmentSerializer(serializers.Serializer):
