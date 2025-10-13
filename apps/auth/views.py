@@ -111,7 +111,7 @@ def auth_initiate_api(request):
         json.dumps(temp_token_state),
     )
 
-    logging.info(f"Created auth intent for action {action} with OTP and temp_token")
+    logging.info("Created auth intent for action %s with OTP and temp_token", action)
 
     details = utils.get_survey_details(action)
     if not details:
@@ -268,7 +268,7 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logging.info(
-        f"Successfully verified temp_token for user {account} with action {action}",
+        "Successfully verified temp_token for user %s with action %s", account, action
     )
 
     # For login action, handle immediate session creation and cleanup
@@ -278,17 +278,14 @@ def verify_callback_api(request):
         if user is None:
             if error_response:
                 logging.error(
-                    f"Failed to create session for login: {
-                        getattr(error_response, 'data', {}).get(
-                            'error', 'Unknown error'
-                        )
-                    }",
+                    "Failed to create session for login: %s",
+                    getattr(error_response, "data", {}).get("error", "Unknown error"),
                 )
                 return error_response
             else:
                 return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
-            logging.warning(f"Inactive user attempted OAuth login: {account}")
+            logging.warning("Inactive user attempted OAuth login: %s", account)
             return Response({"error": "User account is inactive"}, status=403)
         try:
             # Create Django session
@@ -296,11 +293,9 @@ def verify_callback_api(request):
             is_logged_in = True
             # Delete temp_token_state after successful login
             r.delete(state_key)
-        except Exception as e:
+        except Exception:
             logging.exception(
-                f"Error during login session creation or cleanup for user {account}: {
-                    e
-                }",
+                "Error during login session creation or cleanup for user %s", account
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
 

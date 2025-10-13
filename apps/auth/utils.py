@@ -32,14 +32,14 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
     action_details = QUEST_SETTINGS.get(action.upper())
 
     if not action_details:
-        logging.error(f"Invalid quest action requested: {action}")
+        logging.error("Invalid quest action requested: %s", action)
         return None
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
     except (ValueError, TypeError):
         logging.error(
-            f"Could not parse 'QUESTIONID' for action '{action}'. Check your settings."
+            "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )
         return None
 
@@ -66,7 +66,7 @@ async def verify_turnstile_token(
                 },
             )
         if not response.json().get("success"):
-            logging.warning(f"Turnstile verification failed: {response.json()}")
+            logging.warning("Turnstile verification failed: %s", response.json())
             return False, Response(
                 {"error": "Turnstile verification failed"}, status=403
             )
