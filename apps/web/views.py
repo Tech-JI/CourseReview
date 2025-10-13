@@ -1,9 +1,7 @@
-import datetime
 import logging
-import uuid
 
-from django.db.models import Count
 from django.conf import settings
+from django.db.models import Count
 from rest_framework import generics, mixins, pagination, status
 from rest_framework.decorators import (
     api_view,
@@ -20,13 +18,11 @@ from apps.web.models import (
     ReviewVote,
     Vote,
 )
-from apps.web.models.forms import ReviewForm
 from apps.web.serializers import (
     CourseSearchSerializer,
     CourseSerializer,
     ReviewSerializer,
 )
-from lib import constants
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
@@ -71,21 +67,24 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         queryset = queryset.annotate(num_reviews=Count("review"))
         return queryset
 
+    def _filter(self, queryset):
+        """filter courses and filter by score."""
+        queryset = self._filter_courses(queryset)
+        queryset = self._filter_by_score(queryset)
+        return queryset
+
     def _filter_courses(self, queryset):
         """Helper function to apply all filters to courses queryset."""
         department = self.request.query_params.get("department")
+        code = self.request.query_params.get("code")
         if department:
             queryset = queryset.filter(department__iexact=department)
-
-        code = self.request.query_params.get("code")
         if code:
             queryset = queryset.filter(course_code__icontains=code)
-
-        queryset = self._filter_by_score_params(queryset)
         return queryset
 
-    def _filter_by_score_params(self, queryset):
-        """Helper function to filter by quality and difficulty score parameters."""
+    def _filter_by_score(self, queryset):
+        """Helper function to filter by quality and difficulty score."""
         if not self.request.user.is_authenticated:
             return queryset
 
@@ -104,7 +103,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
                     pass
         return queryset
 
-    def _sort_courses(self, queryset):
+    def _sort(self, queryset):
         """Helper function to sort courses based on request parameters."""
         sort_by = self.request.query_params.get("sort_by", "course_code")
         sort_order = self.request.query_params.get("sort_order", "asc")
@@ -119,8 +118,8 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
 
     def filter_queryset(self, queryset):
         """Override to apply both filtering and sorting."""
-        queryset = self._filter_courses(queryset)
-        queryset = self._sort_courses(queryset)
+        queryset = self._filter(queryset)
+        queryset = self._sort(queryset)
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -210,16 +209,13 @@ class CoursesReviewsAPI(
                 {"detail": "User cannot write review"}, status=status.HTTP_403_FORBIDDEN
             )
 
-        # Validate and save review
-        form = ReviewForm(request.data)
-        if not form.is_valid():
-            logger.warning(f"Review form errors: {form.errors}")
-            return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Validate and save review using ReviewSerializer
+        serializer = ReviewSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(f"Review serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        review = form.save(commit=False)
-        review.course = course
-        review.user = request.user
-        review.save()
+        review = serializer.save(course=course, user=request.user)
 
         # Return the created review
         serializer = self.get_serializer(review)
@@ -361,7 +357,7 @@ def course_vote_api(request, course_id):
         forLayup = request.data["forLayup"]
     except KeyError:
         logger.warning(
-            f"Missing required fields in course vote API for course {course_id}"
+            f"Missing required fields: value, forLayup in course vote API for course {course_id}"
         )
         return Response(
             {"detail": "Missing required fields: value, forLayup"}, status=400
@@ -413,7 +409,7 @@ def review_vote_api(request, review_id):
 
         if kudos_count is None or dislike_count is None:
             # Review doesn't exist
-            logger.warning(f"Review {review_id} not found for voting")
+            logger.warning("Review %d not found for voting", review_id)
             return Response({"detail": "Review not found"}, status=404)
 
         return Response(
