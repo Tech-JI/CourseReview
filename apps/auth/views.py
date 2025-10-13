@@ -58,7 +58,7 @@ def auth_initiate_api(request):
         return Response({"error": "Missing action or turnstile_token"}, status=400)
 
     if action not in ACTION_LIST:
-        logger.warning(f"Invalid action '{action}' in auth_initiate_api")
+        logger.warning("Invalid action '%s' in auth_initiate_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     client_ip = (
@@ -73,7 +73,8 @@ def auth_initiate_api(request):
     )
     if not success:
         logger.warning(
-            f"verify_turnstile_token failed in auth_initiate_api:{error_response.data}"
+            "verify_turnstile_token failed in auth_initiate_api:%s",
+            error_response.data,
         )
         return error_response
 
@@ -95,9 +96,8 @@ def auth_initiate_api(request):
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logger.info(
-                    f"Cleaned up existing temp_token_state for action {
-                        existing_state.get('action', 'unknown')
-                    }"
+                    "Cleaned up existing temp_token_state for action %s",
+                    existing_state.get("action", "unknown"),
                 )
         except Exception:
             logger.warning("Error cleaning up existing temp_token")
@@ -116,15 +116,15 @@ def auth_initiate_api(request):
         json.dumps(temp_token_state),
     )
 
-    logger.info(f"Created auth intent for action {action} with OTP and temp_token")
+    logger.info("Created auth intent for action %s with OTP and temp_token", action)
 
     details = utils.get_survey_details(action)
     if not details:
-        logger.error(f"Invalid action '{action}' when fetching survey details")
+        logger.error("Invalid action '%s' when fetching survey details", action)
         return Response({"error": "Invalid action"}, status=400)
     survey_url = details.get("url")
     if not survey_url:
-        logger.error(f"Survey URL missing for {action}")
+        logger.error("Survey URL missing for %s", action)
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
             status=500,
@@ -152,7 +152,9 @@ def verify_callback_api(request):
     Handles the verification of questionnaire callback using temp_token from cookie.
     """
     logger.info(
-        f"verify_callback_api called for account={request.data.get('account')}, action={request.data.get('action')}"
+        "verify_callback_api called for account=%s, action=%s",
+        request.data.get("account"),
+        request.data.get("action"),
     )
     # Get required parameters from request
     account = request.data.get("account")
@@ -164,7 +166,7 @@ def verify_callback_api(request):
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
     if action not in ACTION_LIST:
-        logger.warning(f"Invalid action '{action}' in verify_callback_api")
+        logger.warning("Invalid action '%s' in verify_callback_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     # Get temp_token from HttpOnly cookie
@@ -292,7 +294,9 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logger.info(
-        f"Successfully verified temp_token for user {account} with action {action}",
+        "Successfully verified temp_token for user %s with action %s",
+        account,
+        action,
     )
 
     # For login action, handle immediate session creation and cleanup
@@ -302,14 +306,15 @@ def verify_callback_api(request):
         if user is None:
             if error_response:
                 logger.error(
-                    f"Failed to create session for login: {getattr(error_response, 'data', {})}"
+                    "Failed to create session for login: %s",
+                    getattr(error_response, "data", {}).get("error", "Unknown error"),
                 )
                 return error_response
             else:
                 logger.error("Failed to create user session in verify_callback_api")
                 return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
-            logger.warning(f"Inactive user attempted OAuth login: {account}")
+            logger.warning("Inactive user attempted OAuth login: %s", account)
             return Response({"error": "User account is inactive"}, status=403)
         try:
             # Create Django session
@@ -318,8 +323,8 @@ def verify_callback_api(request):
             # Delete temp_token_state after successful login
             r.delete(state_key)
         except Exception:
-            logger.error(
-                f"Error during login session creation or cleanup for user {account}"
+            logger.exception(
+                "Error during login session creation or cleanup for user %s", account
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
 
@@ -467,7 +472,7 @@ def auth_reset_password_api(request) -> Response:
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
-    account = request.data.get("account", "")
+    account = request.data.get("account", "").strip()
     password = request.data.get("password", "")
     turnstile_token = request.data.get("turnstile_token", "")
 
@@ -485,22 +490,22 @@ def auth_login_api(request) -> Response:
         or request.META.get("REMOTE_ADDR")
     )
 
-    # Verify Turnstile token
     success, error_response = asyncio.run(
         utils.verify_turnstile_token(turnstile_token, client_ip)
     )
     if not success:
-        return error_response
+        return error_response or Response(
+            {"error": "Turnstile verification failed"}, status=502
+        )
 
     user = authenticate(username=account, password=password)
+    if user is None or not user.is_active:
+        return Response({"error": "Invalid account or password"}, status=401)
 
-    if user is not None and user.is_active:
-        logger.info(f"User {account} logged in successfully")
-        login(request, user)
-        Student.objects.get_or_create(user=user)
-        return Response({"message": "Login successfully"}, status=200)
-    logger.warning(f"Invalid account or password for account={account}")
-    return Response({"error": "Invalid account or password"}, status=401)
+    login(request, user)
+    Student.objects.get_or_create(user=user)
+
+    return Response({"message": "Login successfully"}, status=200)
 
 
 @api_view(["POST"])
@@ -508,7 +513,8 @@ def auth_login_api(request) -> Response:
 @permission_classes([AllowAny])
 def auth_logout_api(request) -> Response:
     logger.info(
-        f"auth_logout_api called for user={getattr(request.user, 'username', None)}"
+        "auth_logout_api called for user=%s",
+        getattr(request.user, "username", None),
     )
     """Logout a user."""
     logout(request)

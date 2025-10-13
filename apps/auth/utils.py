@@ -9,6 +9,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
+from typing import Any
 
 from apps.web.models import Student
 
@@ -24,7 +25,7 @@ QUEST_SETTINGS = settings.QUEST
 QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
 
 
-def get_survey_details(action: str) -> dict[str, any] | None:
+def get_survey_details(action: str) -> dict[str, Any] | None:
     """
     A single, clean function to get all survey details for a given action.
     Valid actions: "signup", "login", "reset".
@@ -33,14 +34,14 @@ def get_survey_details(action: str) -> dict[str, any] | None:
     action_details = QUEST_SETTINGS.get(action.upper())
 
     if not action_details:
-        logger.error(f"Invalid quest action requested: {action}")
+        logger.error("Invalid quest action requested: %s", action)
         return None
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
     except (ValueError, TypeError):
         logger.error(
-            f"Could not parse 'QUESTIONID' for action '{action}'. Check your settings."
+            "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )
         return None
 
@@ -67,7 +68,7 @@ async def verify_turnstile_token(
                 },
             )
         if not response.json().get("success"):
-            logger.warning(f"Turnstile verification failed: {response.json()}")
+            logger.warning("Turnstile verification failed: %s", response.json())
             return False, Response(
                 {"error": "Turnstile verification failed"}, status=403
             )
