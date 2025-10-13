@@ -1,0 +1,57 @@
+# Please copy this file to config.yaml and fill in
+# corresponding fields.
+# For non-secret, environment-specific configuration.
+# Values here will override DEFAULTS in settings.py.
+# Environment variables will override values here.
+
+DEBUG: true
+
+# SECRET_KEY: Use env
+
+ALLOWED_HOSTS:
+  # - "backend.redacted.com"
+  - "localhost"
+  - "127.0.0.1"
+
+CORS_ALLOWED_ORIGINS:
+  # - "https://frontend.redacted.com"
+  - "http://localhost:5173"
+  - "http://127.0.0.1:5173"
+
+# SESSION:
+#   COOKIE_AGE: 2592000 # 30 days
+#   SAVE_EVERY_REQUEST: true
+#
+# AUTH:
+#   OTP_TIMEOUT: 120
+#   TEMP_TOKEN_TIMEOUT: 600
+#   TOKEN_RATE_LIMIT: 5
+#   TOKEN_RATE_LIMIT_TIME: 600
+#   PASSWORD_LENGTH_MIN: 10
+#   PASSWORD_LENGTH_MAX: 32
+#   EMAIL_DOMAIN_NAME: "sjtu.edu.cn"
+#
+# DATABASE:
+#   URL: Use env
+#
+# REDIS:
+#   URL: Use env
+#   MAX_CONNECTIONS: 100
+#
+# TURNSTILE_SECRET_KEY: Use env
+
+QUEST:
+  # BASE_URL: "https://wj.sjtu.edu.cn/api/v1/public/export"
+  SIGNUP:
+    # API_KEY: Use env
+    URL: "https://wj.sjtu.edu.cn/q/dummy0"
+    QUESTIONID: 10000000
+  LOGIN:
+    # API_KEY: Use env
+    URL: "https://wj.sjtu.edu.cn/q/dummy1"
+    QUESTIONID: 10000001
+  RESET:
+    # API_KEY: Use env
+    URL: "https://wj.sjtu.edu.cn/q/dummy2"
+    QUESTIONID: 10000002
+# AUTO_IMPORT_CRAWLED_DATA: true

@@ -10,7 +10,7 @@ def main():
 
     try:
         # Run make format and capture exit code
-        result = subprocess.run(["make", "format"], check=True)
+        subprocess.run(["make", "format"], check=True)
 
         # Format succeeded, stage the changes
         subprocess.run(["git", "add", "--update"], check=True)
