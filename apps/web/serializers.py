@@ -4,7 +4,6 @@ from rest_framework import serializers
 
 from apps.web.models import (
     Course,
-    CourseMedian,
     CourseOffering,
     DistributiveRequirement,
     Instructor,
