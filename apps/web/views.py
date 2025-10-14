@@ -36,6 +36,14 @@ class CoursesPagination(pagination.PageNumberPagination):
 
 @api_view(["GET"])
 def user_status(request):
+    """
+    Get user authentication status.
+    Input:
+        - None
+    Output:
+        - Authenticated user: {"isAuthenticated": true, "username": "string"}
+        - Anonymous user: {"isAuthenticated": false}
+    """
     if request.user.is_authenticated:
         logger.info("User is authenticated")
         return Response({"isAuthenticated": True, "username": request.user.username})
@@ -47,7 +55,13 @@ def user_status(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def landing_api(request):
-    """API endpoint for landing page data"""
+    """
+    Get landing page statistics.
+    Input:
+        - None
+    Output:
+        {"review_count": int}
+    """
     return Response(
         {
             "review_count": Review.objects.count(),
@@ -56,7 +70,27 @@ def landing_api(request):
 
 
 class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
-    """API endpoint for listing courses with filtering, sorting, and pagination."""
+    """
+    List courses with filtering, sorting, and pagination.
+    GET
+    Input:
+        - Query parameters:
+            - department (string): Filter by department code (case-insensitive)
+            - code (string): Filter by course code (partial match)
+            - min_quality (integer): Filter by minimum quality score (authenticated only)
+            - min_difficulty (integer): Filter by minimum difficulty score (authenticated only)
+            - sort_by (string): Sort field ("course_code", "num_reviews"),("quality_score", "difficulty_score")(authenticated only)
+            - sort_order (string): "asc" or "desc" (default: "asc")
+            - page (integer): Page number for pagination
+
+    Output:
+        {
+            "count": integer,
+            "next": "string|null",
+            "previous": "string|null",
+            "results": [CourseSearchSerializer objects]
+        }
+    """
 
     serializer_class = CourseSearchSerializer
     permission_classes = [AllowAny]
@@ -127,7 +161,17 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
 
 
 class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
-    """API endpoint for retrieving course details."""
+    """
+    Retrieve details for a specific course.
+    GET
+    Input:
+        - URL parameter: course_id (integer, required)
+
+    Output:
+        - CourseSerializer object
+            - Authenticated: Full details
+            - Non-authenticated: without scores, votes, and vote counts
+    """
 
     serializer_class = CourseSerializer
     permission_classes = [AllowAny]
@@ -138,7 +182,7 @@ class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
         try:
             return Course.objects.get(id=course_id)
         except Course.DoesNotExist:
-            logger.warning(f"Course with id {course_id} does not exist")
+            logger.warning("Course with id %d does not exist", course_id)
             return None
 
     def get(self, request, *args, **kwargs):
@@ -148,7 +192,32 @@ class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
 class CoursesReviewsAPI(
     generics.GenericAPIView, mixins.ListModelMixin, mixins.CreateModelMixin
 ):
-    """API endpoint for course reviews - GET (list/search), POST (create)."""
+    """
+    List and create reviews for a specific course.
+
+    GET - List reviews:
+    Input:
+        - Authentication: Required
+        - URL parameter: course_id (integer, required)
+        - Query parameters:
+            - q (string, optional): Search query for review content
+            - author (string, optional): "me" to filter user's own reviews
+
+    Output:
+        - Success (200): [ReviewSerializer objects]
+
+    POST - Create review:
+    Input:
+        - POST request
+        - Authentication: Required
+        - URL parameter: course_id (integer, required)
+        - Body: "term","professor","comments"(required and only required)
+    Output:
+        Success (201): ReviewSerializer object
+        Error (400): Validation errors
+        Error (403): {"detail": "User cannot write review"}
+        Error (404): {"detail": "Course not found"}
+    """
 
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
@@ -160,7 +229,7 @@ class CoursesReviewsAPI(
             course = Course.objects.get(id=course_id)
             return Review.objects.filter(course=course)
         except Course.DoesNotExist:
-            logger.warning(f"Course with id {course_id} does not exist")
+            logger.warning("Course with id %d does not exist", course_id)
             return Review.objects.none()
 
     def list(self, request, *args, **kwargs):
@@ -203,7 +272,7 @@ class CoursesReviewsAPI(
         # Check if user can write review
         if not Review.objects.user_can_write_review(request.user.id, course.id):
             logger.warning(
-                f"User {request.user.id} cannot write review for course {course.id}"
+                "User %d cannot write review for course %d", request.user.id, course.id
             )
             return Response(
                 {"detail": "User cannot write review"}, status=status.HTTP_403_FORBIDDEN
@@ -212,7 +281,7 @@ class CoursesReviewsAPI(
         # Validate and save review using ReviewSerializer
         serializer = ReviewSerializer(data=request.data)
         if not serializer.is_valid():
-            logger.warning(f"Review serializer errors: {serializer.errors}")
+            logger.warning("Review serializer errors: %s", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         review = serializer.save(course=course, user=request.user)
@@ -229,7 +298,46 @@ class UserReviewsAPI(
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
 ):
-    """API endpoint for user review operations - LIST, GET, PUT, DELETE."""
+    """
+    Manage user's own reviews (CRUD operations).
+
+    GET (List) - List user's reviews:
+    Input:
+        - Authentication: Required
+        - URL parameter: None
+
+    Output:
+        Success (200): [ReviewSerializer objects]
+
+    GET (Retrieve) - Get specific review:
+    Input:
+        - Authentication: Required
+        - URL parameter: review_id (integer, required)
+
+    Output:
+        Success (200): ReviewSerializer object
+        Error (404): {"detail": "Not found."}
+
+    PUT - Update review:
+    Input:
+        - Authentication: Required
+        - URL parameter: review_id (integer, required)
+        - Body: "term","professor","comments"(required and only required)
+
+    Output:
+        Success (200): Updated ReviewSerializer object
+        Error (400): Validation errors
+        Error (404): {"detail": "Not found."}
+
+    DELETE - Delete review:
+    Input:
+        - Authentication: Required
+        - URL parameter: review_id (integer, required)
+
+    Output:
+        Success (204): No content
+        Error (404): {"detail": "Not found."}
+    """
 
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
@@ -259,6 +367,22 @@ class UserReviewsAPI(
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def departments_api(request):
+    """
+    Get list of all departments with course counts.
+
+    Input:
+        - None
+
+    Output:
+        Success (200):
+        [
+            {
+                "code": "string",
+                "name": "string",
+                "count": int
+            }, ...
+        ]
+    """
     department_codes_and_counts = (
         Course.objects.values("department")
         .annotate(Count("department"))
@@ -345,19 +469,45 @@ def course_instructors(request, course_id):
             {"instructors": [instructor.name for instructor in instructors]}, status=200
         )
     except Course.DoesNotExist:
-        logger.warning(f"Course with id {course_id} not found for instructors API")
+        logger.warning("Course with id %d not found for instructors API", course_id)
         return Response({"error": "Course not found"}, status=404)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def course_vote_api(request, course_id):
+    """
+    Vote on course quality or difficulty.
+
+    Input:
+        - POST request
+        - Authentication: Required
+        - URL parameter: course_id (integer, required)
+        - Body (JSON):
+            {
+                "value": integer (vote score),
+                "forLayup": boolean (true for difficulty, false for quality)
+            }
+
+    Output:
+        Success (200):
+        {
+            "new_score": float,
+            "was_unvote": boolean,
+            "new_vote_count": integer
+        }
+        Error (400):
+        {
+            "detail": "Missing required fields: value, forLayup"
+        }
+    """
     try:
         value = request.data["value"]
         forLayup = request.data["forLayup"]
     except KeyError:
         logger.warning(
-            f"Missing required fields: value, forLayup in course vote API for course {course_id}"
+            "Missing required fields: value, forLayup in course vote API for course %d",
+            course_id,
         )
         return Response(
             {"detail": "Missing required fields: value, forLayup"}, status=400
@@ -381,16 +531,23 @@ def course_vote_api(request, course_id):
 @permission_classes([IsAuthenticated])
 def review_vote_api(request, review_id):
     """
-    API endpoint for voting on reviews (kudos/dislike).
+    Vote on reviews (kudos/dislike).
 
-    URL: /api/reviews/{review_id}/vote/
-    POST data:
-    - is_kudos: boolean (True for kudos, False for dislike)
-
-    Returns:
-    - kudos_count: updated kudos count
-    - dislike_count: updated dislike count
-    - user_vote: user's current vote (True/False/None)
+    Input:
+        - POST request
+        - Authentication: Required
+        - URL parameter: review_id (integer, required)
+        - Body (JSON):
+            {
+                "is_kudos": boolean (true for kudos, false for dislike)
+            }
+    Output:
+        Success (200):
+        {
+            "kudos_count": integer,
+            "dislike_count": integer,
+            "user_vote": boolean|null (true/false/null)
+        }
     """
 
     try:
