@@ -1,6 +1,6 @@
 [project]
 name = "course-review"
-requires-python = ">=3.13, <3.14"
+requires-python = ">=3.14, <3.15"
 version = "0.0.1"
 dependencies = [
     "beautifulsoup4==4.13.3",
@@ -14,7 +14,8 @@ dependencies = [
     "pytz==2025.1",
     "redis==5.2.1",
     "requests==2.32.3",
-    "bpython==0.25",
+    "bpython==0.26",
+    "greenlet==3.2.4",
     "ptpython==3.0.29",
     "djangorestframework==3.16.0",
     "django-cors-headers==4.7.0",
