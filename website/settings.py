@@ -19,7 +19,7 @@ DEFAULTS = {
     },
     "WEB": {
         "COURSE": {"PAGE_SIZE": 10},
-        "REVIEW": {"PAGE_SIZE": 10},
+        "REVIEW": {"PAGE_SIZE": 10, "COMMENT_MIN_LENGTH": 30},
     },
     "AUTH": {
         "OTP_TIMEOUT": 120,
@@ -91,6 +91,7 @@ SESSION_COOKIE_SECURE = not DEBUG
 
 # --- Application-Specific Settings ---
 AUTH = config.get("AUTH")
+WEB = config.get("WEB")
 TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
 AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 

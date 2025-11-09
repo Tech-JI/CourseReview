@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class CoursesPagination(pagination.PageNumberPagination):
-    page_size = settings.DEFAULTS["WEB"]["COURSE"]["PAGE_SIZE"]
+    page_size = settings.WEB["COURSE"]["PAGE_SIZE"]
 
 
 @api_view(["GET"])

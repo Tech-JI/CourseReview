@@ -1,5 +1,6 @@
 # apps/web/serializers.py
 from django.db.models import Count
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.web.models import (
@@ -103,7 +104,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def validate_comments(self, value):
         """Validate review minimum length"""
-        REVIEW_MINIMUM_LENGTH = 30
+        REVIEW_MINIMUM_LENGTH = settings.WEB["REVIEW"]["COMMENT_MIN_LENGTH"]
 
         if len(value) < REVIEW_MINIMUM_LENGTH:
             raise serializers.ValidationError(
