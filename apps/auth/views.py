@@ -42,7 +42,7 @@ TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 @authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_initiate_api(request):
-    """Step 1: Authentication Initiation (/api/auth/init)
+    """Step 1: Authentication Initiation (/api/auth/init/)
 
     1. Receives action and turnstile_token from frontend
     2. Verifies Turnstile token with Cloudflare's API
