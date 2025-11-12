@@ -10,10 +10,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from typing import Any
-
+from lib.logging import add_sanitization_to_logger
 from apps.web.models import Student
 
-logger = logging.getLogger(__name__)
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]

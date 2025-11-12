@@ -20,6 +20,7 @@ from lib.terms import numeric_value_of_term
 
 
 import logging
+from lib.logging import add_sanitization_to_logger
 
 from django.db.models import Count
 from django.conf import settings
@@ -31,7 +32,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-logger = logging.getLogger(__name__)
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 
 class CoursesPagination(pagination.PageNumberPagination):

@@ -6,6 +6,7 @@ import secrets
 import time
 
 import dateutil.parser
+from lib.logging import add_sanitization_to_logger
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django_redis import get_redis_connection
@@ -21,7 +22,7 @@ from rest_framework.response import Response
 from apps.auth import utils
 from apps.web.models import Student
 
-logger = logging.getLogger(__name__)
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
