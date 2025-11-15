@@ -14,7 +14,7 @@ repos:
       - id: ruff-check
         types_or: [python, pyi]
         always_run: true
-        args: ["--select", "I", ".","--fix"]
+        args: ["--fix"]
       - id: ruff-format
         types_or: [python, pyi]
         always_run: true
