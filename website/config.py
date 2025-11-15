@@ -1,11 +1,12 @@
-import os
-import yaml
 import collections.abc
+import operator
+import os
+from functools import reduce
 from pathlib import Path
 from typing import Any, Callable, TypeVar
+
+import yaml
 from django.core.exceptions import ImproperlyConfigured
-from functools import reduce
-import operator
 
 # Generic TypeVar for casting function return values
 T = TypeVar("T")

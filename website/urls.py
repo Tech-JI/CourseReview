@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import re_path
 
-
 from apps.auth import views as auth_views
 from apps.spider import views as spider_views
 from apps.web import views

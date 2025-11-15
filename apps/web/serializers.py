@@ -8,8 +8,8 @@ from apps.web.models import (
     DistributiveRequirement,
     Instructor,
     Review,
-    Vote,
     ReviewVote,
+    Vote,
 )
 from lib import constants
 

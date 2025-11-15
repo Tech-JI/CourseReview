@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from typing import Any
 
 import httpx
 from django.conf import settings
@@ -9,7 +10,6 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-from typing import Any
 
 from apps.web.models import Student
 
