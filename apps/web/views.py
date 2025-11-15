@@ -26,7 +26,6 @@ import dateutil.parser
 
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
     permission_classes,

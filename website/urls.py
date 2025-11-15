@@ -1,4 +1,3 @@
-import django.contrib.auth.views as authviews
 from django.contrib import admin
 from django.urls import re_path
 
