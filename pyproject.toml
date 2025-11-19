@@ -1,6 +1,6 @@
 [project]
 name = "course-review"
-requires-python = ">=3.14, <3.15"
+requires-python = ">=3.13, <3.14"
 version = "0.0.1"
 dependencies = [
     "beautifulsoup4==4.13.3",
