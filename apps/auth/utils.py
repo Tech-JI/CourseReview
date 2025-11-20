@@ -12,8 +12,9 @@ from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.web.models import Student
+from lib.logging import add_sanitization_to_logger
 
-logger = logging.getLogger(__name__)
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
