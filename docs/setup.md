@@ -16,7 +16,7 @@ Environment:
 
 3. `git checkout dev`
 
-4. `uv sync`
+4. `uv sync --all-groups`
 
 5. `uv run pre-commit install` (for installing git hook in .git)
 

@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import hashlib
 import json
 import logging
@@ -7,7 +6,6 @@ import secrets
 import time
 
 import dateutil.parser
-import httpx
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django_redis import get_redis_connection

@@ -1,24 +1,26 @@
 [project]
-name = ""
+name = "course-review"
+requires-python = ">=3.14, <3.15"
 version = "0.0.1"
 dependencies = [
-    "beautifulsoup4>=4.13.3",
-    "dj-database-url>=2.3.0",
-    "django>=5.1.6",
-    "django-debug-toolbar>=5.0.1",
-    "httpx>=0.28.1",
-    "psycopg2-binary>=2.9.10",
-    "python-dateutil>=2.9.0",
-    "python-dotenv>=1.0.1",
-    "pytz>=2025.1",
-    "redis>=5.2.1",
-    "requests>=2.32.3",
-    "bpython>=0.25",
-    "ptpython>=3.0.29",
-    "djangorestframework>=3.16.0",
-    "django-cors-headers>=4.7.0",
-    "django-redis",
-    "pyyaml>=6.0.2",
+    "beautifulsoup4==4.14.2",
+    "dj-database-url==3.0.1",
+    "django==5.2.8",
+    "django-debug-toolbar==6.1.0",
+    "httpx==0.28.1",
+    "psycopg2-binary==2.9.11",
+    "python-dateutil==2.9.0",
+    "python-dotenv==1.2.1",
+    "pytz==2025.2",
+    "redis==7.1.0",
+    "requests==2.32.5",
+    "bpython==0.26",
+    "greenlet==3.2.4",
+    "ptpython==3.0.31",
+    "djangorestframework==3.16.1",
+    "django-cors-headers==4.9.0",
+    "django-redis==6.0.0",
+    "pyyaml==6.0.3",
 ]
 
 [tool.uv]
@@ -26,5 +28,8 @@ package = false
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.3.0",
+    "pre-commit==4.4.0",
+]
+lint = [
+    "ruff==0.14.5",
 ]

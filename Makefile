@@ -46,7 +46,8 @@ format: format-backend format-frontend
 
 format-backend:
 	@echo "Formatting backend (Python) code with isort and black..."
-	uvx ruff format
+	uv run ruff check --select I . && \
+	uv run ruff format
 
 format-frontend:
 	@echo "Formatting frontend code with prettier..."
@@ -57,7 +58,7 @@ lint: lint-backend lint-frontend
 
 lint-backend: format-backend
 	@echo "Linting backend (Python) code with ruff..."
-	uvx ruff check
+	uv run ruff check
 
 lint-frontend: format-frontend
 	@echo "Linting frontend code with eslint..."

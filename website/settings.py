@@ -1,8 +1,9 @@
 from pathlib import Path
+
 import dj_database_url
 from dotenv import load_dotenv
-from .config import Config
 
+from .config import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")

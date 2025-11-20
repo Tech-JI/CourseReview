@@ -1,3 +1,16 @@
+import datetime
+import uuid
+
+import dateutil.parser
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Count
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+
 from apps.web.models import (
     Course,
     CourseMedian,
@@ -6,34 +19,16 @@ from apps.web.models import (
     ReviewVote,
     Vote,
 )
-
 from apps.web.models.forms import ReviewForm
-
 from apps.web.serializers import (
     CourseSearchSerializer,
     CourseSerializer,
     ReviewSerializer,
 )
-
 from lib import constants
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
-
-import datetime
-import uuid
-import dateutil.parser
-
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.decorators import (
-    api_view,
-    permission_classes,
-)
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-
 
 LIMITS = {
     "courses": 20,
