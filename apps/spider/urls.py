@@ -1,4 +1,5 @@
 from django.urls import re_path
+
 from apps.spider import views as spider_views
 
 urlpatterns = [

@@ -1,6 +1,6 @@
 # apps/web/serializers.py
-from django.db.models import Count
 from django.conf import settings
+from django.db.models import Count
 from rest_framework import serializers
 
 from apps.web.models import (
