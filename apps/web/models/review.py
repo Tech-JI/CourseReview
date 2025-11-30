@@ -43,7 +43,7 @@ class ReviewManager(models.Manager):
 
         return queryset
 
-    def queryset_raw(self, **kwargs):
+    def raw_queryset(self, **kwargs):
         """
         Return base queryset without vote annotations for better performance when votes aren't needed.
 

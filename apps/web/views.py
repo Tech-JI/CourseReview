@@ -438,7 +438,7 @@ def course_professors(request, course_id):
         {
             "professors": sorted(
                 set(
-                    Review.objects.queryset_raw(course=course_id)
+                    Review.objects.raw_queryset(course=course_id)
                     .values_list("professor", flat=True)
                     .distinct()
                 )
