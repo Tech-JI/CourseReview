@@ -49,7 +49,12 @@ class ReviewVoteManager(models.Manager):
                 vote_value = is_kudos
 
         # Calculate and return updated counts and user's current vote
-        kudos_count, dislike_count = Review.objects.get_vote_counts(review_id)
+        review_with_votes = Review.objects.with_votes(id=review_id).first()
+        if review_with_votes:
+            kudos_count = review_with_votes.kudos_count
+            dislike_count = review_with_votes.dislike_count
+        else:
+            kudos_count, dislike_count = 0, 0
         return kudos_count, dislike_count, vote_value
 
     def get_user_vote(self, review, user):

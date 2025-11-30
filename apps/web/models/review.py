@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Count, OuterRef, Q, Subquery
 
 
 class ReviewManager(models.Manager):
@@ -11,33 +12,45 @@ class ReviewManager(models.Manager):
     def num_reviews_for_user(self, user):
         return self.filter(user=user).count()
 
-    def get_user_review_for_course(self, user, course):
+    def with_votes(self, request_user=None, **kwargs):
         """
-        Get the review written by a user for a specific course.
-        Returns the Review object if found, None otherwise.
-        If multiple reviews exist, returns the most recent one.
+        Return queryset with annotated vote counts (kudos, dislike) and user's vote.
+
+        Args:
+            request_user: User object for user vote annotations
+            **kwargs: Additional filter parameters for queryset
         """
-        try:
-            return self.get(user=user, course=course)
-        except self.model.DoesNotExist:
-            return None
-        except self.model.MultipleObjectsReturned:
-            # If somehow there are multiple reviews, return the most recent one
-            return self.filter(user=user, course=course).order_by("-created_at").first()
+        queryset = self.filter(**kwargs).annotate(
+            kudos_count=Count("votes", filter=Q(votes__is_kudos=True), distinct=True),
+            dislike_count=Count(
+                "votes", filter=Q(votes__is_kudos=False), distinct=True
+            ),
+        )
 
-    def get_kudos_count(self, review_id):
-        """Get the number of kudos for a specific review"""
-        return self.get(id=review_id).votes.filter(is_kudos=True).count()
+        if request_user and request_user.is_authenticated:
+            from .vote_for_review import ReviewVote
 
-    def get_dislike_count(self, review_id):
-        """Get the number of dislikes for a specific review"""
-        return self.get(id=review_id).votes.filter(is_kudos=False).count()
+            # Define subquery: get the is_kudos value for current user's vote on this review
+            vote_subquery = ReviewVote.objects.filter(
+                review=OuterRef("pk"), user=request_user
+            ).values("is_kudos")[:1]
 
-    def get_vote_counts(self, review_id):
-        """Get both kudos and dislike counts for a specific review"""
-        kudos_count = self.get_kudos_count(review_id)
-        dislike_count = self.get_dislike_count(review_id)
-        return kudos_count, dislike_count
+            queryset = queryset.annotate(
+                user_vote=Subquery(
+                    vote_subquery, output_field=models.BooleanField(null=True)
+                )
+            )
+
+        return queryset
+
+    def queryset_raw(self, **kwargs):
+        """
+        Return base queryset without vote annotations for better performance when votes aren't needed.
+
+        Args:
+            **kwargs: Additional filter parameters
+        """
+        return self.filter(**kwargs)
 
 
 class Review(models.Model):

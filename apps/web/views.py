@@ -1,7 +1,7 @@
 import logging
 
 from django.conf import settings
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import generics, mixins, pagination, status
 from rest_framework.decorators import (
     api_view,
@@ -223,11 +223,12 @@ class CoursesReviewsAPI(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Get reviews for the specified course."""
         course_id = self.kwargs.get("course_id")
         try:
             course = Course.objects.get(id=course_id)
-            return Review.objects.filter(course=course)
+            return Review.objects.with_votes(
+                request_user=self.request.user, course=course
+            )
         except Course.DoesNotExist:
             logger.warning("Course with id %d does not exist", course_id)
             return Review.objects.none()
@@ -236,21 +237,16 @@ class CoursesReviewsAPI(
         """List reviews with optional filtering."""
         queryset = self.get_queryset()
 
-        # Handle all query parameters here
-        query = request.query_params.get("q", "").strip()
-        if query:
-            course_id = self.kwargs.get("course_id")
-            try:
-                course = Course.objects.get(id=course_id)
-                queryset = course.search_reviews(query)
-            except Course.DoesNotExist:
-                return Response(
-                    {"detail": "Course not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-
         # Apply author filter
         if request.query_params.get("author") == "me":
             queryset = queryset.filter(user=request.user)
+
+        # Handle search query
+        query = request.query_params.get("q", "").strip()
+        if query:
+            queryset = queryset.order_by("-term").filter(
+                Q(comments__icontains=query) | Q(professor__icontains=query)
+            )
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -284,10 +280,7 @@ class CoursesReviewsAPI(
             logger.warning("Review serializer errors: %s", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        review = serializer.save(course=course, user=request.user)
-
-        # Return the created review
-        serializer = self.get_serializer(review)
+        serializer.save(course=course, user=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -345,8 +338,10 @@ class UserReviewsAPI(
     lookup_url_kwarg = "review_id"
 
     def get_queryset(self):
-        """Only reviews belonging to the authenticated user."""
-        return Review.objects.filter(user=self.request.user)
+        """Only reviews belonging to the authenticated user with vote annotations."""
+        return Review.objects.with_votes(
+            request_user=self.request.user, user=self.request.user
+        )
 
     def get(self, request, *args, **kwargs):
         """Handle both list (no id) and retrieve (with id) operations."""
@@ -443,7 +438,7 @@ def course_professors(request, course_id):
         {
             "professors": sorted(
                 set(
-                    Review.objects.filter(course=course_id)
+                    Review.objects.queryset_raw(course=course_id)
                     .values_list("professor", flat=True)
                     .distinct()
                 )
@@ -566,7 +561,7 @@ def review_vote_api(request, review_id):
 
         if kudos_count is None or dislike_count is None:
             # Review doesn't exist
-            logger.warning("Review %d not found for voting", review_id)
+            logger.warning("Review %s not found for voting", str(review_id))
             return Response({"detail": "Review not found"}, status=404)
 
         return Response(
