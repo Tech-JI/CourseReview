@@ -1,7 +1,7 @@
 import logging
 
 from django.conf import settings
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from rest_framework import generics, mixins, pagination, status
 from rest_framework.decorators import (
     api_view,
@@ -79,7 +79,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
             - code (string): Filter by course code (partial match)
             - min_quality (integer): Filter by minimum quality score (authenticated only)
             - min_difficulty (integer): Filter by minimum difficulty score (authenticated only)
-            - sort_by (string): Sort field ("course_code", "num_reviews"),("quality_score", "difficulty_score")(authenticated only)
+            - sort_by (string): Sort field ("course_code", "review_count"),("quality_score", "difficulty_score")(authenticated only)
             - sort_order (string): "asc" or "desc" (default: "asc")
             - page (integer): Page number for pagination
 
@@ -97,8 +97,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
     pagination_class = CoursesPagination
 
     def get_queryset(self):
-        queryset = Course.objects.all().prefetch_related("distribs", "review_set")
-        queryset = queryset.annotate(num_reviews=Count("review"))
+        queryset = Course.objects.with_scores().prefetch_related("distribs")
         return queryset
 
     def _filter(self, queryset):
@@ -143,7 +142,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         sort_order = self.request.query_params.get("sort_order", "asc")
         sort_prefix = "-" if sort_order.lower() == "desc" else ""
 
-        allowed_sort_fields = ["course_code", "num_reviews"]
+        allowed_sort_fields = ["course_code", "review_count"]
         if self.request.user.is_authenticated:
             allowed_sort_fields.extend(["quality_score", "difficulty_score"])
 
@@ -175,15 +174,23 @@ class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
 
     serializer_class = CourseSerializer
     permission_classes = [AllowAny]
-    queryset = Course.objects.all()
+    lookup_field = "id"
+    lookup_url_kwarg = "course_id"
 
-    def get_object(self):
-        course_id = self.kwargs.get("course_id")
-        try:
-            return Course.objects.get(id=course_id)
-        except Course.DoesNotExist:
-            logger.warning("Course with id %d does not exist", course_id)
-            return None
+    def get_queryset(self):
+        queryset = Course.objects.with_scores_vote_counts()
+
+        # Prefetch reviews with votes if authenticated
+        request = self.request
+        if request and request.user.is_authenticated:
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "review_set",
+                    queryset=Review.objects.with_votes(request_user=request.user),
+                )
+            )
+
+        return queryset
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)

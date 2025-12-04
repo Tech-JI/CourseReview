@@ -118,6 +118,8 @@ class CourseSearchSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     is_offered_in_current_term = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
+    quality_score = serializers.SerializerMethodField()
+    difficulty_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -135,7 +137,13 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         )
 
     def get_review_count(self, obj):
-        return obj.review_set.count()
+        return getattr(obj, "review_count", obj.review_set.count())
+
+    def get_quality_score(self, obj):
+        return getattr(obj, "quality_score", 0.0)
+
+    def get_difficulty_score(self, obj):
+        return getattr(obj, "difficulty_score", 0.0)
 
     def get_is_offered_in_current_term(self, obj):
         return obj.courseoffering_set.filter(term=constants.CURRENT_TERM).exists()
@@ -191,6 +199,8 @@ class CourseSerializer(serializers.ModelSerializer):
     course_topics = serializers.SerializerMethodField()
     quality_vote_count = serializers.SerializerMethodField()
     difficulty_vote_count = serializers.SerializerMethodField()
+    quality_score = serializers.SerializerMethodField()
+    difficulty_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -243,7 +253,13 @@ class CourseSerializer(serializers.ModelSerializer):
         return []
 
     def get_review_count(self, obj):
-        return obj.review_set.count()
+        return getattr(obj, "review_count", obj.review_set.count())
+
+    def get_quality_score(self, obj):
+        return getattr(obj, "quality_score", 0.0)
+
+    def get_difficulty_score(self, obj):
+        return getattr(obj, "difficulty_score", 0.0)
 
     def get_xlist(self, obj):
         return [
@@ -290,10 +306,14 @@ class CourseSerializer(serializers.ModelSerializer):
         return None
 
     def get_quality_vote_count(self, obj):
-        return Vote.objects.get_vote_count(obj, "quality")
+        return getattr(
+            obj, "quality_vote_count", Vote.objects.get_vote_count(obj, "quality")
+        )
 
     def get_difficulty_vote_count(self, obj):
-        return Vote.objects.get_vote_count(obj, "difficulty")
+        return getattr(
+            obj, "difficulty_vote_count", Vote.objects.get_vote_count(obj, "difficulty")
+        )
 
     def get_can_write_review(self, obj):
         request = self.context.get("request")
