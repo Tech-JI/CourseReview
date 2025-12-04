@@ -186,7 +186,7 @@ class CoursesDetailAPI(generics.GenericAPIView, mixins.RetrieveModelMixin):
             queryset = queryset.prefetch_related(
                 Prefetch(
                     "review_set",
-                    queryset=Review.objects.with_votes(request_user=request.user),
+                    queryset=Review.objects.with_votes(vote_user=request.user),
                 )
             )
 
@@ -233,9 +233,7 @@ class CoursesReviewsAPI(
         course_id = self.kwargs.get("course_id")
         try:
             course = Course.objects.get(id=course_id)
-            return Review.objects.with_votes(
-                request_user=self.request.user, course=course
-            )
+            return Review.objects.with_votes(vote_user=self.request.user, course=course)
         except Course.DoesNotExist:
             logger.warning("Course with id %d does not exist", course_id)
             return Review.objects.none()
@@ -347,7 +345,7 @@ class UserReviewsAPI(
     def get_queryset(self):
         """Only reviews belonging to the authenticated user with vote annotations."""
         return Review.objects.with_votes(
-            request_user=self.request.user, user=self.request.user
+            vote_user=self.request.user, user=self.request.user
         )
 
     def get(self, request, *args, **kwargs):

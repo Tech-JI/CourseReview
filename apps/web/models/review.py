@@ -12,12 +12,12 @@ class ReviewManager(models.Manager):
     def review_count_for_user(self, user):
         return self.filter(user=user).count()
 
-    def with_votes(self, request_user=None, **kwargs):
+    def with_votes(self, vote_user=None, **kwargs):
         """
         Return queryset with annotated vote counts (kudos, dislike) and user's vote.
 
         Args:
-            request_user: User object for user vote annotations
+            vote_user: User object for user vote annotations
             **kwargs: Additional filter parameters for queryset
         """
         queryset = self.filter(**kwargs).annotate(
@@ -27,12 +27,12 @@ class ReviewManager(models.Manager):
             ),
         )
 
-        if request_user and request_user.is_authenticated:
+        if vote_user and vote_user.is_authenticated:
             from .vote_for_review import ReviewVote
 
             # Define subquery: get the is_kudos value for current user's vote on this review
             vote_subquery = ReviewVote.objects.filter(
-                review=OuterRef("pk"), user=request_user
+                review=OuterRef("pk"), user=vote_user
             ).values("is_kudos")[:1]
 
             queryset = queryset.annotate(
