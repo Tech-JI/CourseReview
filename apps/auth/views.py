@@ -8,12 +8,12 @@ import time
 import dateutil.parser
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_redis import get_redis_connection
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
-    authentication_classes,
     permission_classes,
+    authentication_classes,
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -22,11 +22,6 @@ from apps.auth import utils
 from apps.web.models import Student
 
 logger = logging.getLogger(__name__)
-
-
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return
 
 
 AUTH_SETTINGS = settings.AUTH
@@ -38,7 +33,6 @@ TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_initiate_api(request):
     """Step 1: Authentication Initiation (/api/auth/init)
@@ -143,8 +137,8 @@ def auth_initiate_api(request):
     return response
 
 
+@ensure_csrf_cookie
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def verify_callback_api(request):
     """Callback Verification (/api/auth/verify)
@@ -386,6 +380,7 @@ def verify_token_pwd(request, action: str) -> tuple[dict | None, Response | None
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
 def auth_signup_api(request) -> Response:
     """Signup API (/api/auth/signup)
 
@@ -429,6 +424,7 @@ def auth_signup_api(request) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
 def auth_reset_password_api(request) -> Response:
     """Reset Password API (/api/auth/password)
 
@@ -469,7 +465,6 @@ def auth_reset_password_api(request) -> Response:
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
     account = request.data.get("account", "").strip()
@@ -509,7 +504,6 @@ def auth_login_api(request) -> Response:
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_logout_api(request) -> Response:
     logger.info(

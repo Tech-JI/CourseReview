@@ -10,7 +10,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.response import Response
-
+from rest_framework.authentication import SessionAuthentication
 from apps.web.models import Student
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,12 @@ EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
 
 QUEST_SETTINGS = settings.QUEST
 QUEST_BASE_URL = QUEST_SETTINGS["BASE_URL"]
+
+
+class CSRFCheckSessionAuthentication(SessionAuthentication):
+    def authenticate(self, request):
+        super().enforce_csrf(request)
+        return super().authenticate(request)
 
 
 def get_survey_details(action: str) -> dict[str, Any] | None:
