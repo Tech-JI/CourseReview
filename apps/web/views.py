@@ -21,7 +21,9 @@ from apps.web.models import (
 from apps.web.serializers import (
     CourseSearchSerializer,
     CourseSerializer,
+    CourseVoteSerializer,
     ReviewSerializer,
+    ReviewVoteSerializer,
 )
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
@@ -399,6 +401,7 @@ def departments_api(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def medians(request, course_id):
     # retrieve course medians for term, and group by term for averaging
     medians_by_term = {}
@@ -438,6 +441,7 @@ def medians(request, course_id):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def course_professors(request, course_id):
     return Response(
         {
@@ -461,6 +465,7 @@ def course_professors(request, course_id):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def course_instructors(request, course_id):
     try:
         course = Course.objects.get(pk=course_id)
@@ -485,7 +490,7 @@ def course_vote_api(request, course_id):
         - URL parameter: course_id (integer, required)
         - Body (JSON):
             {
-                "value": integer (vote score),
+                "value": integer (vote score between 1-5),
                 "forLayup": boolean (true for difficulty, false for quality)
             }
 
@@ -498,24 +503,19 @@ def course_vote_api(request, course_id):
         }
         Error (400):
         {
-            "detail": "Missing required fields: value, forLayup"
+            "detail": "Validation error with input fields"
         }
     """
-    try:
-        value = request.data["value"]
-        forLayup = request.data["forLayup"]
-    except KeyError:
-        logger.warning(
-            "Missing required fields: value, forLayup in course vote API for course %d",
-            course_id,
-        )
-        return Response(
-            {"detail": "Missing required fields: value, forLayup"}, status=400
-        )
+    serializer = CourseVoteSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+
+    value = serializer.validated_data["value"]
+    forLayup = serializer.validated_data["forLayup"]
 
     category = Vote.CATEGORIES.DIFFICULTY if forLayup else Vote.CATEGORIES.QUALITY
     new_score, is_unvote, new_vote_count = Vote.objects.vote(
-        int(value), course_id, category, request.user
+        value, course_id, category, request.user
     )
 
     return Response(
@@ -548,37 +548,30 @@ def review_vote_api(request, review_id):
             "dislike_count": integer,
             "user_vote": boolean|null (true/false/null)
         }
+        Error (400):
+        {
+            "detail": "Validation error with input fields"
+        }
     """
+    serializer = ReviewVoteSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
 
-    try:
-        is_kudos = request.data.get("is_kudos")
+    is_kudos = serializer.validated_data["is_kudos"]
 
-        if is_kudos is None:
-            logger.warning("is_kudos field is required for review vote API")
-            return Response({"detail": "is_kudos field is required"}, status=400)
+    kudos_count, dislike_count, user_vote = ReviewVote.objects.vote(
+        review_id=review_id, user=request.user, is_kudos=is_kudos
+    )
 
-        is_kudos = bool(is_kudos)
+    if kudos_count is None or dislike_count is None:
+        # Review doesn't exist
+        logger.warning("Review %s not found for voting", str(review_id))
+        return Response({"detail": "Review not found"}, status=404)
 
-        # Use the ReviewVoteManager's vote method
-        kudos_count, dislike_count, user_vote = ReviewVote.objects.vote(
-            review_id=review_id, user=request.user, is_kudos=is_kudos
-        )
-
-        if kudos_count is None or dislike_count is None:
-            # Review doesn't exist
-            logger.warning("Review %s not found for voting", str(review_id))
-            return Response({"detail": "Review not found"}, status=404)
-
-        return Response(
-            {
-                "kudos_count": kudos_count,
-                "dislike_count": dislike_count,
-                "user_vote": user_vote,
-            }
-        )
-
-    except Exception:
-        return Response(
-            {"detail": "An error occurred processing your request"},
-            status=500,
-        )
+    return Response(
+        {
+            "kudos_count": kudos_count,
+            "dislike_count": dislike_count,
+            "user_vote": user_vote,
+        }
+    )

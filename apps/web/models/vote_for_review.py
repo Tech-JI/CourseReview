@@ -39,16 +39,13 @@ class ReviewVoteManager(models.Manager):
         else:
             # Existing vote
             if review_vote.is_kudos == is_kudos:
-                # Same vote type, remove it (cancel)
                 review_vote.delete()
-                vote_value = None  # User cancelled their vote
+                vote_value = None
             else:
-                # Change vote from kudos to dislike or vice versa
                 review_vote.is_kudos = is_kudos
                 review_vote.save()
                 vote_value = is_kudos
 
-        # Calculate and return updated counts and user's current vote
         review_with_votes = Review.objects.with_votes(id=review_id).first()
         if review_with_votes:
             kudos_count = review_with_votes.kudos_count

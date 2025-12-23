@@ -10,9 +10,6 @@ from .course import Course
 class VoteManager(models.Manager):
     @transaction.atomic
     def vote(self, value, course_id, category, user):
-        if value > 5 or value < 1:
-            return None, False, None
-
         course = Course.objects.select_for_update().get(id=course_id)
         vote, created = self.get_or_create(course=course, category=category, user=user)
 

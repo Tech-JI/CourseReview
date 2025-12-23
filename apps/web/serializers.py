@@ -184,6 +184,15 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         return ret
 
 
+class CourseVoteSerializer(serializers.Serializer):
+    value = serializers.IntegerField(min_value=1, max_value=5)
+    forLayup = serializers.BooleanField()
+
+
+class ReviewVoteSerializer(serializers.Serializer):
+    is_kudos = serializers.BooleanField()
+
+
 class CourseSerializer(serializers.ModelSerializer):
     review_set = serializers.SerializerMethodField()
     courseoffering_set = CourseOfferingSerializer(many=True, read_only=True)
