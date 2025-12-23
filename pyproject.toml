@@ -21,7 +21,6 @@ dependencies = [
     "django-cors-headers==4.9.0",
     "django-redis==6.0.0",
     "pyyaml==6.0.3",
-    "celery==5.6.0"
 ]
 
 [tool.uv]
