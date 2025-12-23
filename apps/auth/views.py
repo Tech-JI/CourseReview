@@ -506,6 +506,7 @@ def auth_login_api(request) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_logout_api(request) -> Response:
     logger.info(
