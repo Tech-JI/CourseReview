@@ -204,7 +204,7 @@ class CoursesReviewsAPI(
     """
     List and create reviews for a specific course.
 
-    GET - List reviews:
+    GET - List reviews:(Unused API)
     Input:
         - Authentication: Required
         - URL parameter: course_id (integer, required)
@@ -301,7 +301,7 @@ class UserReviewsAPI(
     """
     Manage user's own reviews (CRUD operations).
 
-    GET (List) - List user's reviews:
+    GET (List) - List user's reviews:(Unused API)
     Input:
         - Authentication: Required
         - URL parameter: None
@@ -318,7 +318,7 @@ class UserReviewsAPI(
         Success (200): ReviewSerializer object
         Error (404): {"detail": "Not found."}
 
-    PUT - Update review:
+    PUT - Update review:(Unused API)
     Input:
         - Authentication: Required
         - URL parameter: review_id (integer, required)
@@ -403,6 +403,9 @@ def departments_api(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def medians(request, course_id):
+    """
+    Unused API.
+    """
     # retrieve course medians for term, and group by term for averaging
     medians_by_term = {}
     for course_median in CourseMedian.objects.filter(course=course_id):
@@ -443,6 +446,9 @@ def medians(request, course_id):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def course_professors(request, course_id):
+    """
+    Unused API.
+    """
     return Response(
         {
             "professors": sorted(
@@ -467,6 +473,9 @@ def course_professors(request, course_id):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def course_instructors(request, course_id):
+    """
+    Unused API.
+    """
     try:
         course = Course.objects.get(pk=course_id)
         instructors = course.get_instructors()
