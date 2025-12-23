@@ -147,7 +147,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "prek" },
-    { name = "ruff" },
 ]
 lint = [
     { name = "ruff" },
@@ -176,10 +175,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "prek", specifier = ">=0.2.24" },
-    { name = "ruff", specifier = ">=0.14.5" },
-]
+dev = [{ name = "prek", specifier = ">=0.2.24" }]
 lint = [{ name = "ruff", specifier = "==0.14.5" }]
 
 [[package]]

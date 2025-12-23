@@ -29,7 +29,6 @@ package = false
 [dependency-groups]
 dev = [
     "prek>=0.2.24",
-    "ruff>=0.14.5",
 ]
 lint = [
     "ruff==0.14.5",
