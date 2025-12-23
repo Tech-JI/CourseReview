@@ -381,6 +381,7 @@ def verify_token_pwd(request, action: str) -> tuple[dict | None, Response | None
 
 @api_view(["POST"])
 @authentication_classes([utils.CSRFCheckSessionAuthentication])
+@permission_classes([AllowAny])
 def auth_signup_api(request) -> Response:
     """Signup API (/api/auth/signup)
 
@@ -427,6 +428,7 @@ def auth_signup_api(request) -> Response:
 
 @api_view(["POST"])
 @authentication_classes([utils.CSRFCheckSessionAuthentication])
+@permission_classes([AllowAny])
 def auth_reset_password_api(request) -> Response:
     """Reset Password API (/api/auth/password)
 
