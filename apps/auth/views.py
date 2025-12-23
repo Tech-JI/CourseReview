@@ -411,6 +411,8 @@ def auth_signup_api(request) -> Response:
         user.set_password(password)
         user.save()
 
+        login(request, user)
+
         # Cleanup: Delete temp_token_state and clear cookie
         r = get_redis_connection("default")
         r.delete(state_key)
