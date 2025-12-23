@@ -217,7 +217,8 @@ class Course(models.Model):
         If term is None, returns instructors across all terms.
         """
         instructors = []
-        offerings = self.courseoffering_set.all()
+        # Prefetch instructors to avoid N+1 queries
+        offerings = self.courseoffering_set.prefetch_related("instructors").all()
 
         if term:
             offerings = offerings.filter(term=term)
