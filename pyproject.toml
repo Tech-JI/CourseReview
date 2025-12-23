@@ -28,7 +28,7 @@ package = false
 
 [dependency-groups]
 dev = [
-    "pre-commit==4.4.0",
+    "prek>=0.2.24",
 ]
 lint = [
     "ruff==0.14.5",
