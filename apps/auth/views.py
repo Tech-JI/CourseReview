@@ -467,6 +467,7 @@ def auth_reset_password_api(request) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
     account = request.data.get("account", "").strip()
