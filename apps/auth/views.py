@@ -404,7 +404,7 @@ def auth_signup_api(request) -> Response:
             return error_response or Response(
                 {"error": "Failed to create user session"}, status=500
             )
-        if user.password:
+        if user.has_usable_password():
             return Response({"error": "User already exists with password."}, status=409)
 
         user.is_active = True
