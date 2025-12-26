@@ -68,7 +68,7 @@ This authentication flow is hardened by its stateless, token-based design. It re
 - **Logic**:
   1. Checks `localStorage` for a non-expired OTP record. If found, displays it to allow the user to re-copy. Expired OTP and auth flow state records in `localStorage` are cleared.
   2. If no valid OTP exists, renders the Cloudflare Turnstile widget.
-  3. On Turnstile success, calls `POST /api/auth/initiate` endpoint with its `action` prop.
+  3. On Turnstile success, calls `POST /api/auth/init` endpoint with its `action` prop.
   4. On receiving the `otp` and `redirect_url` (the `temp_token` is set as a cookie by the backend), stores `{ otp, expires_at }` and `{ status: 'pending', expires_at }` in `localStorage` to track the flow's state.
   5. Displays the OTP and copy button. On click, it copies the OTP, provides visual feedback, and initiates the redirect to the URL received from backend.
 
@@ -107,7 +107,7 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
 
 ### Detailed Backend Process
 
-#### `POST /api/auth/initiate`
+#### `POST /api/auth/init`
 
 1. **Input**: Receives the user's intended `action` and the `turnstile_token`.
 2. **Validation**: Verifies the `turnstile_token` with Cloudflare's API.

@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import hashlib
 import json
 import logging
@@ -7,11 +6,10 @@ import secrets
 import time
 
 import dateutil.parser
-import httpx
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_redis import get_redis_connection
-from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -23,25 +21,21 @@ from rest_framework.response import Response
 from apps.auth import utils
 from apps.web.models import Student
 
-
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return
+logger = logging.getLogger(__name__)
 
 
 AUTH_SETTINGS = settings.AUTH
 OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
 TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
-ACTION_LIST = ["signup", "login", "reset_password"]
+ACTION_LIST = AUTH_SETTINGS["ACTION_LIST"]
 TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
 TOKEN_RATE_LIMIT_TIME = AUTH_SETTINGS["TOKEN_RATE_LIMIT_TIME"]
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_initiate_api(request):
-    """Step 1: Authentication Initiation (/api/auth/initiate)
+    """Step 1: Authentication Initiation (/api/auth/init)
 
     1. Receives action and turnstile_token from frontend
     2. Verifies Turnstile token with Cloudflare's API
@@ -54,9 +48,11 @@ def auth_initiate_api(request):
     turnstile_token = request.data.get("turnstile_token")
 
     if not action or not turnstile_token:
+        logger.warning("Missing action or turnstile_token in auth_initiate_api")
         return Response({"error": "Missing action or turnstile_token"}, status=400)
 
     if action not in ACTION_LIST:
+        logger.warning("Invalid action '%s' in auth_initiate_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     client_ip = (
@@ -70,6 +66,10 @@ def auth_initiate_api(request):
         utils.verify_turnstile_token(turnstile_token, client_ip)
     )
     if not success:
+        logger.warning(
+            "verify_turnstile_token failed in auth_initiate_api:%s",
+            error_response.data,
+        )
         return error_response
 
     # Generate cryptographically secure OTP and temp_token
@@ -89,13 +89,12 @@ def auth_initiate_api(request):
             if existing_state_data:
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
-                logging.info(
-                    f"Cleaned up existing temp_token_state for action {
-                        existing_state.get('action', 'unknown')
-                    }"
+                logger.info(
+                    "Cleaned up existing temp_token_state for action %s",
+                    existing_state.get("action", "unknown"),
                 )
-        except Exception as e:
-            logging.warning(f"Error cleaning up existing temp_token: {e}")
+        except Exception:
+            logger.warning("Error cleaning up existing temp_token")
 
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
@@ -111,13 +110,15 @@ def auth_initiate_api(request):
         json.dumps(temp_token_state),
     )
 
-    logging.info("Created auth intent for action %s with OTP and temp_token", action)
+    logger.info("Created auth intent for action %s with OTP and temp_token", action)
 
     details = utils.get_survey_details(action)
     if not details:
+        logger.error("Invalid action '%s' when fetching survey details", action)
         return Response({"error": "Invalid action"}, status=400)
     survey_url = details.get("url")
     if not survey_url:
+        logger.error("Survey URL missing for %s", action)
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
             status=500,
@@ -136,28 +137,36 @@ def auth_initiate_api(request):
     return response
 
 
+@ensure_csrf_cookie
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def verify_callback_api(request):
     """Callback Verification (/api/auth/verify)
     request data includes account, answer_id, action
     Handles the verification of questionnaire callback using temp_token from cookie.
     """
+    logger.info(
+        "verify_callback_api called for account=%s, action=%s",
+        request.data.get("account"),
+        request.data.get("action"),
+    )
     # Get required parameters from request
     account = request.data.get("account")
     answer_id = request.data.get("answer_id")
     action = request.data.get("action")
 
     if not account or not answer_id or not action:
+        logger.warning("Missing account, answer_id, or action in verify_callback_api")
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
     if action not in ACTION_LIST:
+        logger.warning("Invalid action '%s' in verify_callback_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     # Get temp_token from HttpOnly cookie
     temp_token = request.COOKIES.get("temp_token")
     if not temp_token:
+        logger.warning("No temp_token found in verify_callback_api")
         return Response({"error": "No temp_token found"}, status=401)
 
     r = get_redis_connection("default")
@@ -168,18 +177,22 @@ def verify_callback_api(request):
     state_data = r.get(state_key)
 
     if not state_data:
+        logger.warning("Temp token state not found or expired in verify_callback_api")
         return Response({"error": "Temp token state not found or expired"}, status=401)
 
     try:
         state_data = json.loads(state_data)
     except json.JSONDecodeError:
+        logger.error("Invalid temp token state data in verify_callback_api")
         return Response({"error": "Invalid temp token state data"}, status=401)
 
     # Verify status is pending and action matches
     if state_data.get("status") != "pending":
+        logger.warning("Temp token state not pending in verify_callback_api")
         return Response({"error": "Invalid temp token state"}, status=401)
 
     if state_data.get("action") != action:
+        logger.warning("Action mismatch in verify_callback_api")
         return Response({"error": "Action mismatch"}, status=403)
 
     # Step 2: Apply rate limiting per temp_token to prevent brute-force attempts
@@ -193,6 +206,7 @@ def verify_callback_api(request):
         r.expire(rate_limit_key, TOKEN_RATE_LIMIT_TIME)
 
     if attempts > TOKEN_RATE_LIMIT:
+        logger.warning("Too many verification attempts in verify_callback_api")
         return Response({"error": "Too many verification attempts"}, status=429)
 
     # Step 3: Query questionnaire API for latest submission of the specific questionnaire of the action
@@ -203,10 +217,12 @@ def verify_callback_api(request):
         return error_response
 
     if latest_answer is None:
+        logger.warning("No questionnaire submission found in verify_callback_api")
         return Response({"error": "No questionnaire submission found"}, status=404)
 
     # Check if this is the submission we're looking for
     if str(latest_answer.get("id")) != str(answer_id):
+        logger.warning("Answer ID mismatch in verify_callback_api")
         return Response({"error": "Answer ID mismatch"}, status=403)
 
     # Extract OTP and quest_id from submission
@@ -217,6 +233,7 @@ def verify_callback_api(request):
     otp_data_raw = r.getdel(otp_key)
 
     if not otp_data_raw:
+        logger.warning("Invalid or expired OTP in verify_callback_api")
         return Response({"error": "Invalid or expired OTP"}, status=401)
 
     try:
@@ -224,13 +241,16 @@ def verify_callback_api(request):
         expected_temp_token = otp_data.get("temp_token")
         initiated_at = otp_data.get("initiated_at")
     except (json.JSONDecodeError, AttributeError):
+        logger.error("Invalid OTP data format in verify_callback_api")
         return Response({"error": "Invalid OTP data format"}, status=401)
 
     if not expected_temp_token or not initiated_at:
+        logger.warning("Incomplete OTP data in verify_callback_api")
         return Response({"error": "Incomplete OTP data"}, status=401)
 
     # Step 5: StepVerify temp_token matches
     if expected_temp_token != temp_token:
+        logger.warning("Invalid temp_token in verify_callback_api")
         return Response({"error": "Invalid temp_token"}, status=401)
 
     # Step 6: Validate submission timestamp after OTP extraction
@@ -248,8 +268,8 @@ def verify_callback_api(request):
                 status=401,
             )
 
-    except (ValueError, TypeError) as e:
-        logging.exception(f"Error parsing submission timestamp: {e}")
+    except (ValueError, TypeError):
+        logger.error("Error parsing submission timestamp")
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
     # Step 7: Update state to verified and add user details
@@ -267,8 +287,10 @@ def verify_callback_api(request):
     # Clear rate limiting on success
     r.delete(rate_limit_key)
 
-    logging.info(
-        "Successfully verified temp_token for user %s with action %s", account, action
+    logger.info(
+        "Successfully verified temp_token for user %s with action %s",
+        account,
+        action,
     )
 
     # For login action, handle immediate session creation and cleanup
@@ -277,15 +299,16 @@ def verify_callback_api(request):
         user, error_response = utils.create_user_session(request, account)
         if user is None:
             if error_response:
-                logging.error(
+                logger.error(
                     "Failed to create session for login: %s",
                     getattr(error_response, "data", {}).get("error", "Unknown error"),
                 )
                 return error_response
             else:
+                logger.error("Failed to create user session in verify_callback_api")
                 return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
-            logging.warning("Inactive user attempted OAuth login: %s", account)
+            logger.warning("Inactive user attempted OAuth login: %s", account)
             return Response({"error": "User account is inactive"}, status=403)
         try:
             # Create Django session
@@ -294,7 +317,7 @@ def verify_callback_api(request):
             # Delete temp_token_state after successful login
             r.delete(state_key)
         except Exception:
-            logging.exception(
+            logger.exception(
                 "Error during login session creation or cleanup for user %s", account
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
@@ -357,6 +380,8 @@ def verify_token_pwd(request, action: str) -> tuple[dict | None, Response | None
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
+@permission_classes([AllowAny])
 def auth_signup_api(request) -> Response:
     """Signup API (/api/auth/signup)
 
@@ -379,13 +404,15 @@ def auth_signup_api(request) -> Response:
             return error_response or Response(
                 {"error": "Failed to create user session"}, status=500
             )
-        if user.password:
+        if user.has_usable_password():
             return Response({"error": "User already exists with password."}, status=409)
 
         user.is_active = True
         # Set password
         user.set_password(password)
         user.save()
+
+        login(request, user)
 
         # Cleanup: Delete temp_token_state and clear cookie
         r = get_redis_connection("default")
@@ -394,12 +421,14 @@ def auth_signup_api(request) -> Response:
         response.delete_cookie("temp_token")
         return response
 
-    except Exception as e:
-        logging.error(f"Error in auth_signup_api: {e}")
+    except Exception:
+        logger.error("Error in auth_signup_api")
         return Response({"error": "Failed to complete signup"}, status=500)
 
 
 @api_view(["POST"])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
+@permission_classes([AllowAny])
 def auth_reset_password_api(request) -> Response:
     """Reset Password API (/api/auth/password)
 
@@ -434,13 +463,12 @@ def auth_reset_password_api(request) -> Response:
         response.delete_cookie("temp_token")
         return response
 
-    except Exception as e:
-        logging.error(f"Error in auth_reset_password_api: {e}")
+    except Exception:
+        logger.error("Error in auth_reset_password_api")
         return Response({"error": "Failed to reset password"}, status=500)
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_login_api(request) -> Response:
     account = request.data.get("account", "").strip()
@@ -448,6 +476,9 @@ def auth_login_api(request) -> Response:
     turnstile_token = request.data.get("turnstile_token", "")
 
     if not account or not password or not turnstile_token:
+        logger.warning(
+            "Account, password, and Turnstile token are missing in auth_login_api"
+        )
         return Response(
             {"error": "Account, password, and Turnstile token are missing"}, status=400
         )
@@ -477,9 +508,13 @@ def auth_login_api(request) -> Response:
 
 
 @api_view(["POST"])
-@authentication_classes([CsrfExemptSessionAuthentication])
+@authentication_classes([utils.CSRFCheckSessionAuthentication])
 @permission_classes([AllowAny])
 def auth_logout_api(request) -> Response:
+    logger.info(
+        "auth_logout_api called for user=%s",
+        getattr(request.user, "username", None),
+    )
     """Logout a user."""
     logout(request)
     return Response({"message": "Logged out successfully"}, status=200)

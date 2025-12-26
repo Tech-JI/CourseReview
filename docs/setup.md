@@ -16,9 +16,9 @@ Environment:
 
 3. `git checkout dev`
 
-4. `uv sync`
+4. `uv sync --all-groups`
 
-5. `uv run pre-commit install` (for installing git hook in .git)
+5. `uv run prek install` (for installing git hook in .git)
 
 6. Make directory for builds of static files: `mkdir staticfiles`
 

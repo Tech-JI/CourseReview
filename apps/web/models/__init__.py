@@ -7,3 +7,15 @@ from .review import Review
 from .student import Student
 from .vote import Vote
 from .vote_for_review import ReviewVote
+
+__all__ = [
+    "Course",
+    "CourseMedian",
+    "CourseOffering",
+    "DistributiveRequirement",
+    "Instructor",
+    "Review",
+    "Student",
+    "Vote",
+    "ReviewVote",
+]

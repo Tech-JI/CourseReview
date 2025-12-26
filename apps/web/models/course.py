@@ -3,7 +3,8 @@ from __future__ import unicode_literals
 import re
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Avg, Count, Q
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 
 from lib.constants import CURRENT_TERM
@@ -69,6 +70,37 @@ class CourseManager(models.Manager):
                 )
             return courses
 
+    def with_scores(self):
+        """Annotate courses with calculated scores and review count (for list view)"""
+        from apps.web.models import Vote
+
+        return self.annotate(
+            quality_score=Coalesce(
+                Avg("vote__value", filter=Q(vote__category=Vote.CATEGORIES.QUALITY)),
+                0.0,
+            ),
+            difficulty_score=Coalesce(
+                Avg("vote__value", filter=Q(vote__category=Vote.CATEGORIES.DIFFICULTY)),
+                0.0,
+            ),
+            review_count=Count("review", distinct=True),
+        )
+
+    def with_scores_vote_counts(self):
+        """Annotate courses with vote counts (for detail view)"""
+        from apps.web.models import Vote
+
+        return self.with_scores().annotate(
+            quality_vote_count=Count(
+                "vote", filter=Q(vote__category=Vote.CATEGORIES.QUALITY), distinct=True
+            ),
+            difficulty_vote_count=Count(
+                "vote",
+                filter=Q(vote__category=Vote.CATEGORIES.DIFFICULTY),
+                distinct=True,
+            ),
+        )
+
 
 class Course(models.Model):
     objects = CourseManager()
@@ -98,9 +130,6 @@ class Course(models.Model):
     # number = models.IntegerField(db_index=True)
     # subnumber = models.IntegerField(null=True, db_index=True, blank=True)
     # source = models.CharField(max_length=16, choices=SOURCES.CHOICES)
-
-    difficulty_score = models.FloatField(default=0.0)
-    quality_score = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -188,7 +217,8 @@ class Course(models.Model):
         If term is None, returns instructors across all terms.
         """
         instructors = []
-        offerings = self.courseoffering_set.all()
+        # Prefetch instructors to avoid N+1 queries
+        offerings = self.courseoffering_set.prefetch_related("instructors").all()
 
         if term:
             offerings = offerings.filter(term=term)

@@ -1,8 +1,9 @@
 from pathlib import Path
+
 import dj_database_url
 from dotenv import load_dotenv
-from .config import Config
 
+from .config import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -17,6 +18,10 @@ DEFAULTS = {
         "COOKIE_AGE": 2592000,  # 30 days
         "SAVE_EVERY_REQUEST": True,
     },
+    "WEB": {
+        "COURSE": {"PAGE_SIZE": 10},
+        "REVIEW": {"PAGE_SIZE": 10, "COMMENT_MIN_LENGTH": 30},
+    },
     "AUTH": {
         "OTP_TIMEOUT": 120,
         "TEMP_TOKEN_TIMEOUT": 600,
@@ -25,6 +30,7 @@ DEFAULTS = {
         "PASSWORD_LENGTH_MIN": 10,
         "PASSWORD_LENGTH_MAX": 32,
         "EMAIL_DOMAIN_NAME": "sjtu.edu.cn",
+        "ACTION_LIST": ["signup", "login", "reset_password"],
     },
     "DATABASE": {"URL": "sqlite:///db.sqlite3"},
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
@@ -41,7 +47,7 @@ DEFAULTS = {
             "URL": None,
             "QUESTIONID": None,
         },
-        "RESET": {
+        "RESET_PASSWORD": {
             "API_KEY": None,
             "URL": None,
             "QUESTIONID": None,
@@ -86,6 +92,7 @@ SESSION_COOKIE_SECURE = not DEBUG
 
 # --- Application-Specific Settings ---
 AUTH = config.get("AUTH")
+WEB = config.get("WEB")
 TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
 AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 
