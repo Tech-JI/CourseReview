@@ -56,7 +56,7 @@ QUEST:
     # API_KEY: Use env
     URL: "https://wj.sjtu.edu.cn/q/dummy1"
     QUESTIONID: 10000001
-  RESET:
+  RESET_PASSWORD:
     # API_KEY: Use env
     URL: "https://wj.sjtu.edu.cn/q/dummy2"
     QUESTIONID: 10000002

@@ -30,7 +30,7 @@ DEFAULTS = {
         "PASSWORD_LENGTH_MIN": 10,
         "PASSWORD_LENGTH_MAX": 32,
         "EMAIL_DOMAIN_NAME": "sjtu.edu.cn",
-        "ACTION_LIST": ["signup", "login", "reset"],
+        "ACTION_LIST": ["signup", "login", "reset_password"],
     },
     "DATABASE": {"URL": "sqlite:///db.sqlite3"},
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
@@ -47,7 +47,7 @@ DEFAULTS = {
             "URL": None,
             "QUESTIONID": None,
         },
-        "RESET": {
+        "RESET_PASSWORD": {
             "API_KEY": None,
             "URL": None,
             "QUESTIONID": None,

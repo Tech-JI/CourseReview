@@ -35,7 +35,7 @@ class CSRFCheckSessionAuthentication(SessionAuthentication):
 def get_survey_details(action: str) -> dict[str, Any] | None:
     """
     A single, clean function to get all survey details for a given action.
-    Valid actions: "signup", "login", "reset".
+    Valid actions: "signup", "login", "reset_password".
     """
 
     action_details = QUEST_SETTINGS.get(action.upper())

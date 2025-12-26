@@ -437,7 +437,7 @@ def auth_reset_password_api(request) -> Response:
     try:
         verification_data, error_response = verify_token_pwd(
             request,
-            action="reset",
+            action="reset_password",
         )
         if verification_data is None:
             return error_response or Response(
