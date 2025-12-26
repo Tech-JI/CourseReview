@@ -11,7 +11,7 @@ help:
 	@echo "  collect               - Collects Django static files"
 	@echo "  install-frontend      - Installs frontend dependencies using bun"
 	@echo "  format                - Formats both backend (Python) and frontend (JS/TS/CSS) code"
-	@echo "  format-backend        - Formats Python code using isort and black"
+	@echo "  format-backend        - Formats Python code using ruff check and format"
 	@echo "  format-frontend       - Formats frontend code using prettier"
 	@echo "  lint                  - Lints both backend (Python) and frontend (JS/TS/CSS) code"
 	@echo "  lint-backend          - Lints Python code using ruff"
@@ -45,8 +45,8 @@ format: format-backend format-frontend
 	@echo "All code formatted successfully!"
 
 format-backend:
-	@echo "Formatting backend (Python) code with isort and black..."
-	uv run ruff check --select I . && \
+	@echo "Formatting backend (Python) code with ruff check and format..."
+	uv run ruff check --select I . --fix && \
 	uv run ruff format
 
 format-frontend:

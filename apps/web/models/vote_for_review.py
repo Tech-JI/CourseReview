@@ -34,43 +34,25 @@ class ReviewVoteManager(models.Manager):
         )
 
         if created:
-            # New vote, increment the appropriate counter
-            if is_kudos:
-                review.kudos_count = models.F("kudos_count") + 1
-            else:
-                review.dislike_count = models.F("dislike_count") + 1
-            review.save(update_fields=["kudos_count", "dislike_count"])
+            # New vote
             vote_value = is_kudos
         else:
             # Existing vote
             if review_vote.is_kudos == is_kudos:
-                # Same vote type, remove it (cancel)
                 review_vote.delete()
-                if is_kudos:
-                    review.kudos_count = models.F("kudos_count") - 1
-                else:
-                    review.dislike_count = models.F("dislike_count") - 1
-                review.save(update_fields=["kudos_count", "dislike_count"])
-                vote_value = None  # User cancelled their vote
+                vote_value = None
             else:
-                # Change vote from kudos to dislike or vice versa
-                old_is_kudos = review_vote.is_kudos
                 review_vote.is_kudos = is_kudos
                 review_vote.save()
-
-                # Update counts: decrease old vote type, increase new vote type
-                if old_is_kudos:  # Was kudos, changing to dislike
-                    review.kudos_count = models.F("kudos_count") - 1
-                    review.dislike_count = models.F("dislike_count") + 1
-                else:  # Was dislike, changing to kudos
-                    review.dislike_count = models.F("dislike_count") - 1
-                    review.kudos_count = models.F("kudos_count") + 1
-                review.save(update_fields=["kudos_count", "dislike_count"])
                 vote_value = is_kudos
 
-        # Return updated counts and user's current vote
-        review.refresh_from_db()
-        return review.kudos_count, review.dislike_count, vote_value
+        review_with_votes = Review.objects.with_votes(id=review_id).first()
+        if review_with_votes:
+            kudos_count = review_with_votes.kudos_count
+            dislike_count = review_with_votes.dislike_count
+        else:
+            kudos_count, dislike_count = 0, 0
+        return kudos_count, dislike_count, vote_value
 
     def get_user_vote(self, review, user):
         """Get the user's vote for a review"""
@@ -80,12 +62,6 @@ class ReviewVoteManager(models.Manager):
             return self.get(review=review, user=user).is_kudos
         except self.model.DoesNotExist:
             return None
-
-    def get_vote_counts(self, review):
-        """Get kudos and dislike counts for a review"""
-        kudos_count = self.filter(review=review, is_kudos=True).count()
-        dislike_count = self.filter(review=review, is_kudos=False).count()
-        return kudos_count, dislike_count
 
 
 class ReviewVote(models.Model):

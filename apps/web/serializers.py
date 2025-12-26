@@ -1,4 +1,5 @@
 # apps/web/serializers.py
+from django.conf import settings
 from django.db.models import Count
 from rest_framework import serializers
 
@@ -8,10 +9,10 @@ from apps.web.models import (
     DistributiveRequirement,
     Instructor,
     Review,
-    ReviewVote,
     Vote,
 )
 from lib import constants
+from lib.terms import is_valid_term
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):
@@ -29,10 +30,12 @@ class CourseOfferingSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    #    user = serializers.StringRelatedField()  # Display username
+    #    user = serializers.StringRelatedField()
     term = serializers.CharField()
     professor = serializers.CharField()
     user_vote = serializers.SerializerMethodField()
+    kudos_count = serializers.SerializerMethodField()
+    dislike_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -48,18 +51,60 @@ class ReviewSerializer(serializers.ModelSerializer):
             "created_at",
             "user_vote",
         )
+        read_only_fields = (
+            "id",
+            "kudos_count",
+            "dislike_count",
+            "created_at",
+            "user_vote",
+        )
+
+    def get_kudos_count(self, obj):
+        """Get the number of kudos for this review"""
+        return getattr(obj, "kudos_count", 0)
+
+    def get_dislike_count(self, obj):
+        """Get the number of dislikes for this review"""
+        return getattr(obj, "dislike_count", 0)
 
     def get_user_vote(self, obj):
         """Get the current user's vote for this review"""
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return None
+        return getattr(obj, "user_vote", None)
 
-        try:
-            vote = ReviewVote.objects.get(review=obj, user=request.user)
-            return vote.is_kudos  # True for kudos, False for dislike
-        except ReviewVote.DoesNotExist:
-            return None
+    def validate_term(self, value):
+        """Validate term format"""
+        term = value.upper()
+
+        if is_valid_term(term):
+            return term
+        else:
+            raise serializers.ValidationError(
+                "Please use a valid term, e.g. {}".format(constants.CURRENT_TERM)
+            )
+
+    def validate_professor(self, value):
+        """Validate professor name format"""
+        names = value.split(" ")
+
+        if len(names) < 2:
+            raise serializers.ValidationError(
+                "Please use a valid professor name, e.g. John Smith"
+            )
+
+        return " ".join([n.capitalize() for n in names])
+
+    def validate_comments(self, value):
+        """Validate review minimum length"""
+        REVIEW_MINIMUM_LENGTH = settings.WEB["REVIEW"]["COMMENT_MIN_LENGTH"]
+
+        if len(value) < REVIEW_MINIMUM_LENGTH:
+            raise serializers.ValidationError(
+                "Please write a longer review (at least {} characters)".format(
+                    REVIEW_MINIMUM_LENGTH
+                )
+            )
+
+        return value
 
 
 class DepartmentSerializer(serializers.Serializer):
@@ -73,6 +118,8 @@ class CourseSearchSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     is_offered_in_current_term = serializers.SerializerMethodField()
     instructors = serializers.SerializerMethodField()
+    quality_score = serializers.SerializerMethodField()
+    difficulty_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -90,7 +137,13 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         )
 
     def get_review_count(self, obj):
-        return obj.review_set.count()
+        return getattr(obj, "review_count", obj.review_set.count())
+
+    def get_quality_score(self, obj):
+        return getattr(obj, "quality_score", 0.0)
+
+    def get_difficulty_score(self, obj):
+        return getattr(obj, "difficulty_score", 0.0)
 
     def get_is_offered_in_current_term(self, obj):
         return obj.courseoffering_set.filter(term=constants.CURRENT_TERM).exists()
@@ -131,6 +184,15 @@ class CourseSearchSerializer(serializers.ModelSerializer):
         return ret
 
 
+class CourseVoteSerializer(serializers.Serializer):
+    value = serializers.IntegerField(min_value=1, max_value=5)
+    forLayup = serializers.BooleanField()
+
+
+class ReviewVoteSerializer(serializers.Serializer):
+    is_kudos = serializers.BooleanField()
+
+
 class CourseSerializer(serializers.ModelSerializer):
     review_set = serializers.SerializerMethodField()
     courseoffering_set = CourseOfferingSerializer(many=True, read_only=True)
@@ -146,6 +208,8 @@ class CourseSerializer(serializers.ModelSerializer):
     course_topics = serializers.SerializerMethodField()
     quality_vote_count = serializers.SerializerMethodField()
     difficulty_vote_count = serializers.SerializerMethodField()
+    quality_score = serializers.SerializerMethodField()
+    difficulty_score = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -198,7 +262,13 @@ class CourseSerializer(serializers.ModelSerializer):
         return []
 
     def get_review_count(self, obj):
-        return obj.review_set.count()
+        return getattr(obj, "review_count", obj.review_set.count())
+
+    def get_quality_score(self, obj):
+        return getattr(obj, "quality_score", 0.0)
+
+    def get_difficulty_score(self, obj):
+        return getattr(obj, "difficulty_score", 0.0)
 
     def get_xlist(self, obj):
         return [
@@ -245,10 +315,14 @@ class CourseSerializer(serializers.ModelSerializer):
         return None
 
     def get_quality_vote_count(self, obj):
-        return Vote.objects.get_vote_count(obj, "quality")
+        return getattr(
+            obj, "quality_vote_count", Vote.objects.get_vote_count(obj, "quality")
+        )
 
     def get_difficulty_vote_count(self, obj):
-        return Vote.objects.get_vote_count(obj, "difficulty")
+        return getattr(
+            obj, "difficulty_vote_count", Vote.objects.get_vote_count(obj, "difficulty")
+        )
 
     def get_can_write_review(self, obj):
         request = self.context.get("request")
