@@ -67,7 +67,7 @@ class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     professor = models.CharField(max_length=255, db_index=True, blank=False)
-    term = models.CharField(max_length=3, db_index=True, blank=False)
+    term = models.CharField(max_length=255, db_index=True, blank=False)
     comments = models.TextField(blank=False)
 
     sentiment_labeler = models.CharField(

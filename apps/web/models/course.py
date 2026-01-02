@@ -120,7 +120,7 @@ class Course(models.Model):
         max_length=10, unique=True, db_index=True, default=""
     )  # Avoid two empty types of blank and null
     course_title = models.CharField(max_length=100, default="")
-    department = models.CharField(max_length=5, db_index=True, default="")
+    department = models.CharField(max_length=10, db_index=True, default="")
     number = models.IntegerField(null=True, blank=True, db_index=True)
     course_credits = models.IntegerField(null=True, blank=True)
     pre_requisites = models.TextField(blank=True, default="")

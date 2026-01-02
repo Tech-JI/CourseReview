@@ -1,16 +1,18 @@
 import factory
 from django.contrib.auth.models import User
-
+from django.utils.crypto import get_random_string
 from apps.web import models
 from lib import constants
+from apps.web.models import Course, Review
+import factory.fuzzy
 
 
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    username = factory.Faker("first_name")
-    email = factory.Faker("email")
+    username = factory.Sequence(lambda n: f"user_{n}")
+    email = factory.LazyAttribute(lambda o: f"{o.username}@example.com")
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
     is_active = True
@@ -30,13 +32,17 @@ class UserFactory(factory.django.DjangoModelFactory):
 
 class CourseFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = models.Course
+        model = Course
 
-    title = factory.Faker("words")
-    department = "COSC"
-    number = factory.Faker("random_number")
-    url = factory.Faker("url")
-    description = factory.Faker("text")
+    # in line with the real name you searched
+    course_title = factory.Faker("sentence", nb_words=3)
+    course_code = factory.Sequence(lambda n: f"JI-CS{100 + n}")
+    department = factory.fuzzy.FuzzyChoice(["UMJI", "EECS", "MATH"])
+    number = factory.Sequence(lambda n: 100 + n)
+
+    # create fake data
+    description = factory.Faker("paragraph")
+    course_credits = 4
 
 
 class CourseOfferingFactory(factory.django.DjangoModelFactory):
@@ -52,14 +58,18 @@ class CourseOfferingFactory(factory.django.DjangoModelFactory):
 
 class ReviewFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = models.Review
+        model = Review
 
+    # connect to the previous factory厂
     course = factory.SubFactory(CourseFactory)
     user = factory.SubFactory(UserFactory)
 
     professor = factory.Faker("name")
-    term = constants.CURRENT_TERM
     comments = factory.Faker("paragraph")
+    term = "2023-Fall"
+
+    # assume having evaluation
+    # rating = fuzzy.FuzzyInteger(1, 5)
 
 
 class DistributiveRequirementFactory(factory.django.DjangoModelFactory):
@@ -75,7 +85,7 @@ class StudentFactory(factory.django.DjangoModelFactory):
         model = models.Student
 
     user = factory.SubFactory(UserFactory)
-    confirmation_link = User.objects.make_random_password(length=16)
+    confirmation_link = get_random_string(length=16)
 
 
 class VoteFactory(factory.django.DjangoModelFactory):

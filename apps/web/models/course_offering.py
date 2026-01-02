@@ -16,7 +16,7 @@ class CourseOffering(models.Model):
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
     instructors = models.ManyToManyField("Instructor")
 
-    term = models.CharField(max_length=4, db_index=True)
+    term = models.CharField(max_length=10, db_index=True)
     section = models.IntegerField()
     period = models.CharField(max_length=128, db_index=True)
     limit = models.IntegerField(null=True)
