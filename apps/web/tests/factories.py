@@ -1,6 +1,6 @@
 import factory
 from django.contrib.auth.models import User
-
+import factory.fuzzy
 from apps.web import models
 from lib import constants
 
@@ -32,7 +32,7 @@ class CourseFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = models.Course
 
-    title = factory.Faker("words")
+    course_title = factory.Faker("words")
     department = "COSC"
     number = factory.Faker("random_number")
     url = factory.Faker("url")
@@ -75,7 +75,7 @@ class StudentFactory(factory.django.DjangoModelFactory):
         model = models.Student
 
     user = factory.SubFactory(UserFactory)
-    confirmation_link = User.objects.make_random_password(length=16)
+    confirmation_link = User.objects.get_random_string(length=16)
 
 
 class VoteFactory(factory.django.DjangoModelFactory):
