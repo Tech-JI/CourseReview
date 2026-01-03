@@ -14,7 +14,9 @@ from rest_framework.response import Response
 
 from apps.web.models import Student
 
-logger = logging.getLogger(__name__)
+from lib.logging import add_sanitization_to_logger
+
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
