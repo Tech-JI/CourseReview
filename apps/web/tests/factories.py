@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 import factory.fuzzy
 from apps.web import models
 from lib import constants
+from django.utils.crypto import get_random_string
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -75,7 +76,7 @@ class StudentFactory(factory.django.DjangoModelFactory):
         model = models.Student
 
     user = factory.SubFactory(UserFactory)
-    confirmation_link = User.objects.get_random_string(length=16)
+    confirmation_link = factory.LazyFunction(lambda: get_random_string(length=16))
 
 
 class VoteFactory(factory.django.DjangoModelFactory):
