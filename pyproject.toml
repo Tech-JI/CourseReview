@@ -22,13 +22,20 @@ dependencies = [
     "django-redis==6.0.0",
     "pyyaml==6.0.3",
 ]
-
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "website.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--reuse-db --strict-markers"
+testpaths = ["apps"]
 [tool.uv]
 package = false
 
 [dependency-groups]
 dev = [
     "prek>=0.2.24",
+    "pytest>=8.0.0",
+    "pytest-django>=4.8.0",
+    "factory-boy>=3.3.0",
 ]
 lint = [
     "ruff==0.14.5",
