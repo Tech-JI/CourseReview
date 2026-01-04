@@ -3,7 +3,8 @@ from django.contrib.auth.models import User
 import factory.fuzzy
 from apps.web import models
 from lib import constants
-from django.utils.crypto import get_random_string
+from apps.web.models.course import Course
+from apps.web.models.student import Student
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -29,15 +30,37 @@ class UserFactory(factory.django.DjangoModelFactory):
         return user
 
 
+# class CourseFactory(factory.django.DjangoModelFactory):
+#    class Meta:
+#        model = models.Course
+
+
+# course_title = factory.Faker("words")
+# department = "COSC"
+# number = factory.Faker("random_number")
+# url = factory.Faker("url")
+# description = factory.Faker("text")
 class CourseFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = models.Course
+        model = Course  # or models.Course
 
-    course_title = factory.Faker("words")
-    department = "COSC"
-    number = factory.Faker("random_number")
+    # 1. Title using Faker to generate random words
+    course_title = factory.Faker("sentence", nb_words=3)
+
+    # 2. Department (defaults to MATH, can be overridden)
+    department = "MATH"
+
+    # 3. Number sequence (starts from 100, 101, 102...)
+    number = factory.Sequence(lambda n: 100 + n)
+
+    # 4. Construct unique course_code in JI style (e.g., MATH100, MATH101)
+    # This prevents the "UniqueViolation" error
+    @factory.lazy_attribute
+    def course_code(self):
+        return f"{self.department}{self.number}"
+
     url = factory.Faker("url")
-    description = factory.Faker("text")
+    description = factory.Faker("paragraph")
 
 
 class CourseOfferingFactory(factory.django.DjangoModelFactory):
@@ -45,10 +68,8 @@ class CourseOfferingFactory(factory.django.DjangoModelFactory):
         model = models.CourseOffering
 
     course = factory.SubFactory(CourseFactory)
-
-    term = constants.CURRENT_TERM
-    section = factory.Faker("random_number")
-    period = "2A"
+    term = "2023F"
+    period = "2A"  # Common period format
 
 
 class ReviewFactory(factory.django.DjangoModelFactory):
@@ -73,10 +94,12 @@ class DistributiveRequirementFactory(factory.django.DjangoModelFactory):
 
 class StudentFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = models.Student
+        model = Student
 
     user = factory.SubFactory(UserFactory)
-    confirmation_link = factory.LazyFunction(lambda: get_random_string(length=16))
+
+
+#    confirmation_link = factory.LazyFunction(lambda: get_random_string(length=16))
 
 
 class VoteFactory(factory.django.DjangoModelFactory):
