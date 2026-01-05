@@ -36,3 +36,8 @@ def course(db):
 def review(db, course, user):
     """Returns a saved review instance."""
     return factories.ReviewFactory(course=course, user=user)
+
+
+@pytest.fixture
+def course_factory(db):
+    """Fixture to access the factory class directly for batch creation"""

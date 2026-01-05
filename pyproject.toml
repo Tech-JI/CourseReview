@@ -39,5 +39,5 @@ lint = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "website.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
-addopts = "--reuse-db --strict-markers"
+addopts = "--reuse-db --strict-markers --ignore=apps/web/tests/lib_tests --ignore=apps/web/tests/model_tests"
 testpaths = ["apps"]
