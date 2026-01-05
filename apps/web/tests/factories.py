@@ -47,8 +47,8 @@ class CourseOfferingFactory(factory.django.DjangoModelFactory):
         model = CourseOffering
 
     course = factory.SubFactory(CourseFactory)
-    term = "2023F"
-    section = factory.Sequence(lambda n: f"S{n:02d}")
+    term = "23F"
+    section = factory.Sequence(lambda n: n)
     period = "2A"
 
 

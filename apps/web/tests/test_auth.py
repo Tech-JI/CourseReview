@@ -24,3 +24,11 @@ class TestAuthentication:
         assert response.status_code == 200
         assert response.data["isAuthenticated"] is True
         assert response.data["username"] == user.username
+
+    def test_landing_page_review_count(self, base_client, review):
+        """Verify landing page shows correct review statistics."""
+        url = reverse("landing_api")
+        response = base_client.get(url)
+        assert response.status_code == 200
+        # Should be at least 1 due to the 'review' fixture
+        assert response.data["review_count"] >= 1
