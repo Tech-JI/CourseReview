@@ -41,3 +41,4 @@ def review(db, course, user):
 @pytest.fixture
 def course_factory(db):
     """Fixture to access the factory class directly for batch creation"""
+    return factories.CourseFactory
