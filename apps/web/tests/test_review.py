@@ -7,7 +7,11 @@ from apps.web.models import Review
 class TestReviewManagement:
     def test_create_review_success(self, auth_client, course):
         url = reverse("course_review_api", kwargs={"course_id": course.id})
-        data = {"term": "2023F", "professor": "Dr. Li", "comments": "Great!"}
+        data = {
+            "term": "23F",
+            "professor": "Dr. Li",
+            "comments": "This course was absolutely amazing and I learned a lot of practical skills that will be very useful for my future career.",
+        }
         response = auth_client.post(url, data, format="json")
         assert response.status_code == 201
         assert Review.objects.filter(course=course).count() == 1
