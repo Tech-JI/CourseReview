@@ -59,7 +59,7 @@ class ReviewFactory(factory.django.DjangoModelFactory):
     course = factory.SubFactory(CourseFactory)
     user = factory.SubFactory(UserFactory)
 
-    term = "2023F"
+    term = "23F"
     professor = factory.Faker("name")
     comments = factory.Faker("paragraph")
 
