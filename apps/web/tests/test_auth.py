@@ -31,4 +31,4 @@ class TestAuthentication:
         response = base_client.get(url)
         assert response.status_code == 200
         # Should be at least 1 due to the 'review' fixture
-        assert response.data["review_count"] >= 1
+        assert response.data["review_count"] == 1
