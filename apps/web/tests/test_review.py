@@ -29,7 +29,7 @@ class TestReviewManagement:
         url = reverse("course_review_api", kwargs={"course_id": course.id})
 
         # Scenario 1: Comments too short
-        data = {"term": "24S", "comments": "Way too short."}
+        data = {"term": "24S", "comments": "Way too short.", "professor": "Dr. Wang"}
         response = auth_client.post(url, data, format="json")
         assert response.status_code == 400
         assert "comments" in response.data
