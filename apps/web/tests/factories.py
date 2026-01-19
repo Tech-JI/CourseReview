@@ -31,13 +31,13 @@ class CourseFactory(factory.django.DjangoModelFactory):
         model = Course
 
     course_title = factory.Faker("sentence", nb_words=3)
-    department = factory.fuzzy.FuzzyChoice(["MATH", "PHYS", "EECS", "VGE"])
+    department = factory.fuzzy.FuzzyChoice(["MATH", "PHYS", "EECS"])
     number = factory.Sequence(lambda n: 100 + n)
 
     @factory.lazy_attribute
     def course_code(self):
         """Generates unique MATH100, PHYS101, etc."""
-        return f"{self.department}{self.number}"
+        return f"{self.department}{str(self.number):<04}J"
 
     description = factory.Faker("paragraph")
 
