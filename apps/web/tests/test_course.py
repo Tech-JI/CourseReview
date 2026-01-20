@@ -55,6 +55,25 @@ class TestCourseManagement:
         response = base_client.get(url, {"code": "101"})
         assert response.data["count"] == 2
 
+    # Verify that authenticated users can sort by review count.
+    def test_sort_by_review_count(self, auth_client, user, course_factory):
+        from apps.web.models import Review
+
+        c_hot = course_factory(course_code="ENGR101J")
+        course_factory(course_code="ENGR100J")
+        Review.objects.create(
+            course=c_hot, user=user, term="23S", professor="Prof X", comments="Great!"
+        )
+        url = reverse("courses_api")
+
+        response = auth_client.get(
+            url, {"sort_by": "review_count", "sort_order": "desc"}
+        )
+
+        results = response.data["results"]
+        assert results[0]["course_code"] == "ENGR101J"
+        assert results[1]["course_code"] == "ENGR100J"
+
     # Verify that authenticated users can sort by quality score.
     def test_sort_courses_by_score(self, auth_client, user, course_factory):
         from apps.web.models import Vote
@@ -101,7 +120,7 @@ class TestCourseManagement:
         assert response.data["results"][1]["course_code"] == "MATH101J"
 
     # Verify that authenticated users can filter by min_quality.
-    def test_filter_courses_by_score(self, auth_client, user, course_factory):
+    def test_filter_courses_by_quality(self, auth_client, user, course_factory):
         from apps.web.models import Vote
 
         c1 = course_factory(course_code="MATH101J")
@@ -142,6 +161,29 @@ class TestCourseManagement:
         assert response.status_code == 200
         assert response.data["count"] == 2
 
+        # Verify that authenticated users can filter by min_difficulty.
+
+    def test_filter_courses_by_difficulty(self, auth_client, user, course_factory):
+        from apps.web.models import Vote
+
+        c1 = course_factory(course_code="MATH101J")
+        Vote.objects.create(
+            user=user, course=c1, value=5, category=Vote.CATEGORIES.DIFFICULTY
+        )
+
+        c2 = course_factory(course_code="MATH102J")
+        Vote.objects.create(
+            user=user, course=c2, value=1, category=Vote.CATEGORIES.DIFFICULTY
+        )
+
+        url = reverse("courses_api")
+
+        response = auth_client.get(url, {"min_difficulty": 4})
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["course_code"] == "MATH101J"
+
     def test_course_detail_retrieval(self, base_client, course):
         """Verify retrieving details for a specific course using its ID."""
         url = reverse("course_detail_api", kwargs={"course_id": course.id})
@@ -166,3 +208,41 @@ class TestCourseManagement:
         # Find MATH department in the list
         math_dept = next(item for item in response.data if item["code"] == "MATH")
         assert math_dept["count"] == 2
+
+    def test_sort_order_asc_and_desc(self, auth_client, course_factory):
+        course_factory(course_code="MATH101J")
+        course_factory(course_code="PHY101J")
+
+        url = reverse("courses_api")
+
+        # case 1: Ascending
+        res_asc = auth_client.get(url, {"sort_by": "course_code", "sort_order": "asc"})
+        assert res_asc.data["results"][0]["course_code"] == "MATH101J"
+        assert res_asc.data["results"][1]["course_code"] == "PHY101J"
+
+        # case 2: Descending
+        res_desc = auth_client.get(
+            url, {"sort_by": "course_code", "sort_order": "desc"}
+        )
+        assert res_desc.data["results"][0]["course_code"] == "PHY101J"
+        assert res_desc.data["results"][1]["course_code"] == "MATH101J"
+
+    def test_pagination_with_default_settings(self, auth_client, course_factory):
+        for i in range(11):
+            course_factory(course_code=f"CODE_{i:02d}")
+
+        url = reverse("courses_api")
+
+        resp_p1 = auth_client.get(url, {"page": 1})
+
+        assert resp_p1.status_code == 200
+        assert len(resp_p1.data["results"]) == 10
+        assert resp_p1.data["next"] is not None
+        assert resp_p1.data["previous"] is None
+
+        resp_p2 = auth_client.get(url, {"page": 2})
+
+        assert resp_p2.status_code == 200
+        assert len(resp_p2.data["results"]) == 1
+        assert resp_p2.data["previous"] is not None
+        assert resp_p2.data["next"] is None
