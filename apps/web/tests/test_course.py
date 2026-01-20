@@ -26,8 +26,8 @@ class TestCourseManagement:
     def test_filter_courses_by_department(self, base_client, course_factory):
         """Verify filtering courses by department code."""
         # Create specific courses
-        course_factory(department="MATH", course_code="MATH101")
-        course_factory(department="PHYS", course_code="PHYS101")
+        course_factory(department="MATH", course_code="MATH101J")
+        course_factory(department="PHYS", course_code="PHYS101J")
 
         url = reverse("courses_api")
         # Test filtering for MATH department
@@ -38,13 +38,13 @@ class TestCourseManagement:
         assert response.data["count"] == 1
 
         # Check course_code instead of department key
-        # Since 'department' is not in the response, we verify 'MATH101'
-        assert response.data["results"][0]["course_code"] == "MATH101"
+        # Since 'department' is not in the response, we verify 'MATH101J'
+        assert response.data["results"][0]["course_code"] == "MATH101J"
 
     def test_filter_courses_by_code(self, base_client, course_factory):
-        course_factory(course_code="PHYS101")
-        course_factory(course_code="MATH102")
-        course_factory(course_code="MATH101")
+        course_factory(course_code="PHYS101J")
+        course_factory(course_code="MATH102J")
+        course_factory(course_code="MATH101J")
 
         url = reverse("courses_api")
 
@@ -59,12 +59,12 @@ class TestCourseManagement:
     def test_sort_courses_by_score(self, auth_client, user, course_factory):
         from apps.web.models import Vote
 
-        c1 = course_factory(course_code="MATH101")
+        c1 = course_factory(course_code="MATH101J")
         Vote.objects.create(
             user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
         )
 
-        c2 = course_factory(course_code="MATH102")
+        c2 = course_factory(course_code="MATH102J")
         Vote.objects.create(
             user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
         )
@@ -75,18 +75,18 @@ class TestCourseManagement:
             url, {"sort_by": "quality_score", "sort_order": "desc"}
         )
         assert response.status_code == 200
-        assert response.data["results"][0]["course_code"] == "MATH101"
+        assert response.data["results"][0]["course_code"] == "MATH101J"
 
     # Verify that sort params are ignored for anonymous users (fallback to default).
     def test_sort_courses_by_score_anonymous(self, base_client, user, course_factory):
         from apps.web.models import Vote
 
-        c1 = course_factory(course_code="MATH101")
+        c1 = course_factory(course_code="MATH101J")
         Vote.objects.create(
             user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
         )
 
-        c2 = course_factory(course_code="MATH102")
+        c2 = course_factory(course_code="MATH102J")
         Vote.objects.create(
             user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
         )
@@ -97,19 +97,19 @@ class TestCourseManagement:
             url, {"sort_by": "quality_score", "sort_order": "desc"}
         )
         assert response.status_code == 200
-        assert response.data["results"][0]["course_code"] == "MATH102"
-        assert response.data["results"][1]["course_code"] == "MATH101"
+        assert response.data["results"][0]["course_code"] == "MATH102J"
+        assert response.data["results"][1]["course_code"] == "MATH101J"
 
     # Verify that authenticated users can filter by min_quality.
     def test_filter_courses_by_score(self, auth_client, user, course_factory):
         from apps.web.models import Vote
 
-        c1 = course_factory(course_code="MATH101")
+        c1 = course_factory(course_code="MATH101J")
         Vote.objects.create(
             user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
         )
 
-        c2 = course_factory(course_code="MATH102")
+        c2 = course_factory(course_code="MATH102J")
         Vote.objects.create(
             user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
         )
@@ -120,18 +120,18 @@ class TestCourseManagement:
 
         assert response.status_code == 200
         assert response.data["count"] == 1
-        assert response.data["results"][0]["course_code"] == "MATH101"
+        assert response.data["results"][0]["course_code"] == "MATH101J"
 
     # Verify that min_quality filter is ignored for anonymous users.
     def test_filter_courses_by_score_anonymous(self, base_client, user, course_factory):
         from apps.web.models import Vote
 
-        c1 = course_factory(course_code="MATH101")
+        c1 = course_factory(course_code="MATH101J")
         Vote.objects.create(
             user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
         )
 
-        c2 = course_factory(course_code="MATH102")
+        c2 = course_factory(course_code="MATH102J")
         Vote.objects.create(
             user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
         )
