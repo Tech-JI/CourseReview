@@ -2,6 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 from apps.web.tests import factories
 from django.conf import settings
+from django.urls import reverse
 
 
 # 1. Anonymous Client (Base Client)
@@ -83,3 +84,29 @@ def valid_review_data(min_len):
 def course_factory(db):
     """Fixture to access the factory class directly for batch creation"""
     return factories.CourseFactory
+
+
+@pytest.fixture
+def user_reviews_url():
+    """URL for the list of current user's reviews."""
+    return reverse("user_reviews_api")
+
+
+@pytest.fixture
+def own_review_url(review):
+    """URL for a specific review owned by the current user."""
+    return reverse("user_review_api", kwargs={"review_id": review.id})
+
+
+@pytest.fixture
+def other_review(db):
+    """A review belonging to a different user."""
+    from apps.web.tests.factories import ReviewFactory, UserFactory
+
+    return ReviewFactory(user=UserFactory())
+
+
+@pytest.fixture
+def other_review_url(other_review):
+    """URL for a review NOT owned by the current user."""
+    return reverse("user_review_api", kwargs={"review_id": other_review.id})
