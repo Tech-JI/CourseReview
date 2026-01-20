@@ -106,8 +106,18 @@ class TestReviewManagement:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Review.objects.filter(id=review.id).exists()
 
+    def test_delete_review_anonymous_forbidden(self, base_client, review):
+        """11. Verify that unauthenticated users are forbidden from deleting reviews."""
+        url = reverse("user_review_api", kwargs={"review_id": review.id})
+        response = base_client.delete(url)
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
+        assert Review.objects.filter(id=review.id).exists()
+
     def test_department_api_sorting(self, base_client, db):
-        """11. Verify departments are sorted by code."""
+        """12. Verify departments are sorted by code."""
         from apps.web.tests.factories import CourseFactory
 
         CourseFactory(department="ENGL", course_code="ENGL1000J")
@@ -122,7 +132,7 @@ class TestReviewManagement:
     def test_create_validation_length_error(
         self, auth_client, course_reviews_url, valid_review_data, min_len
     ):
-        """12. Verify rejection of comments shorter than min_length."""
+        """13. Verify rejection of comments shorter than min_length."""
         valid_review_data["comments"] = "a" * (min_len - 1)
         response = auth_client.post(
             course_reviews_url, valid_review_data, format="json"
@@ -132,31 +142,31 @@ class TestReviewManagement:
     def test_update_validation_missing_field(
         self, auth_client, personal_review_detail_url
     ):
-        """13. Verify PUT fails if required fields (professor) are missing."""
+        """14. Verify PUT fails if required fields (professor) are missing."""
         response = auth_client.put(
             personal_review_detail_url, {"comments": "Valid length..."}, format="json"
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_duplicate_review_denied(self, auth_client, review, valid_review_data):
-        """14. Verify user cannot review the same course twice (403)."""
+        """15. Verify user cannot review the same course twice (403)."""
         url = reverse("course_review_api", kwargs={"course_id": review.course.id})
         response = auth_client.post(url, valid_review_data, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_access_other_user_review_404(self, auth_client, other_review_detail_url):
-        """15. Security: Verify user cannot access someone else's review ID."""
+        """16. Security: Verify user cannot access someone else's review ID."""
         response = auth_client.get(other_review_detail_url)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_non_existent_id(self, auth_client):
-        """16. Verify deletion of non-existent review ID returns 404."""
+        """17. Verify deletion of non-existent review ID returns 404."""
         url = reverse("user_review_api", kwargs={"review_id": 99999})
         response = auth_client.delete(url)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_post_to_invalid_course_id(self, auth_client, valid_review_data):
-        """17. Verify posting to non-existent course ID returns 404."""
+        """18. Verify posting to non-existent course ID returns 404."""
         url = reverse("course_review_api", kwargs={"course_id": 88888})
         response = auth_client.post(url, valid_review_data, format="json")
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -164,6 +174,6 @@ class TestReviewManagement:
     def test_review_response_contains_votes(
         self, auth_client, personal_review_detail_url
     ):
-        """(Extra) Verify vote statistics are included in the response."""
+        """19. Verify vote statistics are included in the response."""
         response = auth_client.get(personal_review_detail_url)
         assert "kudos_count" in response.data
