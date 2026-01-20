@@ -51,13 +51,15 @@ def department_mixed_courses(db):
     # Note: Using 'title' to match your original course.py
     return [
         factories.CourseFactory(
-            department="MATH", title="Honors Calculus II", course_code="MATH1560J"
+            department="MATH",
+            course_title="Honors Calculus II",
+            course_code="MATH1560J",
         ),
         factories.CourseFactory(
-            department="MATH", title="Calculus II", course_code="MATH1160J"
+            department="MATH", course_title="Calculus II", course_code="MATH1160J"
         ),
         factories.CourseFactory(
-            department="CHEM", title="Chemistry", course_code="CHEM2100J"
+            department="CHEM", course_title="Chemistry", course_code="CHEM2100J"
         ),
     ]
 

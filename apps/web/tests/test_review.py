@@ -110,10 +110,10 @@ class TestReviewManagement:
         """11. Verify departments are sorted by code."""
         from apps.web.tests.factories import CourseFactory
 
-        CourseFactory(department="ZOO", course_code="ZOO1000J")
-        CourseFactory(department="APP", course_code="APP1000J")
+        CourseFactory(department="ENGL", course_code="ENGL1000J")
+        CourseFactory(department="MATH", course_code="MATH1560J")
         response = base_client.get(reverse("departments_api"))
-        assert response.data[0]["code"] == "APP"
+        assert response.data[0]["code"] == "MATH"
 
     # -------------------------------------------------------------------------
     # GROUP 3: Validation, Security & Edge Cases
