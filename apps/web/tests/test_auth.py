@@ -32,3 +32,24 @@ class TestAuthentication:
         assert response.status_code == 200
         # Should be at least 1 due to the 'review' fixture
         assert response.data["review_count"] == 1
+
+    def test_landing_page_review_count_empty(self, base_client, db):
+        """Verify review count is 0 when no reviews exist in the database."""
+        url = reverse("landing_api")
+        response = base_client.get(url)
+
+        assert response.status_code == 200
+        assert response.data["review_count"] == 0
+
+    def test_landing_page_review_count_multiple(self, base_client, db):
+        """Verify review count returns the correct total when multiple reviews exist."""
+        from apps.web.tests.factories import ReviewFactory
+
+        # Create 5 reviews across different courses/users
+        ReviewFactory.create_batch(5)
+
+        url = reverse("landing_api")
+        response = base_client.get(url)
+
+        assert response.status_code == 200
+        assert response.data["review_count"] == 5
