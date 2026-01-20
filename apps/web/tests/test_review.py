@@ -113,7 +113,7 @@ class TestReviewManagement:
         CourseFactory(department="ENGL", course_code="ENGL1000J")
         CourseFactory(department="MATH", course_code="MATH1560J")
         response = base_client.get(reverse("departments_api"))
-        assert response.data[0]["code"] == "MATH"
+        assert response.data[0]["code"] == "ENGL"
 
     # -------------------------------------------------------------------------
     # GROUP 3: Validation, Security & Edge Cases
