@@ -13,7 +13,6 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 
 from apps.web.models import Student
-
 from lib.logging import add_sanitization_to_logger
 
 logger = add_sanitization_to_logger(logging.getLogger(__name__))
