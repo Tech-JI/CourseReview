@@ -121,18 +121,19 @@
        ```
 
 ## Frontend
-There are two ways of developing/running frontend codes:
-   - use git submodule, which registered frontend under the `/frontend` sub directory of `CourseReview` repo:
-      * `cd CourseReview` and run `git submodule update --init --recursive`.
-      * Run frontend (dev mode): `cd CourseReview`, run `make dev-frontend` and visit http://127.0.0.1:5173/
-      * Develop frontend: `cd CourseReview/frontend` and treat it like a normal git repo.
+Two ways to run/develop the frontend:
 
-   - Clone the frontend repo as a seperate repo from `CourseReview`(backend):
-      * `cd <your-projects-dir>` and run `git clone git@github.com:Tech-JI/CourseFront.git`
-      * Run frontend (dev mode): `cd CourseFront`, run `bun run dev` and visit http://127.0.0.1:5173/
+1. Git submodule (in `CourseReview/frontend`):
+   - `cd CourseReview` and run `git submodule update --init --recursive`
+   - Dev server: `make dev-frontend` (visit http://127.0.0.1:5173/)
+   - Development workflow: `cd CourseReview/frontend` (treat it like a normal repo)
+
+2. Separate repo (frontend only):
+   - `cd <your-projects-dir>` and run `git clone git@github.com:Tech-JI/CourseFront.git`
+   - Dev server: `cd CourseFront` then `bun run dev` (visit http://127.0.0.1:5173/)
 
 ### Set up
-Under frontend(`CourseReview/frontend` or `CourseFront`) directory:
+From the frontend directory (`CourseReview/frontend` or `CourseFront`):
 1. `cp .env.example .env`
 
 2. `bun install`
