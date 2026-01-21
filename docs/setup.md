@@ -1,6 +1,6 @@
 # Development
 
-Environment:
+## Environment
 
 - Ubuntu Linux (most modern Linux distros and MacOS are supposedly supported.)
 
@@ -8,7 +8,7 @@ Environment:
 
 - python 3.10 to 3.13
 
----
+## Backend
 
 1. `git clone git@github.com:TechJI-2023/CourseReview.git`
 
@@ -35,8 +35,6 @@ Environment:
    DEBUG=True
    OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
    ```
-
-   Also cp .env.example in frontend/ and rename it .env.
 
 8. Build static files: `make collect`
 
@@ -122,4 +120,22 @@ Environment:
        crawl_and_import_data()
        ```
 
-14. Run frontend (dev mode): `make dev-frontend` and visit http://127.0.0.1:5173/
+## Frontend
+Two ways to run/develop the frontend:
+
+1. Git submodule (in `CourseReview/frontend`):
+   - `cd CourseReview` and run `git submodule update --init --recursive`
+   - Dev server: `make dev-frontend` (visit http://127.0.0.1:5173/)
+   - Development workflow: `cd CourseReview/frontend` (treat it like a normal repo)
+
+2. Separate repo (frontend only):
+   - `cd <your-projects-dir>` and run `git clone git@github.com:Tech-JI/CourseFront.git`
+   - Dev server: `cd CourseFront` then `bun run dev` (visit http://127.0.0.1:5173/)
+
+### Set up
+From the frontend directory (`CourseReview/frontend` or `CourseFront`):
+1. `cp .env.example .env`
+
+2. `bun install`
+
+3. `bun run prek install` (set up git hooks)
