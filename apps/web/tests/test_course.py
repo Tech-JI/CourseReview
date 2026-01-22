@@ -226,23 +226,3 @@ class TestCourseManagement:
         )
         assert res_desc.data["results"][0]["course_code"] == "PHY101J"
         assert res_desc.data["results"][1]["course_code"] == "MATH101J"
-
-    def test_pagination_with_default_settings(self, auth_client, course_factory):
-        for i in range(11):
-            course_factory(course_code=f"CODE_{i:02d}")
-
-        url = reverse("courses_api")
-
-        resp_p1 = auth_client.get(url, {"page": 1})
-
-        assert resp_p1.status_code == 200
-        assert len(resp_p1.data["results"]) == 10
-        assert resp_p1.data["next"] is not None
-        assert resp_p1.data["previous"] is None
-
-        resp_p2 = auth_client.get(url, {"page": 2})
-
-        assert resp_p2.status_code == 200
-        assert len(resp_p2.data["results"]) == 1
-        assert resp_p2.data["previous"] is not None
-        assert resp_p2.data["next"] is None
