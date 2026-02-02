@@ -49,11 +49,11 @@ def auth_initiate_api(request):
     turnstile_token = request.data.get("turnstile_token")
 
     if not action or not turnstile_token:
-        logger.warning("Missing action or turnstile_token in auth_initiate_api")
+        logger.warning("Missing action or turnstile_token in auth_initiate_api, action: %r, turnstile_token_present: %r", action, bool(turnstile_token))
         return Response({"error": "Missing action or turnstile_token"}, status=400)
 
     if action not in ACTION_LIST:
-        logger.warning("Invalid action '%s' in auth_initiate_api", action)
+        logger.warning("Invalid action '%r' in auth_initiate_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     client_ip = (
@@ -68,7 +68,9 @@ def auth_initiate_api(request):
     )
     if not success:
         logger.warning(
-            "verify_turnstile_token failed in auth_initiate_api:%s",
+            "Turnstile verification failed: action=%r, client_ip=%r, response=%r",
+            action,
+            client_ip,
             error_response.data,
         )
         return error_response
@@ -91,11 +93,11 @@ def auth_initiate_api(request):
                 existing_state = json.loads(existing_state_data)
                 r.delete(existing_state_key)
                 logger.info(
-                    "Cleaned up existing temp_token_state for action %s",
+                    "Cleaned up existing temp_token_state for action %r",
                     existing_state.get("action", "unknown"),
                 )
         except Exception:
-            logger.warning("Error cleaning up existing temp_token")
+            logger.warning("Error cleaning up existing temp_token (hash: %r)", existing_hash)
 
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
@@ -111,15 +113,15 @@ def auth_initiate_api(request):
         json.dumps(temp_token_state),
     )
 
-    logger.info("Created auth intent for action %s with OTP and temp_token", action)
+    logger.info("Created auth intent for action %r with OTP and temp_token", action)
 
     details = utils.get_survey_details(action)
     if not details:
-        logger.error("Invalid action '%s' when fetching survey details", action)
+        logger.error("Invalid action '%r' when fetching survey details", action)
         return Response({"error": "Invalid action"}, status=400)
     survey_url = details.get("url")
     if not survey_url:
-        logger.error("Survey URL missing for %s", action)
+        logger.error("Survey URL missing for %r", action)
         return Response(
             {"error": "Something went wrong when fetching the survey URL"},
             status=500,
@@ -147,7 +149,7 @@ def verify_callback_api(request):
     Handles the verification of questionnaire callback using temp_token from cookie.
     """
     logger.info(
-        "verify_callback_api called for account=%s, action=%s",
+        "verify_callback_api called for account=%r, action=%r",
         request.data.get("account"),
         request.data.get("action"),
     )
@@ -157,11 +159,11 @@ def verify_callback_api(request):
     action = request.data.get("action")
 
     if not account or not answer_id or not action:
-        logger.warning("Missing account, answer_id, or action in verify_callback_api")
+        logger.warning("Missing required parameters in verify_callback_api (account: %r, answer_id: %r, action: %r)", request.data.get("account"), request.data.get("answer_id"), request.data.get("action"))
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
     if action not in ACTION_LIST:
-        logger.warning("Invalid action '%s' in verify_callback_api", action)
+        logger.warning("Invalid action '%r' in verify_callback_api", action)
         return Response({"error": "Invalid action"}, status=400)
 
     # Get temp_token from HttpOnly cookie
@@ -193,7 +195,7 @@ def verify_callback_api(request):
         return Response({"error": "Invalid temp token state"}, status=401)
 
     if state_data.get("action") != action:
-        logger.warning("Action mismatch in verify_callback_api")
+        logger.warning("Action mismatch in verify_callback_api: expected %r, got %r", state_data.get("action"), action)
         return Response({"error": "Action mismatch"}, status=403)
 
     # Step 2: Apply rate limiting per temp_token to prevent brute-force attempts
@@ -223,7 +225,7 @@ def verify_callback_api(request):
 
     # Check if this is the submission we're looking for
     if str(latest_answer.get("id")) != str(answer_id):
-        logger.warning("Answer ID mismatch in verify_callback_api")
+        logger.warning("Answer ID mismatch in verify_callback_api: expected %r, got %r", latest_answer.get("id"), answer_id)
         return Response({"error": "Answer ID mismatch"}, status=403)
 
     # Extract OTP and quest_id from submission
@@ -251,7 +253,7 @@ def verify_callback_api(request):
 
     # Step 5: StepVerify temp_token matches
     if expected_temp_token != temp_token:
-        logger.warning("Invalid temp_token in verify_callback_api")
+        logger.warning("Invalid temp_token in verify_callback_api: expected %r, got %r", expected_temp_token, temp_token)
         return Response({"error": "Invalid temp_token"}, status=401)
 
     # Step 6: Validate submission timestamp after OTP extraction
@@ -270,7 +272,7 @@ def verify_callback_api(request):
             )
 
     except (ValueError, TypeError):
-        logger.error("Error parsing submission timestamp")
+        logger.error("Error parsing submission timestamp string %r", latest_answer.get("submitted_at"))
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
     # Step 7: Update state to verified and add user details
@@ -289,7 +291,7 @@ def verify_callback_api(request):
     r.delete(rate_limit_key)
 
     logger.info(
-        "Successfully verified temp_token for user %s with action %s",
+        "Successfully verified temp_token for user %r with action %r",
         account,
         action,
     )
@@ -301,15 +303,16 @@ def verify_callback_api(request):
         if user is None:
             if error_response:
                 logger.error(
-                    "Failed to create session for login: %s",
+                    "Failed to create session: account=%r, action=%r, error=%r",
+                    account, action,
                     getattr(error_response, "data", {}).get("error", "Unknown error"),
                 )
                 return error_response
             else:
-                logger.error("Failed to create user session in verify_callback_api")
+                logger.error("Failed to create user session in verify_callback_api for account %r, action %r", account, action)
                 return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
-            logger.warning("Inactive user attempted OAuth login: %s", account)
+            logger.warning("Inactive user attempted OAuth login: %r", account)
             return Response({"error": "User account is inactive"}, status=403)
         try:
             # Create Django session
@@ -319,7 +322,7 @@ def verify_callback_api(request):
             r.delete(state_key)
         except Exception:
             logger.exception(
-                "Error during login session creation or cleanup for user %s", account
+                "Error during login session creation or cleanup for user %r", account
             )
             return Response({"error": "Failed to finalize login process"}, status=500)
 
@@ -423,7 +426,7 @@ def auth_signup_api(request) -> Response:
         return response
 
     except Exception:
-        logger.error("Error in auth_signup_api")
+        logger.error("Error in auth_signup_api for account %r", request.data.get("account"))
         return Response({"error": "Failed to complete signup"}, status=500)
 
 
@@ -465,7 +468,7 @@ def auth_reset_password_api(request) -> Response:
         return response
 
     except Exception:
-        logger.error("Error in auth_reset_password_api")
+        logger.error("Error in auth_reset_password_api for account %r", account)
         return Response({"error": "Failed to reset password"}, status=500)
 
 
@@ -513,7 +516,7 @@ def auth_login_api(request) -> Response:
 @permission_classes([AllowAny])
 def auth_logout_api(request) -> Response:
     logger.info(
-        "auth_logout_api called for user=%s",
+        "auth_logout_api called for user=%r",
         getattr(request.user, "username", None),
     )
     """Logout a user."""
