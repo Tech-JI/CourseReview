@@ -24,6 +24,29 @@ from lib.logging import add_sanitization_to_logger
 
 logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
+def mask_identifier(val: str | None) -> str:
+    """Return a masked version of an identifier (email or username) for safe logging."""
+    if not val:
+        return "None"
+    try:
+        s = str(val)
+    except Exception:
+        return "[unrepresentable]"
+    # Mask emails keeping domain
+    if "@" in s:
+        name, domain = s.split("@", 1)
+        if len(name) <= 1:
+            masked_name = "*"
+        elif len(name) == 2:
+            masked_name = name[0] + "*"
+        else:
+            masked_name = name[0] + "***" + name[-1]
+        return f"{masked_name}@{domain}"
+    # Fallback: keep first 4 chars
+    if len(s) <= 4:
+        return s[0] + "***"
+    return s[:4] + "...[masked]"
+
 
 AUTH_SETTINGS = settings.AUTH
 OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
@@ -95,8 +118,8 @@ def auth_initiate_api(request):
                     "Cleaned up existing temp_token_state for action %r",
                     existing_state.get("action", "unknown"),
                 )
-        except Exception:
-            logger.warning("Error cleaning up existing temp_token")
+        except Exception as e:
+            logger.warning("Error cleaning up existing temp_token: %r", e)
 
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
@@ -149,7 +172,7 @@ def verify_callback_api(request):
     """
     logger.info(
         "verify_callback_api called for account=%r, action=%r",
-        request.data.get("account"),
+        mask_identifier(request.data.get("account")),
         request.data.get("action"),
     )
     # Get required parameters from request
@@ -158,7 +181,12 @@ def verify_callback_api(request):
     action = request.data.get("action")
 
     if not account or not answer_id or not action:
-        logger.warning("Missing required parameters in verify_callback_api (account: %r, answer_id: %r, action: %r)", request.data.get("account"), request.data.get("answer_id"), request.data.get("action"))
+        logger.warning(
+            "Missing required parameters in verify_callback_api (account: %r, answer_id: %r, action: %r)",
+            mask_identifier(request.data.get("account")),
+            request.data.get("answer_id"),
+            request.data.get("action"),
+        )
         return Response({"error": "Missing account, answer_id, or action"}, status=400)
 
     if action not in ACTION_LIST:
@@ -291,7 +319,7 @@ def verify_callback_api(request):
 
     logger.info(
         "Successfully verified temp_token for user %r with action %r",
-        account,
+        mask_identifier(account),
         action,
     )
 
@@ -303,16 +331,16 @@ def verify_callback_api(request):
             if error_response:
                 logger.error(
                     "Failed to create session: account=%r, action=%r, error=%r",
-                    account, action,
+                    mask_identifier(account), action,
                     getattr(error_response, "data", {}).get("error", "Unknown error"),
                 )
                 return error_response
             else:
-                logger.error("Failed to create user session in verify_callback_api for account %r, action %r", account, action)
+                logger.error("Failed to create user session: account=%r, action=%r", mask_identifier(account), action)
                 return Response({"error": "Failed to create user session"}, status=500)
         if not user.is_active:
-            logger.warning("Inactive user attempted OAuth login: %r", account)
-            return Response({"error": "User account is inactive"}, status=403)
+            logger.warning("Inactive user attempted OAuth login: %r", mask_identifier(account))
+            return Response({"error": "User account is inactive"}, status=403) 
         try:
             # Create Django session
             login(request, user)
@@ -321,9 +349,9 @@ def verify_callback_api(request):
             r.delete(state_key)
         except Exception:
             logger.exception(
-                "Error during login session creation or cleanup for user %r", account
+                "Error during login session creation or cleanup for user %r", mask_identifier(account)
             )
-            return Response({"error": "Failed to finalize login process"}, status=500)
+            return Response({"error": "Failed to finalize login process"}, status=500) 
 
     # Create response
     response = Response(
@@ -516,7 +544,7 @@ def auth_login_api(request) -> Response:
 def auth_logout_api(request) -> Response:
     logger.info(
         "auth_logout_api called for user=%r",
-        getattr(request.user, "username", None),
+        mask_identifier(getattr(request.user, "username", None)),
     )
     """Logout a user."""
     logout(request)
