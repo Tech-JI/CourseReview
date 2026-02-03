@@ -49,7 +49,7 @@ def auth_initiate_api(request):
     turnstile_token = request.data.get("turnstile_token")
 
     if not action or not turnstile_token:
-        logger.warning("Missing action or turnstile_token in auth_initiate_api, action: %r, turnstile_token_present: %r", action, bool(turnstile_token))
+        logger.warning("Missing action or turnstile_token in auth_initiate_api, action: %r", action)
         return Response({"error": "Missing action or turnstile_token"}, status=400)
 
     if action not in ACTION_LIST:
@@ -68,9 +68,8 @@ def auth_initiate_api(request):
     )
     if not success:
         logger.warning(
-            "Turnstile verification failed: action=%r, client_ip=%r, response=%r",
+            "Turnstile verification failed: action=%r, response=%r",
             action,
-            client_ip,
             error_response.data,
         )
         return error_response
@@ -97,7 +96,7 @@ def auth_initiate_api(request):
                     existing_state.get("action", "unknown"),
                 )
         except Exception:
-            logger.warning("Error cleaning up existing temp_token (hash: %r)", existing_hash)
+            logger.warning("Error cleaning up existing temp_token")
 
     # Store OTP -> temp_token mapping with initiated_at timestamp
     current_time = time.time()
@@ -253,7 +252,7 @@ def verify_callback_api(request):
 
     # Step 5: StepVerify temp_token matches
     if expected_temp_token != temp_token:
-        logger.warning("Invalid temp_token in verify_callback_api: expected %r, got %r", expected_temp_token, temp_token)
+        logger.warning("Invalid temp_token in verify_callback_api: temp_token mismatch")
         return Response({"error": "Invalid temp_token"}, status=401)
 
     # Step 6: Validate submission timestamp after OTP extraction
