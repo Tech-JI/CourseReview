@@ -176,3 +176,113 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
+
+
+# ==============================================================================
+#  LOGGING CONFIGURATION
+# ==============================================================================
+import logging
+from lib.logging import SanitizationFilter, add_sanitization_to_logger
+
+DEFAULT_LOG_FORMAT = "[%(asctime)s][%(name)s:%(lineno)d][%(levelname)s] - %(message)s"
+# or DEFAULT_LOG_FORMAT = "[%(asctime)s][%(process)d:%(thread)d][%(name)s:%(lineno)d][%(levelname)s] - %(message)s" ?
+JSON_LOG_FORMAT = {
+    "asctime": "%(asctime)s",
+    "name": "%(name)s",
+    "lineno": "%(lineno)d",
+    "levelname": "%(levelname)s",
+    "message": "%(message)s",
+    "process": "%(process)d",
+    "thread": "%(thread)d",
+}
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "filters": {
+        "sanitization_filter": {
+            "()": "lib.logging.SanitizationFilter",
+            "max_length": 1000,
+        }
+    },
+    "formatters": {
+        "verbose": {
+            "format": DEFAULT_LOG_FORMAT,
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "simple": {
+            "format": "[%(levelname)s] %(message)s"
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "DEBUG" if DEBUG else "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+            "filters": ["sanitization_filter"],
+        },
+        "file": {
+            "level": "DEBUG" if DEBUG else "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "django.log",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "formatter": "verbose",
+            "filters": ["sanitization_filter"],
+            "encoding": "utf-8",
+        },
+        "error_file": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler", 
+            "filename": LOG_DIR / "error.log",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "formatter": "verbose",
+            "filters": ["sanitization_filter"],
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console", "file", "error_file"], 
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "lib": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["console", "error_file"],
+            "level": "ERROR" if not DEBUG else "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console", "file"],
+        "level": "INFO",
+    },
+}
+def initialize_logging():
+    # Optimize log levels in production
+    if not DEBUG:
+        logging.getLogger("django").setLevel(logging.WARNING) # reduce verbosity
+        logging.getLogger("django.request").setLevel(logging.ERROR)
+        logging.getLogger("django.db.backends").setLevel(logging.ERROR) 
+        logging.getLogger("django.security").setLevel(logging.INFO)
+initialize_logging() # Call the initialization function at the startup
