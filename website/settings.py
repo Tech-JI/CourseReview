@@ -249,7 +249,7 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["console", "file", "error_file"],
-            "level": "INFO",
+            "level": "WARNING" if not DEBUG else "INFO",
             "propagate": False,
         },
         "django.request": {
@@ -278,11 +278,3 @@ LOGGING = {
         "level": "INFO",
     },
 }
-def initialize_logging():
-    # Optimize log levels in production
-    if not DEBUG:
-        logging.getLogger("django").setLevel(logging.WARNING) # reduce verbosity
-        logging.getLogger("django.request").setLevel(logging.ERROR)
-        logging.getLogger("django.db.backends").setLevel(logging.ERROR) 
-        logging.getLogger("django.security").setLevel(logging.INFO)
-initialize_logging() # Call the initialization function at the startup
