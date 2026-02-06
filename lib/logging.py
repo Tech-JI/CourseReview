@@ -11,6 +11,8 @@ class SanitizationFilter(logging.Filter):
     def __init__(self, max_length=1000):
         super().__init__()
         self.max_length = max_length
+        self.control_pattern = re.compile(r"[\r\n\t\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+        self.ansi_pattern = re.compile(r"\x1B\[[0-9;]*[mK]")
 
     def filter(self, record):
         """Filter and sanitize the log record."""
@@ -50,9 +52,11 @@ class SanitizationFilter(logging.Filter):
         """
         if value is None:
             return "None"
-
-        # Convert to string
-        str_value = str(value)
+        
+        try:
+            str_value = str(value) # Convert to string
+        except Exception:
+            return "[Convert error]"
 
         # Truncate to max_length to prevent log flooding
         if len(str_value) > self.max_length:
@@ -60,10 +64,10 @@ class SanitizationFilter(logging.Filter):
 
         # Remove control characters that could cause log injection
         # Remove \r, \n, \t and other control characters
-        str_value = re.sub(r"[\r\n\t\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", str_value)
+        str_value = self.control_pattern.sub("", str_value)
 
         # Remove potential ANSI escape sequences used for terminal control
-        str_value = re.sub(r"\x1B\[[0-9;]*[mK]", "", str_value)
+        str_value = self.ansi_pattern.sub("", str_value)
 
         return str_value
 
@@ -76,6 +80,9 @@ def add_sanitization_to_logger(logger, max_length=1000):
         logger: The logger instance to add the filter to
         max_length: Maximum length for log messages
     """
+    for existing_filter in logger.filters:
+        if isinstance(existing_filter, SanitizationFilter):
+            return logger  # Filter already exists, do not add again
     sanitization_filter = SanitizationFilter(max_length)
     logger.addFilter(sanitization_filter)
     return logger
