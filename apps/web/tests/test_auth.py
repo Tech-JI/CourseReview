@@ -1,11 +1,11 @@
 import pytest
 from django.urls import reverse
 
+from apps.web.tests.factories import ReviewFactory
+
 
 @pytest.mark.django_db
-class TestAuthentication:
-    """Tests for user authentication and status endpoints"""
-
+class TestUserStatusAPI:
     def test_user_status_anonymous(self, base_client):
         """Test that unauthenticated users get isAuthenticated=False"""
         url = reverse("user_status")
@@ -25,6 +25,9 @@ class TestAuthentication:
         assert response.data["isAuthenticated"] is True
         assert response.data["username"] == user.username
 
+
+@pytest.mark.django_db
+class TestLandingPageAPI:
     def test_landing_page_review_count(self, base_client, review):
         """Verify landing page shows correct review statistics."""
         url = reverse("landing_api")
@@ -43,8 +46,6 @@ class TestAuthentication:
 
     def test_landing_page_review_count_multiple(self, base_client, db):
         """Verify review count returns the correct total when multiple reviews exist."""
-        from apps.web.tests.factories import ReviewFactory
-
         # Create 5 reviews across different courses/users
         ReviewFactory.create_batch(5)
 

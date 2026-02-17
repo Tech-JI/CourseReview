@@ -4,18 +4,7 @@ from rest_framework import status
 
 
 @pytest.mark.django_db
-class TestVotingSystem:
-    """
-    Tests for the voting system:
-    - Course quality/difficulty voting (POST /courses/<id>/vote)
-    - Review kudos/dislike voting (POST /reviews/<id>/vote)
-    - Logic for changing and canceling votes
-    """
-
-    # -------------------------------------------------------------------------
-    # 1. Course Voting (course_vote_api)
-    # -------------------------------------------------------------------------
-
+class TestCourseVoteAPIAuthenticated:
     def test_course_vote_quality_success(self, auth_client, course):
         """Test authenticated user voting for course quality."""
         url = reverse("course_vote_api", kwargs={"course_id": course.id})
@@ -60,6 +49,9 @@ class TestVotingSystem:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+
+@pytest.mark.django_db
+class TestCourseVoteAPIUnauthenticated:
     def test_course_vote_anonymous_denied(self, base_client, course):
         """Verify unauthenticated users cannot vote."""
         url = reverse("course_vote_api", kwargs={"course_id": course.id})
@@ -69,10 +61,9 @@ class TestVotingSystem:
             status.HTTP_403_FORBIDDEN,
         ]
 
-    # -------------------------------------------------------------------------
-    # 2. Review Voting (review_vote_api)
-    # -------------------------------------------------------------------------
 
+@pytest.mark.django_db
+class TestReviewVoteAPIAuthenticated:
     def test_review_vote_kudos_success(self, auth_client, review):
         """Test authenticated user giving kudos to a review."""
         url = reverse("review_vote_api", kwargs={"review_id": review.id})
@@ -101,6 +92,9 @@ class TestVotingSystem:
         response = auth_client.post(url, {"is_kudos": True}, format="json")
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
+@pytest.mark.django_db
+class TestReviewVoteAPIUnauthenticated:
     def test_review_vote_anonymous_denied(self, base_client, review):
         """Verify unauthenticated users cannot vote on reviews."""
         url = reverse("review_vote_api", kwargs={"review_id": review.id})
