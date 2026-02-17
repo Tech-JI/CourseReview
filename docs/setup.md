@@ -1,10 +1,10 @@
 # Development
 ## Script Setup
-Environment:  
+Environment:
 
-- linux  
+- linux
 
-- python `uv`, `docker`  
+- python `uv`, `docker`
 
 - python >= 3.12
 

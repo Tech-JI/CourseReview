@@ -3,12 +3,12 @@ import subprocess
 import sys
 
 import django
+from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
 django.setup()
-
-from django.contrib.auth.models import User
 
 print("🔧 Running migrations...")
 subprocess.run(["python3", "manage.py", "makemigrations"], check=True)
@@ -26,7 +26,7 @@ try:
         u.is_superuser = True
         u.save()
         print(f"✅ User {u.username} has been made a superuser.")
-except User.DoesNotExist:
+except ObjectDoesNotExist:
     print("⚠️ No user found to make admin.")
 
 
