@@ -48,7 +48,7 @@ def course_batch(db):
 @pytest.fixture
 def department_mixed_courses(db):
     """Returns a mixed set of courses for filtering/sorting tests."""
-    # Note: Using 'title' to match your original course.py
+    # Note: Using course_title to match current course model field
     return [
         factories.CourseFactory(
             department="MATH",

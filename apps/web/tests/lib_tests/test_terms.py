@@ -33,6 +33,11 @@ class TermsTestCase(TestCase):
             term_data
             and term_data.group("year") == "16"
             and term_data.group("term") == "w"
+        )
+        term_data = terms.term_regex.match("16F")
+        self.assertTrue(
+            term_data
+            and term_data.group("year") == "16"
             and term_data.group("term") == "F"
         )
 
@@ -67,9 +72,10 @@ class TermsTestCase(TestCase):
         self.assertEqual(terms.numeric_value_of_term("16W"), 161)
 
     def test_is_valid_term_returns_false_if_in_future(self):
-        next_year = (
-            int(terms.term_regex.match(constants.CURRENT_TERM).group("year")) + 1
-        )
+        term_data = terms.term_regex.match(constants.CURRENT_TERM)
+        if term_data is None:
+            raise AssertionError("CURRENT_TERM did not match term_regex")
+        next_year = int(term_data.group("year")) + 1
         self.assertFalse(terms.is_valid_term("{}f".format(next_year)))
 
     def test_is_valid_term_returns_false_if_no_term(self):
