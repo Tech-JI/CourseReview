@@ -7,6 +7,14 @@ set -e
 
 echo "Setting up the development environment..."
 
+if [ -z "${CONTAINER_RUNTIME:-}" ]; then
+    if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
+        CONTAINER_RUNTIME=podman
+    else
+        CONTAINER_RUNTIME=docker
+    fi
+fi
+
 # Step 1-4: Create virtual environment, install dependencies, setup pre-commit hooks
 echo "[INFO] Creating virtual environment..."
 uv venv .venv
@@ -33,10 +41,10 @@ make collect
 # Step 9: Configure database using Docker with lightweight images
 echo "[INFO] Starting PostgreSQL container..."
 # Stop and remove any existing container with the same name
-docker stop coursereview-postgres 2>/dev/null || true
-docker rm coursereview-postgres 2>/dev/null || true
+${CONTAINER_RUNTIME} stop coursereview-postgres 2>/dev/null || true
+${CONTAINER_RUNTIME} rm coursereview-postgres 2>/dev/null || true
 
-docker run -d --name coursereview-postgres -p 5432:5432 \
+${CONTAINER_RUNTIME} run -d --name coursereview-postgres -p 5432:5432 \
   -e POSTGRES_DB=coursereview \
   -e POSTGRES_USER=admin \
   -e POSTGRES_PASSWORD=test \
@@ -47,7 +55,7 @@ docker run -d --name coursereview-postgres -p 5432:5432 \
 echo "[INFO] Waiting for PostgreSQL to be ready..."
 POSTGRES_MAX_RETRIES=8
 POSTGRES_WAIT_TIME=2
-until docker exec coursereview-postgres pg_isready -U admin; do
+until ${CONTAINER_RUNTIME} exec coursereview-postgres pg_isready -U admin; do
     POSTGRES_MAX_RETRIES=$((POSTGRES_MAX_RETRIES - 1))
     if [ $POSTGRES_MAX_RETRIES -eq 0 ]; then
         echo "[ERROR] PostgreSQL is not ready after multiple attempts"
@@ -58,7 +66,7 @@ until docker exec coursereview-postgres pg_isready -U admin; do
 done
 
 # Check if PostgreSQL container is running
-if docker ps | grep coursereview-postgres > /dev/null; then
+if ${CONTAINER_RUNTIME} ps | grep coursereview-postgres > /dev/null; then
     echo "[INFO] PostgreSQL container is running"
 else
     echo "[ERROR] PostgreSQL container failed to start"
@@ -68,10 +76,10 @@ fi
 # Step 10: Run valkey using docker with a lightweight image
 echo "[INFO] Starting Valkey container..."
 # Stop and remove any existing container with the same name
-docker stop valkey-cache 2>/dev/null || true
-docker rm valkey-cache 2>/dev/null || true
+${CONTAINER_RUNTIME} stop valkey-cache 2>/dev/null || true
+${CONTAINER_RUNTIME} rm valkey-cache 2>/dev/null || true
 
-docker run -d --name valkey-cache -p 6379:6379 \
+${CONTAINER_RUNTIME} run -d --name valkey-cache -p 6379:6379 \
   --restart unless-stopped \
   valkey/valkey:7-alpine
 
@@ -79,7 +87,7 @@ docker run -d --name valkey-cache -p 6379:6379 \
 echo "[INFO] Waiting for Valkey to be ready..."
 VALKEY_MAX_RETRIES=8
 VALKEY_WAIT_TIME=2
-until docker exec valkey-cache redis-cli ping; do
+until ${CONTAINER_RUNTIME} exec valkey-cache redis-cli ping; do
     VALKEY_MAX_RETRIES=$((VALKEY_MAX_RETRIES - 1))
     if [ $VALKEY_MAX_RETRIES -eq 0 ]; then
         echo "[ERROR] Valkey is not ready after multiple attempts"
@@ -90,7 +98,7 @@ until docker exec valkey-cache redis-cli ping; do
 done
 
 # Check if Valkey container is running
-if docker ps | grep valkey-cache > /dev/null; then
+if ${CONTAINER_RUNTIME} ps | grep valkey-cache > /dev/null; then
     echo "[INFO] Valkey container is running"
 else
     echo "[ERROR] Valkey container failed to start"

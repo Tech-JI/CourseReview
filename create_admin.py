@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 import os
+
 import django
-from django.contrib.auth import get_user_model
+from django.apps import apps
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
 django.setup()
 
-User = get_user_model()
+User = apps.get_model("auth", "User")
 
 # 从环境变量获取超级用户信息，如果未设置则使用默认值
 username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
