@@ -133,6 +133,7 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "greenlet" },
     { name = "httpx" },
+    { name = "podman-compose" },
     { name = "psycopg2-binary" },
     { name = "ptpython" },
     { name = "python-dateutil" },
@@ -163,6 +164,7 @@ requires-dist = [
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "greenlet", specifier = "==3.2.4" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "podman-compose", specifier = ">=1.5.0" },
     { name = "psycopg2-binary", specifier = "==2.9.11" },
     { name = "ptpython", specifier = "==3.0.31" },
     { name = "python-dateutil", specifier = "==2.9.0" },
@@ -390,6 +392,19 @@ source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
 sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/81/76/a1e769043c0c0c9fe391b702539d594731a4362334cdf4dc25d0c09761e7/parso-0.8.6.tar.gz", hash = "sha256:2b9a0332696df97d454fa67b81618fd69c35a7b90327cbe6ba5c92d2c68a7bfd", size = 401621, upload-time = "2026-02-09T15:45:24.425Z" }
 wheels = [
     { url = "https://mirrors.ustc.edu.cn/pypi/packages/b6/61/fae042894f4296ec49e3f193aff5d7c18440da9e48102c3315e1bc4519a7/parso-0.8.6-py2.py3-none-any.whl", hash = "sha256:2c549f800b70a5c4952197248825584cb00f033b29c692671d3bf08bf380baff", size = 106894, upload-time = "2026-02-09T15:45:21.391Z" },
+]
+
+[[package]]
+name = "podman-compose"
+version = "1.5.0"
+source = { registry = "https://mirrors.ustc.edu.cn/pypi/simple" }
+dependencies = [
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://mirrors.ustc.edu.cn/pypi/packages/24/91/b168a685ca6813ff9b467d76a7365a099aec16a1032b6edf39b0cd19f6c3/podman_compose-1.5.0.tar.gz", hash = "sha256:5cc09362852711ce5d27648e41cb5fd058ea5a75acbcdec2f8d0b0c114a18e8e", size = 47377, upload-time = "2025-07-07T14:18:09.633Z" }
+wheels = [
+    { url = "https://mirrors.ustc.edu.cn/pypi/packages/41/4b/75ab5c151b9d170fdae0048a6f6528535aff848140c007f408af9ac555d6/podman_compose-1.5.0-py3-none-any.whl", hash = "sha256:f0b9d35f4da1b309172adf208a5cb7a882b532a834c2202666c1988b6f147546", size = 47129, upload-time = "2025-07-07T14:18:08.373Z" },
 ]
 
 [[package]]
