@@ -9,7 +9,6 @@ django.setup()
 
 User = apps.get_model("auth", "User")
 
-# 从环境变量获取超级用户信息，如果未设置则使用默认值
 username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
 email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@example.com")
 password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
