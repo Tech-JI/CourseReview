@@ -8,6 +8,16 @@ set -e
 echo "Setting up the development environment..."
 
 CONTAINER_RUNTIME=podman
+POSTGRES_DB=${POSTGRES_DB:-coursereview}
+POSTGRES_USER=${POSTGRES_USER:-admin}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
+POSTGRES_HOST=${POSTGRES_HOST:-127.0.0.1}
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
+REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
+DATABASE__URL=${DATABASE__URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}}
+
+export DATABASE__URL
+export REDIS_URL
 
 # Step 1-4: Create virtual environment, install dependencies, setup pre-commit hooks
 echo "[INFO] Creating virtual environment..."
@@ -39,9 +49,9 @@ ${CONTAINER_RUNTIME} stop coursereview-postgres 2>/dev/null || true
 ${CONTAINER_RUNTIME} rm coursereview-postgres 2>/dev/null || true
 
 ${CONTAINER_RUNTIME} run -d --name coursereview-postgres -p 5432:5432 \
-  -e POSTGRES_DB=coursereview \
-  -e POSTGRES_USER=admin \
-  -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_DB=${POSTGRES_DB} \
+  -e POSTGRES_USER=${POSTGRES_USER} \
+  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
   --restart unless-stopped \
   postgres:18-alpine
 
@@ -49,7 +59,7 @@ ${CONTAINER_RUNTIME} run -d --name coursereview-postgres -p 5432:5432 \
 echo "[INFO] Waiting for PostgreSQL to be ready..."
 POSTGRES_MAX_RETRIES=8
 POSTGRES_WAIT_TIME=2
-until ${CONTAINER_RUNTIME} exec coursereview-postgres pg_isready -U admin; do
+until ${CONTAINER_RUNTIME} exec coursereview-postgres pg_isready -U ${POSTGRES_USER}; do
     POSTGRES_MAX_RETRIES=$((POSTGRES_MAX_RETRIES - 1))
     if [ $POSTGRES_MAX_RETRIES -eq 0 ]; then
         echo "[ERROR] PostgreSQL is not ready after multiple attempts"

@@ -4,9 +4,9 @@ services:
     volumes:
       - postgres18_data:/var/lib/postgresql/
     environment:
-      - POSTGRES_DB=coursereview
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=test
+      - POSTGRES_DB=${POSTGRES_DB:-coursereview}
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d coursereview"]
       interval: 10s
@@ -35,10 +35,27 @@ services:
       cache:
         condition: service_healthy
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - REDIS_URL=redis://cache:6379/0
-      - DEBUG=False
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-coursereview}
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
+      - DATABASE__URL=${DATABASE__URL:-postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-test}@${DB_HOST:-db}:${DB_PORT:-5432}/${POSTGRES_DB:-coursereview}}
+      - REDIS_URL=${REDIS_URL:-redis://cache:6379/0}
+      - REDIS__URL=${REDIS__URL:-redis://cache:6379/0}
+      - DEBUG=${DEBUG:-False}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/api/user/status/',timeout=5)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
@@ -48,7 +65,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - VITE_API_PROXY_TARGET=http://backend:8000
     restart: unless-stopped
