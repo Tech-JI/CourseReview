@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   cache:
-    image: valkey/valkey:7-alpine
+    image: valkey/valkey:9-alpine
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
