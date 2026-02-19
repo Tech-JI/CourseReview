@@ -67,7 +67,7 @@ else
     exit 1
 fi
 
-# Step 10: Run valkey using docker with a lightweight image
+# Step 10: Run valkey using podman with a lightweight image
 echo "[INFO] Starting Valkey container..."
 # Stop and remove any existing container with the same name
 ${CONTAINER_RUNTIME} stop valkey-cache 2>/dev/null || true
@@ -123,6 +123,6 @@ else:
 EOF
 
 echo "[INFO] Development environment setup complete!"
-echo "PostgreSQL and Valkey are running in Docker containers."
+echo "PostgreSQL and Valkey are running in Podman containers."
 echo "You can now run 'make run' to start the development server."
 echo "[INFO] Log saved to dev_setup.log"
