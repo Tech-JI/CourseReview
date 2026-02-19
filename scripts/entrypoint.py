@@ -16,7 +16,7 @@ print("🔧 Running migrations...")
 subprocess.run(["python3", "manage.py", "migrate"], check=True)
 
 print("👤 Creating admin user...")
-subprocess.run(["python3", "create_admin.py"], check=True)
+subprocess.run(["uv", "run", "create_admin.py"], check=True)
 
 print("🛠 Setting admin permissions...")
 try:
