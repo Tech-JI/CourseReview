@@ -22,6 +22,7 @@ dependencies = [
     "django-redis==6.0.0",
     "pyyaml==6.0.3",
     "podman-compose>=1.5.0",
+    "gunicorn>=25.1.0",
 ]
 
 [tool.uv]
