@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:18-alpine
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres18_data:/var/lib/postgresql/
     environment:
       - POSTGRES_DB=coursereview
       - POSTGRES_USER=admin
@@ -30,8 +30,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - cache
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
     environment:
       - DB_HOST=db
       - DB_PORT=5432
@@ -52,4 +54,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres18_data:
