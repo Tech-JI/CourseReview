@@ -17,4 +17,4 @@ WORKDIR /app
 
 USER nonroot
 
-ENTRYPOINT ["python", "/app/scripts/entrypoint.py"]
+ENTRYPOINT ["python", "scripts/entrypoint.py"]
