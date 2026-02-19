@@ -7,13 +7,7 @@ set -e
 
 echo "Setting up the development environment..."
 
-if [ -z "${CONTAINER_RUNTIME:-}" ]; then
-    if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
-        CONTAINER_RUNTIME=podman
-    else
-        CONTAINER_RUNTIME=docker
-    fi
-fi
+CONTAINER_RUNTIME=podman
 
 # Step 1-4: Create virtual environment, install dependencies, setup pre-commit hooks
 echo "[INFO] Creating virtual environment..."
@@ -22,7 +16,7 @@ source .venv/bin/activate
 echo "[INFO] Installing dependencies..."
 uv sync
 echo "[INFO] Setting up pre-commit hooks..."
-uv run pre-commit install
+uv run prek install
 
 # Step 6: Make directory for builds of static files
 echo "[INFO] Creating static files directory..."
@@ -38,7 +32,7 @@ cp .env.example .env
 echo "[INFO] Building static files..."
 make collect
 
-# Step 9: Configure database using Docker with lightweight images
+# Step 9: Configure database using podman with lightweight images
 echo "[INFO] Starting PostgreSQL container..."
 # Stop and remove any existing container with the same name
 ${CONTAINER_RUNTIME} stop coursereview-postgres 2>/dev/null || true
@@ -49,7 +43,7 @@ ${CONTAINER_RUNTIME} run -d --name coursereview-postgres -p 5432:5432 \
   -e POSTGRES_USER=admin \
   -e POSTGRES_PASSWORD=test \
   --restart unless-stopped \
-  postgres:16-alpine
+  postgres:18-alpine
 
 # Wait for PostgreSQL to be ready
 echo "[INFO] Waiting for PostgreSQL to be ready..."
@@ -81,7 +75,7 @@ ${CONTAINER_RUNTIME} rm valkey-cache 2>/dev/null || true
 
 ${CONTAINER_RUNTIME} run -d --name valkey-cache -p 6379:6379 \
   --restart unless-stopped \
-  valkey/valkey:7-alpine
+  valkey/valkey:9-alpine
 
 # Wait for Valkey to be ready
 echo "[INFO] Waiting for Valkey to be ready..."
