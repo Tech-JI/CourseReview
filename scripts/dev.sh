@@ -125,7 +125,7 @@ u = User.objects.last()
 if u:
     u.is_active = True
     u.is_staff = True
-    u.is_admin = True
+    u.is_superuser = True
     u.save()
     print(f"User {u.username} has been made an admin.")
 else:

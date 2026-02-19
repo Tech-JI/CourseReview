@@ -108,7 +108,7 @@
        u = User.objects.last()
        u.is_active = True
        u.is_staff = True
-       u.is_admin = True
+       u.is_superuser = True
        u.save()
        ```
 
