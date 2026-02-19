@@ -13,7 +13,7 @@ django.setup()
 User = apps.get_model("auth", "User")
 
 print("🔧 Running migrations...")
-subprocess.run(["python3", "manage.py", "migrate"], check=True)
+subprocess.run(["uv", "run", "manage.py", "migrate"], check=True)
 
 print("👤 Creating admin user...")
 subprocess.run(["uv", "run", "create_admin.py"], check=True)
