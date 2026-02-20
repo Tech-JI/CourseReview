@@ -23,7 +23,7 @@ echo "[INFO] Creating virtual environment..."
 uv venv .venv
 source .venv/bin/activate
 echo "[INFO] Installing dependencies..."
-uv sync
+uv sync --all-groups
 echo "[INFO] Setting up pre-commit hooks..."
 uv run prek install
 
