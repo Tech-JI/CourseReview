@@ -37,10 +37,6 @@ echo "[INFO] Creating .env file..."
 echo "[INFO] Secret config should be manually added. "
 cp .env.example .env
 
-# Build static files
-echo "[INFO] Building static files..."
-make collect
-
 # Configure database using podman with lightweight images
 echo "[INFO] Starting PostgreSQL container..."
 # Stop and remove any existing container with the same name
