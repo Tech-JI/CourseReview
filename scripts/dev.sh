@@ -92,7 +92,7 @@ ${CONTAINER_RUNTIME} run -d --name valkey-cache -p 6379:6379 \
 echo "[INFO] Waiting for Valkey to be ready..."
 VALKEY_MAX_RETRIES=8
 VALKEY_WAIT_TIME=2
-until ${CONTAINER_RUNTIME} exec valkey-cache redis-cli ping; do
+until ${CONTAINER_RUNTIME} exec valkey-cache valkey-cli ping; do
   VALKEY_MAX_RETRIES=$((VALKEY_MAX_RETRIES - 1))
   if [ $VALKEY_MAX_RETRIES -eq 0 ]; then
     echo "[ERROR] Valkey is not ready after multiple attempts"
