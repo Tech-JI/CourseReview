@@ -42,7 +42,6 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-admin}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
       - DATABASE__URL=${DATABASE__URL:-postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-test}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${POSTGRES_DB:-coursereview}}
-      - REDIS_URL=${REDIS_URL:-redis://cache:6379/0}
       - REDIS__URL=${REDIS__URL:-redis://cache:6379/0}
       - DEBUG=${DEBUG:-False}
     healthcheck:
