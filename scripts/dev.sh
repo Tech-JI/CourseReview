@@ -35,9 +35,13 @@ mkdir -p staticfiles
 mkdir -p website/static
 
 # Create .env file for storing secrets
-echo "[INFO] Creating .env file..."
-echo "[INFO] Secret config should be manually added. "
-cp .env.example .env
+if [[ ! -f ".env" ]]; then
+  echo "[INFO] Creating .env file..."
+  echo "[INFO] Secret config should be manually added."
+  cp .env.example .env
+else
+  echo "[INFO] .env exists."
+fi
 
 # Configure database using podman with lightweight images
 echo "[INFO] Starting PostgreSQL container..."
