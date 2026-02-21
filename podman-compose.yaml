@@ -8,7 +8,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-admin}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d coursereview"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-coursereview}"]
       interval: 10s
       timeout: 5s
       retries: 5
