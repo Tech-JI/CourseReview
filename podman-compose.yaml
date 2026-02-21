@@ -44,6 +44,7 @@ services:
       DATABASE__URL: ${DATABASE__URL:-postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-test}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${POSTGRES_DB:-coursereview}}
       REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
       DEBUG: ${DEBUG:-False}
+      PYTHONUNBUFFERED: "1"
     healthcheck:
       test:
         [
