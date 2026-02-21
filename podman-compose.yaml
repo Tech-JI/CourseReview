@@ -4,9 +4,9 @@ services:
     volumes:
       - postgres18_data:/var/lib/postgresql/
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-coursereview}
-      - POSTGRES_USER=${POSTGRES_USER:-admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
+      POSTGRES_DB: ${POSTGRES_DB:-coursereview}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-test}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-coursereview}"]
       interval: 10s
@@ -36,14 +36,14 @@ services:
       cache:
         condition: service_healthy
     environment:
-      - DB_HOST=${DB_HOST:-localhost}
-      - DB_PORT=${DB_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-coursereview}
-      - POSTGRES_USER=${POSTGRES_USER:-admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-test}
-      - DATABASE__URL=${DATABASE__URL:-postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-test}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${POSTGRES_DB:-coursereview}}
-      - REDIS__URL=${REDIS__URL:-redis://cache:6379/0}
-      - DEBUG=${DEBUG:-False}
+      DB_HOST: ${DB_HOST:-localhost}
+      DB_PORT: ${DB_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-coursereview}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-test}
+      DATABASE__URL: ${DATABASE__URL:-postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-test}@${DB_HOST:-localhost}:${DB_PORT:-5432}/${POSTGRES_DB:-coursereview}}
+      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+      DEBUG: ${DEBUG:-False}
     healthcheck:
       test:
         [
