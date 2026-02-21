@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Redirect all output to both stdout and a log file for debugging
-exec > >(tee -a dev_setup.log) 2>&1
+if [ -n "${NON_INTERACTIVE_DEV_SETUP:-}" ]; then
+  exec > >(tee -a dev_setup.log) 2>&1
+fi
 
 set -e
 
