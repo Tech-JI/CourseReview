@@ -26,6 +26,7 @@ services:
   backend:
     build:
       context: .
+      dockerfile: Containerfile
     image: coursereview
     ports:
       - "8000:8000"
