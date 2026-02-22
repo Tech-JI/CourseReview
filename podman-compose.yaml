@@ -39,6 +39,7 @@ services:
       DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
       REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
       DEBUG: ${DEBUG:-False}
+      GUNICORN_CMD_ARGS: "--control-socket /tmp/gunicorn.ctl --worker-tmp-dir /tmp"
       PYTHONUNBUFFERED: "1"
     healthcheck:
       test:
