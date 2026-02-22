@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:18-alpine
     volumes:
-      - postgres18_data:/var/lib/postgresql/
+      - postgres18_data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-coursereview}
       POSTGRES_USER: ${POSTGRES_USER:-admin}
