@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import os
 import shutil
 import subprocess
@@ -17,7 +17,7 @@ User = apps.get_model("auth", "User")
 
 # --- Step 1: Migrations ---
 print("🔧 Running migrations...")
-subprocess.run(["python3", "manage.py", "migrate"], check=True)
+subprocess.run(["python", "manage.py", "migrate"], check=True)
 
 # --- Step 2: Create or fix admin user ---
 print("👤 Ensuring admin user exists and has superuser permissions...")
@@ -69,6 +69,6 @@ if shutil.which("gunicorn"):
 else:
     print("[ENTRYPOINT] Gunicorn not found, starting Django runserver...")
     subprocess.run(
-        ["python3", "manage.py", "runserver", "0.0.0.0:8000"],
+        ["python", "manage.py", "runserver", "0.0.0.0:8000"],
         check=True,
     )
