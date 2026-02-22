@@ -45,7 +45,7 @@ services:
       test:
         [
           "CMD",
-          "python3",
+          "python",
           "-c",
           "__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/api/user/status/',timeout=5)",
         ]
