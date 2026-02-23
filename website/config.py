@@ -116,7 +116,7 @@ class Config:
 
         try:
             value = reduce(operator.getitem, path, self._final_config)
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             if required:
                 raise ImproperlyConfigured(
                     f"Required setting '{key}' is not defined in any source."
