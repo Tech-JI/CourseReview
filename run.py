@@ -46,6 +46,7 @@ def _require(cmd: str) -> str:
     p = _which(cmd)
     if p is None:
         raise AppError(f"Required executable not found on PATH: {cmd!r}")
+
     return p
 
 
@@ -55,6 +56,7 @@ def _detect_exec() -> Exec:
     # but the real, common entrypoint is `podman-compose`.
     compose = _which("podman-compose") or "podman compose"
     uv = _which("uv")
+
     return Exec(podman=podman, compose=compose, uv=uv)
 
 
@@ -99,6 +101,7 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
         if key:
             out[key] = val
+
     return out
 
 
@@ -112,6 +115,7 @@ def _effective_env(*, env_file: Path | None) -> dict[str, str]:
     if env_file is not None:
         merged.update(_parse_env_file(env_file))
     merged.update(os.environ)  # OS env overrides
+
     return merged
 
 
@@ -156,6 +160,7 @@ def _derive_postgres_env(env: dict[str, str]) -> dict[str, str]:
 
     out = dict(env)
     out.update(derived)
+
     return out
 
 
@@ -181,6 +186,7 @@ def _compose_argv(exec_: Exec, *, mode: str, args: list[str]) -> list[str]:
         argv += ["-f", str(f)]
 
     argv += args
+
     return argv
 
 
@@ -189,6 +195,7 @@ def _warn_localhost_db_url_if_starting_backend(
 ) -> None:
     if not starting_backend:
         return
+
     db_url = env.get("DATABASE__URL", "")
     if "@127.0.0.1" in db_url or "@localhost" in db_url:
         print(
@@ -294,6 +301,7 @@ def cmd_hooks(ns: argparse.Namespace) -> None:
     exec_ = _detect_exec()
     if exec_.uv is None:
         raise AppError("uv is required to run prek but was not found on PATH.")
+
     _run([exec_.uv, "run", "prek", "-a"])
 
 
