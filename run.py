@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent
@@ -117,6 +117,102 @@ def _effective_env(*, env_file: Path | None) -> dict[str, str]:
     merged.update(os.environ)  # OS env overrides
 
     return merged
+
+
+def _build_netloc(
+    *, username: str | None, password: str | None, host: str, port: int | None
+) -> str:
+    """
+    Re-encode user/pass safely for the URL
+    """
+
+    userinfo = ""
+    if username:
+        userinfo = quote(username, safe="")
+        if password is not None:
+            userinfo += f":{quote(password, safe='')}"
+        userinfo += "@"
+
+    hostport = host
+    if port is not None:
+        hostport = f"{host}:{port}"
+
+    return f"{userinfo}{hostport}"
+
+
+def _normalize_env_for_host(env: dict[str, str]) -> dict[str, str]:
+    """
+    Rewrite db -> 127.0.0.1 and cache -> 127.0.0.1
+    for running Django on the host.
+    """
+    out = dict(env)
+
+    db_url = out.get("DATABASE__URL")
+    if db_url:
+        p = urlparse(db_url)
+        if p.hostname == "db":
+            out["DATABASE__URL"] = _rewrite_url_host(db_url, new_host="127.0.0.1")
+            print("[info] Rewrote DATABASE__URL host db -> 127.0.0.1 for host commands")
+
+    redis_url = out.get("REDIS__URL")
+    if redis_url:
+        p = urlparse(redis_url)
+        if p.hostname == "cache":
+            out["REDIS__URL"] = _rewrite_url_host(redis_url, new_host="127.0.0.1")
+            print("[info] Rewrote REDIS__URL host cache -> 127.0.0.1 for host commands")
+
+    return out
+
+
+def _normalize_env_for_compose(env: dict[str, str]) -> dict[str, str]:
+    """
+    Rewrite localhost/127.0.0.1 -> db/cache
+    for running inside the container network.
+    """
+    out = dict(env)
+
+    db_url = out.get("DATABASE__URL")
+    if db_url:
+        p = urlparse(db_url)
+        if p.hostname in {"127.0.0.1", "localhost"}:
+            out["DATABASE__URL"] = _rewrite_url_host(db_url, new_host="db")
+            print(
+                "[info] Rewrote DATABASE__URL host localhost -> db for container runs"
+            )
+
+    redis_url = out.get("REDIS__URL")
+    if redis_url:
+        p = urlparse(redis_url)
+        if p.hostname in {"127.0.0.1", "localhost"}:
+            out["REDIS__URL"] = _rewrite_url_host(redis_url, new_host="cache")
+            print(
+                "[info] Rewrote REDIS__URL host localhost -> cache for container runs"
+            )
+
+    return out
+
+
+def _rewrite_url_host(url: str, *, new_host: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.hostname:
+        return url
+
+    netloc = _build_netloc(
+        username=parsed.username,
+        password=parsed.password,
+        host=new_host,
+        port=parsed.port,
+    )
+    return urlunparse(
+        (
+            parsed.scheme,
+            netloc,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
 
 
 def _derive_postgres_env(env: dict[str, str]) -> dict[str, str]:
@@ -239,7 +335,9 @@ def cmd_infra(ns: argparse.Namespace) -> None:
     exec_ = _detect_exec()
 
     env_file = ENV_DEV if ns.env_file is None else Path(ns.env_file)
-    env = _derive_postgres_env(_effective_env(env_file=env_file))
+    env = _effective_env(env_file=env_file)
+    env = _normalize_env_for_compose(env)
+    env = _derive_postgres_env(env)
 
     if ns.action == "up":
         argv = _compose_argv(exec_, mode="dev", args=["up", "-d", "db", "cache"])
@@ -259,7 +357,10 @@ def _uv_run_manage(exec_: Exec, args: list[str], *, env_file: Path | None) -> No
         raise AppError(
             "uv is required for host Django commands but was not found on PATH."
         )
-    env = _derive_postgres_env(_effective_env(env_file=env_file))
+
+    env = _effective_env(env_file=env_file)
+    env = _normalize_env_for_host(env)
+    env = _derive_postgres_env(env)
     _run([exec_.uv, "run", "django_manage.py", *args], env=env)
 
 
@@ -293,8 +394,7 @@ def cmd_dev(ns: argparse.Namespace) -> None:
     if exec_.uv is None:
         raise AppError("uv is required for dev server but was not found on PATH.")
 
-    env = _derive_postgres_env(_effective_env(env_file=env_file))
-    _run([exec_.uv, "run", "django_manage.py", "runserver", ns.addr], env=env)
+    _uv_run_manage(exec_, ["runserver", ns.addr], env_file=env_file)
 
 
 def cmd_hooks(ns: argparse.Namespace) -> None:
@@ -322,7 +422,9 @@ def cmd_stack(ns: argparse.Namespace) -> None:
     else:
         env_file = Path(ns.env_file)
 
-    env = _derive_postgres_env(_effective_env(env_file=env_file))
+    env = _effective_env(env_file=env_file)
+    env = _normalize_env_for_compose(env)
+    env = _derive_postgres_env(env)
 
     starting_backend = ns.action in {"up", "restart"} and not ns.only_infra
     _warn_localhost_db_url_if_starting_backend(env, starting_backend=starting_backend)
