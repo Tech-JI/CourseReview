@@ -358,7 +358,7 @@ def cmd_stack(ns: argparse.Namespace) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="django_manage.py", description="Project management utility (dev/prod)."
+        prog="run.py", description="Project management utility (dev/prod)."
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
