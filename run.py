@@ -107,8 +107,7 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 def _effective_env(*, env_file: Path | None) -> dict[str, str]:
     """
-    Merge env sources with the priority you want:
-      OS env > env_file
+    Merge env sources with the priority OS env > env_file
     """
 
     merged: dict[str, str] = {}
@@ -169,6 +168,7 @@ def _normalize_env_for_compose(env: dict[str, str]) -> dict[str, str]:
     Rewrite localhost/127.0.0.1 -> db/cache
     for running inside the container network.
     """
+
     out = dict(env)
 
     db_url = out.get("DATABASE__URL")
@@ -339,15 +339,49 @@ def cmd_infra(ns: argparse.Namespace) -> None:
     env = _normalize_env_for_compose(env)
     env = _derive_postgres_env(env)
 
-    if ns.action == "up":
+    action = ns.action
+    if action == "down":
+        # 'down' is destructive in compose-land; for dev infra we want non-destructive.
+        print(
+            "[info] 'infra down' is treated as 'infra stop' (keeps DB volume). Use 'infra destroy' for a fresh DB."
+        )
+        action = "stop"
+
+    elif action == "up":
         argv = _compose_argv(exec_, mode="dev", args=["up", "-d", "db", "cache"])
         _run(argv, env=env)
-    elif ns.action == "down":
+
+    elif action == "stop":
+        argv = _compose_argv(exec_, mode="dev", args=["stop", "db", "cache"])
+        _run(argv, env=env)
+
+    elif action == "start":
+        # Start existing containers; if they don't exist yet, fall back to up.
+        argv = _compose_argv(exec_, mode="dev", args=["start", "db", "cache"])
+        try:
+            _run(argv, env=env)
+        except subprocess.CalledProcessError:
+            argv = _compose_argv(exec_, mode="dev", args=["up", "-d", "db", "cache"])
+            _run(argv, env=env)
+
+    elif action == "restart":
+        # Restart existing containers; if they don't exist yet, fall back to up.
+        argv = _compose_argv(exec_, mode="dev", args=["restart", "db", "cache"])
+        try:
+            _run(argv, env=env)
+        except subprocess.CalledProcessError:
+            argv = _compose_argv(exec_, mode="dev", args=["up", "-d", "db", "cache"])
+            _run(argv, env=env)
+
+    elif action == "destroy":
+        # Full teardown (may result in a fresh DB depending on podman-compose behavior/config).
         argv = _compose_argv(exec_, mode="dev", args=["down"])
         _run(argv, env=env)
-    elif ns.action == "ps":
+
+    elif action == "ps":
         argv = _compose_argv(exec_, mode="dev", args=["ps"])
         _run(argv, env=env)
+
     else:
         raise AppError(f"Unknown infra action: {ns.action!r}")
 
@@ -487,7 +521,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_infra = sub.add_parser(
         "infra", help="Manage dev infra containers (db/cache only)."
     )
-    p_infra.add_argument("action", choices=["up", "down", "ps"])
+    p_infra.add_argument(
+        "action", choices=["up", "start", "stop", "restart", "down", "destroy", "ps"]
+    )
     p_infra.add_argument(
         "--env-file",
         default=None,
