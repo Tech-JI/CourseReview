@@ -3,23 +3,23 @@ name = "course-review"
 requires-python = ">=3.14, <3.15"
 version = "0.0.1"
 dependencies = [
-    "beautifulsoup4>=4.14.3",
+    "beautifulsoup4>=4.14.0",
     "bpython>=0.26",
-    "dj-database-url>=3.1.2",
-    "django>=6.0.2",
+    "dj-database-url>=3.1.0",
+    "django>=6.0.0",
     "django-cors-headers>=4.9.0",
-    "django-debug-toolbar>=6.2.0",
+    "django-debug-toolbar>=6.3.0",
     "django-redis>=6.0.0",
-    "djangorestframework>=3.16.1",
-    "gunicorn>=25.1.0",
-    "httpx>=0.28.1",
-    "psycopg[binary]>=3.3.3",
+    "djangorestframework>=3.17.0",
+    "gunicorn>=26.0.0",
+    "httpx>=0.28.0",
+    "psycopg[binary]>=3.3.0",
     "python-dateutil>=2.9.0.post0",
-    "python-dotenv>=1.2.1",
-    "pytz>=2025.2",
-    "pyyaml>=6.0.3",
-    "redis>=7.2.1",
-    "requests>=2.32.5",
+    "python-dotenv>=1.2.0",
+    "pytz>=2026.2",
+    "pyyaml>=6.0.0",
+    "redis>=7.4.0",
+    "requests>=2.34.0",
 ]
 
 [tool.uv]
@@ -27,8 +27,8 @@ package = false
 
 [dependency-groups]
 dev = [
-    "prek>=0.3.3",
+    "prek>=0.4.0",
 ]
 lint = [
-    "ruff>=0.15.2",
+    "ruff>=0.15.0",
 ]
