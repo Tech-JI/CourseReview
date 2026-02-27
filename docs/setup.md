@@ -185,6 +185,97 @@ In GitHub Actions, the workflow uses service containers for:
 
 and runs tests through `./run.py test`, so the same env normalization logic is used in CI and locally.
 
+## Production deployment
+
+Recommended production model:
+
+- build the image in GitHub Actions
+- publish it to `ghcr.io`
+- pull it on the server with Podman
+- run containers with Quadlet
+- keep secrets on the server
+- deploy by image digest
+
+### Registry
+
+Image name:
+
+```text
+ghcr.io/tech-ji/coursereview
+```
+
+Use GitHub Actions to publish images manually for now, instead of building on every push.
+
+### Server user
+
+Create a dedicated service user and group:
+
+- user: `coursereview`
+- group: `coursereview`
+
+Enable lingering so rootless user services can run without login:
+
+```bash
+sudo loginctl enable-linger coursereview
+```
+
+### Server config layout
+
+Recommended:
+
+```text
+/etc/coursereview/
+  secrets.env
+  config.yaml
+```
+
+Suggested ownership and permissions:
+
+- directory owned by `root:coursereview`
+- `secrets.env` readable by group `coursereview`
+- `config.yaml` readable by group `coursereview`
+
+### Quadlet
+
+Use rootless Quadlet units under:
+
+```text
+~/.config/containers/systemd/
+```
+
+for the `coursereview` user.
+
+Typical units:
+
+- one network
+- one Postgres container
+- one Valkey container
+- one Django container
+
+### Deployment workflow
+
+Recommended deploy flow:
+
+1. trigger GitHub Actions to publish image
+2. get the image digest
+3. pull that exact image on the server
+4. run migrations using that image
+5. restart the backend service
+
+Prefer:
+
+```text
+ghcr.io/tech-ji/coursereview@sha256:...
+```
+
+over floating tags like `latest`.
+
+### Migrations
+
+Run migrations explicitly during deploy, before restarting the backend.
+
+Do not rely on container startup to hide migration failures.
+
 ## Static files and Django admin
 
 The Vue frontend is separate, but Django admin still needs Django static assets.
