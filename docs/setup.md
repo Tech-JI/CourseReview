@@ -1,150 +1,192 @@
-# Development
+# Setup and Operations
 
-## Environment
+This project has:
 
-- Ubuntu Linux (most modern Linux distros and MacOS are supposedly supported.)
+- a Django backend
+- a separate frontend repo deployed to Cloudflare Pages
 
-- Use your corresponding package manager. This guide uses ubuntu/debian's `apt`, python `uv`, modern javascript runtime, package manager `bun` and `podman`.
+The backend does **not** build or serve the frontend app.
+It only serves the API and Django admin.
 
-- python 3.10 to 3.13
+## Tech stack
 
-## Backend
+- Python 3.14
+- Django 6
+- PostgreSQL 18
+- Valkey 9
+- Podman
+- uv
+- ruff
+- ty
 
-1. `git clone git@github.com:TechJI-2023/CourseReview.git`
+## Prerequisites
 
-2. `cd CourseReview`
+Install:
 
-3. `git checkout dev`
+- `uv`
+- `podman`
+- `podman-compose` (required by `podman compose`)
 
-4. `uv sync --all-groups`
+## Repository setup
 
-5. `uv run prek install` (for installing git hook in .git)
+```bash
+git clone git@github.com:Tech-JI/CourseReview.git
+cd CourseReview
+./run.py init
+```
 
-6. Make directory for builds of static files: `mkdir staticfiles`
+`./run.py init` will:
 
-7. cp .env.example and rename it .env at root dir. The contents of PostgreSQL should be like:
+- create `.venv`
+- install dependencies
+- install hooks
+- create `.env` from `.env.example` if missing
+- create `config.yaml` from `config.yaml.example` if missing
 
-   ```ini
-   # PostgreSQL
-   DB_USER=admin
-   DB_PASSWORD=test
-   DB_HOST=127.0.0.1
-   DB_PORT=5432
-   REDIS_URL=redis://localhost:6379/0
-   SECRET_KEY=02247f40-a769-4c49-9178-4c038048e7ad
-   DEBUG=True
-   OFFERINGS_THRESHOLD_FOR_TERM_UPDATE=100
-   ```
+Then edit:
 
-8. Build static files: `make collect`
+- `.env`
+- `config.yaml`
 
-9. Configure database
+See `docs/config.md` for details.
 
-   1. Install Postgres:
+## Local development
 
-      - `sudo apt update`
+Recommended workflow:
 
-      - `sudo apt install postgresql`
+- run Postgres and Valkey in containers
+- run Django on the host
 
-   2. Create user postgres: `sudo -iu postgres`
+Start everything:
 
-   3. Initialize database: `initdb -D /var/lib/postgres/data`
+```bash
+./run.py dev
+```
 
-   4. Start postgresql service: `sudo systemctl start postgresql`. Run `sudo systemctl enable postgresql` to auto-start postgresql service on start-up.
+This will:
 
-   5. Switch to user postgres: `sudo -iu postgres`
+- start `db` and `cache`
+- run migrations
+- start Django at `127.0.0.1:8000`
 
-   6. `psql`
+### Common commands
 
-      1. Initialize coursereview database, user and privileges
+- Start only infra:
 
-         ```sql
-         CREATE DATABASE coursereview;
-         CREATE USER admin WITH PASSWORD 'test'; -- This is the same password of admin in .env file above.
-         GRANT ALL PRIVILEGES ON DATABASE coursereview TO admin;
-         ALTER DATABASE coursereview OWNER TO admin;
-         ```
+  ```bash
+  ./run.py infra up
+  ```
 
-      2. Get the path of config file:
+- Stop infra:
 
-         ```sql
-         SHOW config_file;
-         ```
+  ```bash
+  ./run.py infra stop
+  ```
 
-      3. Copy the path (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> by default)
+- Destroy infra:
 
-      4. Exit `psql` and switch back to normal user: `\q`, `exit`
+  ```bash
+  ./run.py infra destroy
+  ```
 
-   7. Configure postgres to listen on all interfaces (DO NOT do this in production): `sudo vim {Path to your config file}`, example: `sudo vim /etc/postgresql/14/main/postgresql.conf`. Find the line `listen_addresses`, modify it to:
+- Run migrations:
 
-      ```ini
-      listen_addresses = '0.0.0.0'
-      ```
+  ```bash
+  ./run.py django migrate
+  ```
 
-   8. Grant permission to connect to postgres from any IP (DO NOT do this in production): `sudo vim /etc/postgresql/14/main/pg_hba.conf` (maybe differ from your path, just change the command according to the copied path) and add a line:
+- Create migrations:
 
-      ```ini
-      host    all             all             0.0.0.0/0            md5
-      ```
+  ```bash
+  ./run.py django makemigrations
+  ```
 
-   9. Restart postgres service: `sudo systemctl restart postgresql`
+- Create superuser:
 
-   10. Auto setup database connection and static file routes in Django: `make migrate`, `make makemigrations`
+  ```bash
+  ./run.py django createsuperuser
+  ```
 
-10. Install cache database valkey: `sudo apt install valkey`, `sudo systemctl start valkey`. Run `sudo systemctl enable valkey` to auto-start valkey service on start-up.
+- Open Django shell:
 
-11. `make run` and visit <http://127.0.0.1:8000/>
+  ```bash
+  ./run.py django shell
+  ```
 
-12. Add local admin:
+- Run tests:
 
-    1. `make createsuperuser`. The email can be blank. Use a strong password in production.
+  ```bash
+  ./run.py test
+  ```
 
-    2. Enter interactive python shell: `make shell`. (Different from directly running `python` from shell.)
+- Pass extra pytest arguments:
 
-    3. Run following python codes in interactive shell:
+  ```bash
+  ./run.py test -- -q
+  ```
 
-       ```python
-       from django.contrib.auth.models import User
-       u = User.objects.last()
-       u.is_active = True
-       u.is_staff = True
-       u.is_superuser = True
-       u.save()
-       ```
+### Why `.env` uses `db` and `cache`
 
-13. Crawl data from JI official website:
+Keep this in `.env`:
 
-    1. Edit `COURSE_DETAIL_URL_PREFIX` in `apps/spider/crawlers/orc.py`: Add a number after url param `id` like this: `...?id=23`, so only course id starting from 23 (e.g. 230-239, 2300) will be crawled, so as to save time during development. Remember not to commit this change.
+```env
+DATABASE__URL=postgres://admin:test@db:5432/coursereview
+REDIS__URL=redis://cache:6379/0
+```
 
-    2. Enter interactive python shell: `make shell`.
+This works for both cases:
 
-    3. Run following python codes in interactive shell:
+- Podman Compose uses `db` and `cache` directly
+- host-side commands automatically rewrite them to `127.0.0.1`
 
-       ```python
-       from scripts import crawl_and_import_data
-       crawl_and_import_data()
-       ```
+So do not switch `.env` back and forth between `db` and `localhost`.
 
-## Frontend
+## Full container stack
 
-Two ways to run/develop the frontend:
+If you want to run the entire backend stack in containers:
 
-1. Git submodule (in `CourseReview/frontend`):
+```bash
+./run.py stack up --mode dev --build
+```
 
-   - `cd CourseReview` and run `git submodule update --init --recursive`
-   - Dev server: `make dev-frontend` (visit http://127.0.0.1:5173/)
-   - Development workflow: `cd CourseReview/frontend` (treat it like a normal repo)
+Run migrations in the stack:
 
-2. Separate repo (frontend only):
-   - `cd <your-projects-dir>` and run `git clone git@github.com:Tech-JI/CourseFront.git`
-   - Dev server: `cd CourseFront` then `bun run dev` (visit http://127.0.0.1:5173/)
+```bash
+./run.py stack migrate --mode dev
+```
 
-### Set up
+Inspect services:
 
-From the frontend directory (`CourseReview/frontend` or `CourseFront`):
+```bash
+./run.py stack ps --mode dev
+./run.py stack logs --mode dev
+```
 
-1. `cp .env.example .env`
+Stop the stack:
 
-2. `bun install`
+```bash
+./run.py stack down --mode dev
+```
 
-3. `bun run prek install` (set up git hooks)
+## CI testing
+
+Tests are run with `pytest`.
+
+Locally:
+
+```bash
+./run.py test
+```
+
+In GitHub Actions, the workflow uses service containers for:
+
+- `db`
+- `cache`
+
+and runs tests through `./run.py test`, so the same env normalization logic is used in CI and locally.
+
+## Static files and Django admin
+
+The Vue frontend is separate, but Django admin still needs Django static assets.
+
+So production still needs a static-files strategy for admin, typically `collectstatic`
