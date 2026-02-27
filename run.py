@@ -398,6 +398,18 @@ def _uv_run_manage(exec_: Exec, args: list[str], *, env_file: Path | None) -> No
     _run([exec_.uv, "run", "django_manage.py", *args], env=env)
 
 
+def _uv_run_pytest(
+    exec_: Exec, pytest_args: list[str], *, env_file: Path | None
+) -> None:
+    if exec_.uv is None:
+        raise AppError("uv is required for host tests but was not found on PATH.")
+
+    env = _effective_env(env_file=env_file)
+    env = _normalize_env_for_host(env)
+    env = _derive_postgres_env(env)
+    _run([exec_.uv, "run", "pytest", *pytest_args], env=env)
+
+
 def cmd_django(ns: argparse.Namespace) -> None:
     exec_ = _detect_exec()
     env_file = ENV_DEV if ns.env_file is None else Path(ns.env_file)
@@ -413,6 +425,17 @@ def cmd_django(ns: argparse.Namespace) -> None:
             _uv_run_manage(exec_, ["createsuperuser"], env_file=env_file)
         case _:
             raise AppError(f"Unknown django action: {ns.action!r}")
+
+
+def cmd_test(ns: argparse.Namespace) -> None:
+    exec_ = _detect_exec()
+    env_file = ENV_DEV if ns.env_file is None else Path(ns.env_file)
+
+    pytest_args = list(ns.pytest_args)
+    if pytest_args and pytest_args[0] == "--":
+        pytest_args = pytest_args[1:]
+
+    _uv_run_pytest(exec_, pytest_args, env_file=env_file)
 
 
 def cmd_dev(ns: argparse.Namespace) -> None:
@@ -541,6 +564,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--env-file", default=None, help="Env file used for Django (default: .env)."
     )
     p_dj.set_defaults(func=cmd_django)
+
+    p_test = sub.add_parser(
+        "test",
+        help="Run pytest on host (via uv) with host env normalization.",
+    )
+    p_test.add_argument(
+        "--env-file", default=None, help="Env file used for tests (default: .env)."
+    )
+    p_test.add_argument(
+        "pytest_args",
+        nargs=argparse.REMAINDER,
+        help="Arguments passed through to pytest. Use '--' before pytest flags.",
+    )
+    p_test.set_defaults(func=cmd_test)
 
     p_dev = sub.add_parser(
         "dev",
