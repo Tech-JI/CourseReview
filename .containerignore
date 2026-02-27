@@ -4,6 +4,7 @@ run.py
 .venv
 .env
 .ruff_cache
+.pytest_cache
 frontend
 .github
 docs
