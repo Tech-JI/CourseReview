@@ -152,7 +152,7 @@ TEMPLATES = [
     }
 ]
 
-STATIC_URL = "/dummy/"  # Required by Django staticfiles but not used in this setup
+STATIC_URL = "/static/"  # Required by Django staticfiles but not used in this setup
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-us"
