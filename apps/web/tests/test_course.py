@@ -180,33 +180,6 @@ class TestCourseAPIUnauthenticated:
 
 @pytest.mark.django_db
 class TestCourseAPIAuthenticated:
-    def test_filter_courses_by_department_authenticated(
-        self, auth_client, course_factory
-    ):
-        course_factory(department="MATH", course_code="MATH101J")
-        course_factory(department="PHYS", course_code="PHYS101J")
-
-        url = reverse("courses_api")
-        response = auth_client.get(url, {"department": "MATH"})
-
-        assert response.status_code == 200
-        assert response.data["count"] == 1
-        assert response.data["results"][0]["course_code"] == "MATH101J"
-
-    def test_filter_courses_by_code_authenticated(self, auth_client, course_factory):
-        course_factory(course_code="PHYS101J")
-        course_factory(course_code="MATH102J")
-        course_factory(course_code="MATH101J")
-
-        url = reverse("courses_api")
-
-        response = auth_client.get(url, {"code": "MATH"})
-        assert response.status_code == 200
-        assert response.data["count"] == 2
-
-        response = auth_client.get(url, {"code": "101"})
-        assert response.data["count"] == 2
-
     def test_sort_by_review_count(self, auth_client, user, course_factory):
         c_hot = course_factory(course_code="ENGR101J")
         course_factory(course_code="ENGR100J")
@@ -222,25 +195,6 @@ class TestCourseAPIAuthenticated:
         results = response.data["results"]
         assert results[0]["course_code"] == "ENGR101J"
         assert results[1]["course_code"] == "ENGR100J"
-
-    def test_sort_courses_by_score(self, auth_client, user, course_factory):
-        c1 = course_factory(course_code="MATH101J")
-        Vote.objects.create(
-            user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
-        )
-
-        c2 = course_factory(course_code="MATH102J")
-        Vote.objects.create(
-            user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
-        )
-
-        url = reverse("courses_api")
-
-        response = auth_client.get(
-            url, {"sort_by": "quality_score", "sort_order": "desc"}
-        )
-        assert response.status_code == 200
-        assert response.data["results"][0]["course_code"] == "MATH101J"
 
     def test_filter_courses_by_quality(self, auth_client, user, course_factory):
         c1 = course_factory(course_code="MATH101J")
@@ -278,6 +232,25 @@ class TestCourseAPIAuthenticated:
 
         assert response.status_code == 200
         assert response.data["count"] == 1
+        assert response.data["results"][0]["course_code"] == "MATH101J"
+
+    def test_sort_courses_by_quality_score(self, auth_client, user, course_factory):
+        c1 = course_factory(course_code="MATH101J")
+        Vote.objects.create(
+            user=user, course=c1, value=5, category=Vote.CATEGORIES.QUALITY
+        )
+
+        c2 = course_factory(course_code="MATH102J")
+        Vote.objects.create(
+            user=user, course=c2, value=1, category=Vote.CATEGORIES.QUALITY
+        )
+
+        url = reverse("courses_api")
+
+        response = auth_client.get(
+            url, {"sort_by": "quality_score", "sort_order": "desc"}
+        )
+        assert response.status_code == 200
         assert response.data["results"][0]["course_code"] == "MATH101J"
 
     def test_sort_courses_by_difficulty_score(self, auth_client, user, course_factory):
