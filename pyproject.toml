@@ -28,8 +28,16 @@ package = false
 
 [dependency-groups]
 dev = [
+    "factory-boy>=3.3.3",
     "prek>=0.2.24",
+    "pytest>=9.0.2",
+    "pytest-django>=4.11.1",
 ]
 lint = [
     "ruff==0.14.5",
 ]
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "website.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--reuse-db --strict-markers --ignore=apps/web/tests/lib_tests"
+testpaths = ["apps"]
