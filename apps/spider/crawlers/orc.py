@@ -7,35 +7,11 @@ from lib.constants import CURRENT_TERM
 
 BASE_URL = "https://www.ji.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
-# ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
-# ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
     "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 UNDERGRAD_URL = ORC_BASE_URL
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
-
-# SUPPLEMENT_URL = "http://dartmouth.smartcatalogiq.com/en/2016s/Supplement/Courses"
-
-# COURSE_HEADING_CORRECTIONS = {
-#     "COLT": {"7 First Year Seminars": "COLT 7 First Year Seminars"},
-#     "GRK": {"GRK 1.02-3.02 Intensive Greek": "GRK 1.02 Intensive Greek"},
-#     "INTS": {
-#         "INTS INTS 17.04 Migration Stories": "INTS 17.04 Migration Stories",
-#     },
-#     "MALS": {
-#         "MALS MALS 368 Seeing and Feeling in Early Modern Europe": (
-#             "MALS 368 Seeing and Feeling in Early Modern Europe"
-#         ),
-#     },
-#     "PSYC": {"$name": None},
-#     "QBS": {
-#         "Quantitative Biomedical Sciences 132-2 Molecular Markers in Human "
-#         "Health Studies Lab": (
-#             "QBS 132.02 Molecular Markers in Human Health Studies Lab"
-#         ),
-#     },
-# }
 
 
 def crawl_program_urls():
@@ -122,18 +98,6 @@ def _crawl_course_data(course_url):
             "url": course_url,
         }
         return result
-        # return {
-        #     "course_code": "QWER1234J",
-        #     "course_title": "Test Course",
-        #     "department": "QWER",
-        #     "number": 1234,
-        #     "course_credits": 4,
-        #     "pre_requisites": None,
-        #     "description": "This is a test course",
-        #     "course_topics": ["Test Topic"],
-        #     "instructors": ["Test Instructor"],
-        #     "url": course_url,
-        # }
 
 
 def import_department(department_data):
