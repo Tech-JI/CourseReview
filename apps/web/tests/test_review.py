@@ -143,6 +143,12 @@ class TestReviewAPIAuthenticated:
         response = auth_client.get(other_review_detail_url)
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_delete_non_existent_id(self, auth_client):
+        """17. Verify deletion of non-existent review ID returns 404."""
+        url = reverse("user_review_api", kwargs={"review_id": 99999})
+        response = auth_client.delete(url)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
     def test_post_to_invalid_course_id(self, auth_client, valid_review_data):
         """18. Verify posting to non-existent course ID returns 404."""
         url = reverse("course_review_api", kwargs={"course_id": 88888})
