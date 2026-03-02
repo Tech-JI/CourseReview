@@ -27,9 +27,10 @@ from apps.web.serializers import (
 )
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
+from lib.logging import add_sanitization_to_logger
 from lib.terms import numeric_value_of_term
 
-logger = logging.getLogger(__name__)
+logger = add_sanitization_to_logger(logging.getLogger(__name__))
 
 
 class CoursesPagination(pagination.PageNumberPagination):
@@ -47,7 +48,7 @@ def user_status(request):
         - Anonymous user: {"isAuthenticated": false}
     """
     if request.user.is_authenticated:
-        logger.info("User is authenticated")
+        logger.info("User is authenticated, user_id=%d", request.user.id)
         return Response({"isAuthenticated": True, "username": request.user.username})
     else:
         logger.info("User is not authenticated")
@@ -284,7 +285,7 @@ class CoursesReviewsAPI(
         # Validate and save review using ReviewSerializer
         serializer = ReviewSerializer(data=request.data)
         if not serializer.is_valid():
-            logger.warning("Review serializer errors: %s", serializer.errors)
+            logger.warning("Failed to validate review for course %d, user %d, serializer errors: %r", course.id, request.user.id, serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save(course=course, user=request.user)
@@ -574,7 +575,7 @@ def review_vote_api(request, review_id):
 
     if kudos_count is None or dislike_count is None:
         # Review doesn't exist
-        logger.warning("Review %s not found for voting", str(review_id))
+        logger.warning("Review %r not found for voting, user_id=%d", review_id, request.user.id)
         return Response({"detail": "Review not found"}, status=404)
 
     return Response(
