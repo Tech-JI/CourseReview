@@ -51,5 +51,6 @@ jobs:
     - name: Test with pytest
       env:
         DATABASE__URL: postgres://admin:test@localhost:5432/coursereview
+        SECRET_KEY: 02247f40-a769-4c49-9178-4c038048e7ad
       run: |
         uv run pytest
