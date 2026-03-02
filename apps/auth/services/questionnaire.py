@@ -52,11 +52,7 @@ async def get_latest_answer(
     action: str,
     account: str,
 ) -> tuple[dict | None, ServiceError | None]:
-    """Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions).
-    Returns a tuple of (filtered_data, error_response).
-    `filtered_data` contains: id, submitted_at, user.account, and otp.
-    `error_response` is a DRF Response object if an error occurs, otherwise None.
-    """
+    """Fetch the latest questionnaire answer for a given account from the WJ API(specific api for actions)."""
 
     details = get_survey_details(action)
     if not details:

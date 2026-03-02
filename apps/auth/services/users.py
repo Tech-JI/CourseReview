@@ -17,11 +17,7 @@ def create_user_session(
     request,
     account,
 ) -> tuple[AbstractUser | None, ServiceError | None]:
-    """Helper function includes session management, user creation and Student model integration.
-    Returns a tuple of (user, error_response).
-    `user` is the user object on success, otherwise None.
-    `error_response` is a DRF Response object if an error occurs, otherwise None.
-    """
+    """Helper function includes session management, user creation and Student model integration."""
 
     try:
         # Ensure session exists - create one if it doesn't exist
