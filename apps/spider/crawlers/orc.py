@@ -138,6 +138,9 @@ def _crawl_course_data(course_url):
 
 def import_department(department_data):
     for course_data in department_data:
+        if not course_data:
+            continue
+
         course, created = Course.objects.update_or_create(
             course_code=course_data["course_code"],
             defaults={

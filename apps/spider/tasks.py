@@ -55,8 +55,16 @@ def crawl_orc():
     program_urls = orc.crawl_program_urls()
     print(f"Found {len(program_urls)} program URLs")
     # assert len(program_urls) > 50
-    for url in program_urls:
-        crawl_program_url.delay(url)
+    new_data = [
+        course_data
+        for course_data in (orc._crawl_course_data(url) for url in sorted(program_urls))
+        if course_data
+    ]
+    CrawledData.objects.handle_new_crawled_data(
+        new_data,
+        "orc_department_courses",
+        CrawledData.ORC_DEPARTMENT_COURSES,
+    )
     return sorted(program_urls)
 
 
