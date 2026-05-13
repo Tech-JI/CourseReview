@@ -68,9 +68,17 @@ def _crawl_course_data(course_url):
         split_course_heading = course_heading.split(" – ")
         children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
 
-        course_code = split_course_heading[0]
-        department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
-        number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
+        raw_course_code = split_course_heading[0].strip()
+        course_code_match = re.match(
+            r"^(?P<department>[A-Z]{2,4})(?P<number>\d{3,4}J?)", raw_course_code
+        )
+        if not course_code_match:
+            return None
+
+        department = course_code_match.group("department")
+        number_text = course_code_match.group("number").removesuffix("J")
+        number = int(number_text)
+        course_code = f"{department}{course_code_match.group('number')}"
         course_title = split_course_heading[1]
 
         course_credits = 0

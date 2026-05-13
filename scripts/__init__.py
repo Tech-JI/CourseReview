@@ -39,9 +39,11 @@ def crawl_and_import_data():
 
 
 def _import_crawled_datas(data_type):
+    from apps.spider.tasks import import_pending_crawled_data
+
     for crawled_data in CrawledData.objects.filter(data_type=data_type):
         if crawled_data.has_change():
-            crawled_data.approve_change()
+            import_pending_crawled_data(crawled_data.pk)
 
 
 # WARNING: Only use when already have course data but not instructor data
