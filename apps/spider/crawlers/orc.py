@@ -5,12 +5,12 @@ from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
-BASE_URL = "https://www.ji.sjtu.edu.cn/"
+BASE_URL = "https://gc.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 # ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
 # ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
+    "https://gc.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 UNDERGRAD_URL = ORC_BASE_URL
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
@@ -82,7 +82,8 @@ def _crawl_course_data(course_url):
         for i, child in enumerate(children):
             text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
             if "Credits:" in text:
-                course_credits = int(re.findall(r"\d+", text)[0])
+                credits_match = re.search(r"Credits:\s*(\d+)", text)
+                course_credits = int(credits_match.group(1)) if credits_match else 0
             elif "Pre-requisites:" in text:
                 pre_requisites = extract_prerequisites(text)
             elif "Description:" in text:
