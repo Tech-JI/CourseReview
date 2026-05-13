@@ -45,10 +45,12 @@ class CrawledData(models.Model):
     MEDIANS = "medians"
     ORC_DEPARTMENT_COURSES = "orc_department_courses"
     COURSE_TIMETABLE = "course_timetable"
+    COURSE_OFFERINGS = "course_offerings"
     DATA_TYPE_CHOICES = (
         (MEDIANS, "Medians"),
         (ORC_DEPARTMENT_COURSES, "ORC Department Courses"),
         (COURSE_TIMETABLE, "Course Timetable"),
+        (COURSE_OFFERINGS, "Course Offerings"),
     )
     objects = CrawledDataManager()
 
@@ -102,4 +104,7 @@ class CrawledData(models.Model):
     def approve_change(self):
         from apps.spider.tasks import import_pending_crawled_data
 
-        import_pending_crawled_data.delay(self.pk)
+        if settings.DEBUG or import_pending_crawled_data.app.conf.task_always_eager:
+            import_pending_crawled_data(self.pk)
+        else:
+            import_pending_crawled_data.delay(self.pk)

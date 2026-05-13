@@ -1,8 +1,8 @@
-# from apps.spider.crawlers import medians, orc, timetable
+# from apps.spider.crawlers import medians, timetable
 from celery import shared_task
 from django.db import transaction
 
-from apps.spider.crawlers import orc
+from apps.spider.crawlers import offerings, orc
 from apps.spider.models import CrawledData
 from lib import task_utils
 
@@ -20,6 +20,8 @@ def import_pending_crawled_data(crawled_data_pk):
     # elif
     if crawled_data.data_type == CrawledData.ORC_DEPARTMENT_COURSES:
         orc.import_department(crawled_data.pending_data)
+    elif crawled_data.data_type == CrawledData.COURSE_OFFERINGS:
+        offerings.import_offerings(crawled_data.pending_data)
     # else:
     #     assert crawled_data.data_type == CrawledData.COURSE_TIMETABLE
     #     timetable.import_timetable(crawled_data.pending_data)
@@ -66,6 +68,19 @@ def crawl_orc():
         CrawledData.ORC_DEPARTMENT_COURSES,
     )
     return sorted(program_urls)
+
+
+@shared_task
+@task_utils.email_if_fails
+def crawl_offerings():
+    print("Starting crawl_offerings")
+    new_data = offerings.crawl_offerings()
+    CrawledData.objects.handle_new_crawled_data(
+        new_data,
+        "present_course_offerings",
+        CrawledData.COURSE_OFFERINGS,
+    )
+    return new_data
 
 
 @shared_task
