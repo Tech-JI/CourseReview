@@ -240,7 +240,7 @@ def verify_callback_api(request):
         otp_data = json.loads(otp_data_raw.decode("utf-8"))
         expected_temp_token = otp_data.get("temp_token")
         initiated_at = otp_data.get("initiated_at")
-    except (json.JSONDecodeError, AttributeError):
+    except json.JSONDecodeError, AttributeError:
         logger.error("Invalid OTP data format in verify_callback_api")
         return Response({"error": "Invalid OTP data format"}, status=401)
 
@@ -268,7 +268,7 @@ def verify_callback_api(request):
                 status=401,
             )
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.error("Error parsing submission timestamp")
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
