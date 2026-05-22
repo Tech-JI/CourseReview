@@ -46,7 +46,7 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.error(
             "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )

@@ -1,0 +1,78 @@
+name: pytest
+
+on:
+  push:
+    branches: ["dev", "main"]
+  pull_request:
+    branches: ["dev", "main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: coursereview
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U admin -d coursereview"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      cache:
+        image: valkey/valkey:9-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SECRET_KEY: 02247f40-a769-4c49-9178-4c038048e7ad
+      DATABASE__URL: postgres://admin:test@db:5432/coursereview
+      REDIS__URL: redis://cache:6379/0
+
+      TURNSTILE_SECRET_KEY: dummy0
+
+      QUEST__SIGNUP__API_KEY: dummy1
+      QUEST__SIGNUP__URL: https://wj.sjtu.edu.cn/q/dummy0
+      QUEST__SIGNUP__QUESTIONID: "10000000"
+
+      QUEST__LOGIN__API_KEY: dummy2
+      QUEST__LOGIN__URL: https://wj.sjtu.edu.cn/q/dummy1
+      QUEST__LOGIN__QUESTIONID: "10000001"
+
+      QUEST__RESET__API_KEY: dummy3
+      QUEST__RESET__URL: https://wj.sjtu.edu.cn/q/dummy2
+      QUEST__RESET__QUESTIONID: "10000002"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Run pytest
+        run: python run.py test
