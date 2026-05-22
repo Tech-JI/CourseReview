@@ -36,7 +36,7 @@ on:
   public:
   pull_request:
     branches:
-      - '*'
+      - "*"
     types: [opened, reopened]
   pull_request_review:
     types: [edited, dismissed, submitted]
@@ -46,7 +46,7 @@ on:
     types: [assigned, opened, synchronize, reopened]
   push:
     branches:
-      - '*'
+      - "*"
   registry_package:
     types: [published]
   release:

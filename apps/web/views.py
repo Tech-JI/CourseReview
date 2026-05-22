@@ -134,7 +134,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
                 try:
                     threshold = int(param_value)
                     queryset = queryset.filter(**{f"{field_name}__gte": threshold})
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
         return queryset
 

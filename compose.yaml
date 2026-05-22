@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:18-alpine
+    volumes:
+      - postgres18_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-coursereview}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-test}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-coursereview}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  cache:
+    image: valkey/valkey:9-alpine
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: coursereview-backend
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      GUNICORN_CMD_ARGS: "--control-socket /tmp/gunicorn.ctl --worker-tmp-dir /tmp"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/api/user/status/',timeout=5)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  migrate:
+    image: coursereview-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "django_manage.py", "migrate"]
+    restart: "no"
+
+volumes:
+  postgres18_data:

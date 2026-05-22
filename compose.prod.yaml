@@ -1,0 +1,20 @@
+services:
+  backend:
+    ports:
+      - "8000:8000"
+    env_file:
+      - /etc/coursereview/secrets.env
+    environment:
+      DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
+      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+    volumes:
+      - /etc/coursereview/config.yaml:/app/config.yaml:ro
+
+  migrate:
+    env_file:
+      - /etc/coursereview/secrets.env
+    environment:
+      DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
+      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+    volumes:
+      - /etc/coursereview/config.yaml:/app/config.yaml:ro
