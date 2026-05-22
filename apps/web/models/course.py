@@ -41,7 +41,7 @@ class CourseManager(models.Manager):
         elif len(department_or_query) not in self.DEPARTMENT_LENGTHS:
             # must be query, too long to be department. ignore numbers we may
             # have. e.g. "Introduction"
-            return Course.objects.filter(title__icontains=department_or_query)
+            return Course.objects.filter(course_title__icontains=department_or_query)
         # elif number and subnumber:
         #     # course with number and subnumber
         #     # e.g. COSC 089.01
@@ -140,7 +140,7 @@ class Course(models.Model):
         ]
 
     def __unicode__(self):
-        return "{}: {}".format(self.short_name(), self.title)
+        return "{}: {}".format(self.short_name(), self.course_title)
 
     def get_absolute_url(self):
         return reverse("course_detail", args=[self.id])

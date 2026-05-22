@@ -1,0 +1,56 @@
+# This workflow will install Python dependencies, run tests with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+  pull_request:
+    branches: [ "dev", "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+        postgres:
+          image: postgres:18
+          env:
+            POSTGRES_DB: coursereview
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: test
+          ports:
+            - 5432:5432
+          options: >-
+            --health-cmd pg_isready
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install python
+      uses: actions/setup-python@v6
+      with:
+          python-version-file: "pyproject.toml"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+        version: "0.10.7"
+
+    - name: Install the project
+      run: uv sync --group dev
+
+    - name: Test with pytest
+      env:
+        DATABASE__URL: postgres://admin:test@localhost:5432/coursereview
+        SECRET_KEY: 02247f40-a769-4c49-9178-4c038048e7ad
+      run: |
+        uv run pytest
