@@ -2,8 +2,8 @@ from django.db import transaction
 
 from apps.spider.models import CrawledData
 
-# from apps.spider.tasks import crawl_medians, crawl_orc, crawl_timetable
-from apps.spider.tasks import crawl_orc
+# from apps.spider.tasks import crawl_medians, crawl_timetable
+from apps.spider.tasks import crawl_offerings, crawl_orc
 from apps.spider.utils import retrieve_soup
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
@@ -20,8 +20,8 @@ def crawl_and_import_data():
     print("Crawling ORC. This will take a while.")
     crawl_orc()
 
-    # print("Crawling timetable")
-    # crawl_timetable()
+    print("Crawling course offerings")
+    crawl_offerings()
 
     # print("Crawling medians")
     # crawl_medians()
@@ -29,8 +29,8 @@ def crawl_and_import_data():
     print("Importing ORC")
     _import_crawled_datas(CrawledData.ORC_DEPARTMENT_COURSES)
 
-    # print("Importing timetable")
-    # _import_crawled_datas(CrawledData.COURSE_TIMETABLE)
+    print("Importing course offerings")
+    _import_crawled_datas(CrawledData.COURSE_OFFERINGS)
 
     # print("Importing medians")
     # _import_crawled_datas(CrawledData.MEDIANS)
@@ -39,9 +39,11 @@ def crawl_and_import_data():
 
 
 def _import_crawled_datas(data_type):
+    from apps.spider.tasks import import_pending_crawled_data
+
     for crawled_data in CrawledData.objects.filter(data_type=data_type):
         if crawled_data.has_change():
-            crawled_data.approve_change()
+            import_pending_crawled_data(crawled_data.pk)
 
 
 # WARNING: Only use when already have course data but not instructor data

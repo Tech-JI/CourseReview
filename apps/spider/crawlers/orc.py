@@ -5,10 +5,10 @@ from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
-BASE_URL = "https://www.ji.sjtu.edu.cn/"
+BASE_URL = "https://gc.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
+    "https://gc.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 UNDERGRAD_URL = ORC_BASE_URL
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
@@ -44,9 +44,17 @@ def _crawl_course_data(course_url):
         split_course_heading = course_heading.split(" – ")
         children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
 
-        course_code = split_course_heading[0]
-        department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
-        number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
+        raw_course_code = split_course_heading[0].strip()
+        course_code_match = re.match(
+            r"^(?P<department>[A-Z]{2,4})(?P<number>\d{3,4}J?)", raw_course_code
+        )
+        if not course_code_match:
+            return None
+
+        department = course_code_match.group("department")
+        number_text = course_code_match.group("number").removesuffix("J")
+        number = int(number_text)
+        course_code = f"{department}{course_code_match.group('number')}"
         course_title = split_course_heading[1]
 
         course_credits = 0
@@ -58,7 +66,8 @@ def _crawl_course_data(course_url):
         for i, child in enumerate(children):
             text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
             if "Credits:" in text:
-                course_credits = int(re.findall(r"\d+", text)[0])
+                credits_match = re.search(r"Credits:\s*(\d+)", text)
+                course_credits = int(credits_match.group(1)) if credits_match else 0
             elif "Pre-requisites:" in text:
                 pre_requisites = extract_prerequisites(text)
             elif "Description:" in text:
@@ -102,6 +111,9 @@ def _crawl_course_data(course_url):
 
 def import_department(department_data):
     for course_data in department_data:
+        if not course_data:
+            continue
+
         course, created = Course.objects.update_or_create(
             course_code=course_data["course_code"],
             defaults={
