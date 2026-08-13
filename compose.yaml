@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:18-alpine
     volumes:
-      - postgres18_data:/var/lib/postgresql/data
+      - postgres18_data:/var/lib/postgresql
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-coursereview}
       POSTGRES_USER: ${POSTGRES_USER:-admin}
@@ -23,8 +23,11 @@ services:
       retries: 5
     restart: unless-stopped
 
-  backend:
+  CourseReview:
     image: coursereview-backend
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +59,14 @@ services:
       PYTHONUNBUFFERED: "1"
     command: ["python", "django_manage.py", "migrate"]
     restart: "no"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run --protocol http2 --token ${TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      CourseReview:
+        condition: service_healthy
 
 volumes:
   postgres18_data:
