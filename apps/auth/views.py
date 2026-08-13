@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 AUTH_SETTINGS = settings.AUTH
-OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+OTP_TIMEOUT = int(AUTH_SETTINGS["OTP_TIMEOUT"])
 TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
 ACTION_LIST = AUTH_SETTINGS["ACTION_LIST"]
 TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
@@ -240,7 +240,7 @@ def verify_callback_api(request):
         otp_data = json.loads(otp_data_raw.decode("utf-8"))
         expected_temp_token = otp_data.get("temp_token")
         initiated_at = otp_data.get("initiated_at")
-    except json.JSONDecodeError, AttributeError:
+    except (json.JSONDecodeError, AttributeError):  # fmt: skip
         logger.error("Invalid OTP data format in verify_callback_api")
         return Response({"error": "Invalid OTP data format"}, status=401)
 
@@ -261,15 +261,35 @@ def verify_callback_api(request):
 
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
-        # Additional validation: check submission is after initiation and within window
-        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIMEOUT:
+        # Additional validation: check submission is after initiation and within window.
+        # The WJ platform's server clock is measurably slow (~39s, verified via
+        # its HTTP Date header), so tolerate a small negative offset instead of
+        # rejecting valid submissions.
+        timestamp_tolerance = 60
+        if (
+            submitted_at + timestamp_tolerance < initiated_at
+            or (submitted_at - initiated_at) > OTP_TIMEOUT
+        ):
+            logger.warning(
+                "Submission timestamp outside validity window: "
+                "submitted_at=%s initiated_at=%s diff=%.1fs",
+                submitted_at,
+                initiated_at,
+                submitted_at - initiated_at,
+            )
             return Response(
                 {"error": "Submission timestamp outside validity window"},
                 status=401,
             )
 
-    except ValueError, TypeError:
-        logger.error("Error parsing submission timestamp")
+    except (ValueError, TypeError) as e:
+        logger.error(
+            "Error parsing submission timestamp: submitted_at_str=%r "
+            "initiated_at=%r exception=%s",
+            locals().get("submitted_at_str"),
+            locals().get("initiated_at"),
+            e,
+        )
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
     # Step 7: Update state to verified and add user details

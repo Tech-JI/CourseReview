@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
 PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
-OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+OTP_TIMEOUT = int(AUTH_SETTINGS["OTP_TIMEOUT"])
 EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
 
 QUEST_SETTINGS = settings.QUEST
@@ -46,7 +46,7 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         logger.error(
             "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )
@@ -59,35 +59,75 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
     }
 
 
+# Dedicated network timeout for the siteverify HTTP call. Kept short and
+# separate from OTP_TIMEOUT: the OTP window is a business rule, not a
+# network deadline.
+TURNSTILE_VERIFY_TIMEOUT = 15
+TURNSTILE_VERIFY_RETRIES = 3
+
+
 async def verify_turnstile_token(
     turnstile_token, client_ip
 ) -> tuple[bool, Response | None]:
     """Helper function to verify Turnstile token with Cloudflare's API"""
 
-    try:
-        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
-            response = await client.post(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                data={
-                    "secret": settings.TURNSTILE_SECRET_KEY,
-                    "response": turnstile_token,
-                    "remoteip": client_ip,
-                },
+    last_error: Exception | None = None
+    for attempt in range(TURNSTILE_VERIFY_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=TURNSTILE_VERIFY_TIMEOUT) as client:
+                response = await client.post(
+                    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                    data={
+                        "secret": settings.TURNSTILE_SECRET_KEY,
+                        "response": turnstile_token,
+                        "remoteip": client_ip,
+                    },
+                )
+            try:
+                data = response.json()
+            except ValueError:
+                logger.error(
+                    "Turnstile siteverify returned non-JSON: status=%s body=%s",
+                    response.status_code,
+                    response.text[:200],
+                )
+                return False, Response(
+                    {"error": "Turnstile verification error"}, status=502
+                )
+            if not data.get("success"):
+                logger.warning("Turnstile verification failed: %s", data)
+                return False, Response(
+                    {"error": "Turnstile verification failed"}, status=403
+                )
+            return True, None
+        except httpx.TimeoutException as e:
+            last_error = e
+            logger.warning(
+                "Turnstile verification timed out (attempt %d/%d)",
+                attempt + 1,
+                TURNSTILE_VERIFY_RETRIES,
             )
-        if not response.json().get("success"):
-            logger.warning("Turnstile verification failed: %s", response.json())
+        except httpx.HTTPError as e:
+            # ConnectError / ReadError etc.: transient network failures.
+            last_error = e
+            logger.warning(
+                "Turnstile verification network error (attempt %d/%d): %s",
+                attempt + 1,
+                TURNSTILE_VERIFY_RETRIES,
+                e,
+            )
+        except Exception:
+            logger.exception("Turnstile verification error")
             return False, Response(
-                {"error": "Turnstile verification failed"}, status=403
+                {"error": "Turnstile verification error"}, status=500
             )
-        return True, None
-    except httpx.TimeoutException:
-        logger.error("Turnstile verification timed out")
-        return False, Response(
-            {"error": "Turnstile verification timed out"}, status=504
-        )
-    except Exception:
-        logger.error("Turnstile verification error")
-        return False, Response({"error": "Turnstile verification error"}, status=500)
+
+    logger.error(
+        "Turnstile verification failed after %d attempts: %s",
+        TURNSTILE_VERIFY_RETRIES,
+        last_error,
+    )
+    return False, Response({"error": "Turnstile verification timed out"}, status=504)
 
 
 async def get_latest_answer(
@@ -133,7 +173,7 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TURNSTILE_VERIFY_TIMEOUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,
@@ -153,7 +193,10 @@ async def get_latest_answer(
             status=500,
         )
     except Exception:
-        logger.error("An unexpected error occurred")
+        logger.exception(
+            "Questionnaire API returned unexpected response: %s",
+            response.text[:200] if "response" in locals() else "(no response)",
+        )
         return None, Response({"error": "An unexpected error occurred"}, status=500)
 
     # Filter and return only the required fields from the first row
