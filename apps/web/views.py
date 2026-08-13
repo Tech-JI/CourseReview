@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.db.models import Count, Prefetch, Q
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, mixins, pagination, status
 from rest_framework.decorators import (
     api_view,
@@ -36,6 +37,7 @@ class CoursesPagination(pagination.PageNumberPagination):
     page_size = settings.WEB["COURSE"]["PAGE_SIZE"]
 
 
+@ensure_csrf_cookie
 @api_view(["GET"])
 def user_status(request):
     """

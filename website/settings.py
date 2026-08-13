@@ -14,6 +14,7 @@ DEFAULTS = {
     "SECRET_KEY": None,
     "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
     "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
+    "CSRF_TRUSTED_ORIGINS": [],
     "SESSION": {
         "COOKIE_AGE": 2592000,  # 30 days
         "SAVE_EVERY_REQUEST": True,
@@ -68,6 +69,11 @@ SECRET_KEY = config.get("SECRET_KEY")
 DEBUG = config.get("DEBUG", cast=bool)
 ALLOWED_HOSTS = config.get("ALLOWED_HOSTS", cast=list)
 CORS_ALLOWED_ORIGINS = config.get("CORS_ALLOWED_ORIGINS", cast=list)
+CSRF_TRUSTED_ORIGINS = config.get("CSRF_TRUSTED_ORIGINS", cast=list)
+
+# Requests arrive via Cloudflare Tunnel over HTTPS; make Django trust the
+# forwarded proto so Secure cookies and is_secure() work correctly.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # --- Infrastructure ---
 DATABASES = {"default": dj_database_url.parse(config.get("DATABASE.URL"))}
