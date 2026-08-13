@@ -5,12 +5,12 @@ from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
-BASE_URL = "https://www.ji.sjtu.edu.cn/"
+BASE_URL = "https://gc.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 # ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
 # ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
+    "https://gc.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 UNDERGRAD_URL = ORC_BASE_URL
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
