@@ -132,7 +132,7 @@ def _get_timetable_term_code(term):
     year, term = split_term(term)
     return "20{year}0{term_number}".format(
         year=year,
-        term_number={"w": 1, "s": 3, "x": 6, "f": 9}[term.lower()],
+        term_number={"sp": 3, "su": 6, "fa": 9}[term.lower()],
     )
 
 

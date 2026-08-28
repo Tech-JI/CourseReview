@@ -57,6 +57,17 @@ class TestReviewAPIAuthenticated:
         )
         assert response.status_code == status.HTTP_201_CREATED
         assert Review.objects.filter(course=course).count() == 1
+        assert Review.objects.get(course=course).term == "23FA"
+
+    def test_create_review_normalizes_mixed_case_term(
+        self, auth_client, course_reviews_url, course, valid_review_data
+    ):
+        valid_review_data["term"] = "23Sp"
+        response = auth_client.post(
+            course_reviews_url, valid_review_data, format="json"
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        assert Review.objects.get(course=course).term == "23SP"
 
     def test_list_personal_reviews(
         self, auth_client, personal_reviews_list_url, review, other_review
