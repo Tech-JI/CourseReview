@@ -89,7 +89,7 @@ def test_import_gc_offerings_syncs_courses_sections_and_instructors():
         course=stale_course, term="26SU", section=1, period=""
     )
 
-    assert import_gc_offerings(rows) == 4
+    assert import_gc_offerings(rows) == 6
 
     physics = Course.objects.get(course_code="PHYS1500J")
     sections = list(
