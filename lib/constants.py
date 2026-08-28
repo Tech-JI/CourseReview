@@ -7,11 +7,11 @@ def get_current_term():
     month = now.month
 
     if 2 <= month <= 4:
-        term = "S"  # Spring
+        term = "SP"  # Spring
     elif 5 <= month <= 8:
-        term = "X"  # Summer
+        term = "SU"  # Summer
     else:
-        term = "F"  # Fall
+        term = "FA"  # Fall
 
     return f"{year}{term}"
 
