@@ -2,7 +2,7 @@
 from celery import shared_task
 from django.db import transaction
 
-from apps.spider.crawlers import orc
+from apps.spider.crawlers import gc_offerings, orc
 from apps.spider.models import CrawledData
 from lib import task_utils
 
@@ -20,6 +20,8 @@ def import_pending_crawled_data(crawled_data_pk):
     # elif
     if crawled_data.data_type == CrawledData.ORC_DEPARTMENT_COURSES:
         orc.import_department(crawled_data.pending_data)
+    elif crawled_data.data_type == CrawledData.COURSE_TIMETABLE:
+        gc_offerings.import_gc_courses(crawled_data.pending_data)
     # else:
     #     assert crawled_data.data_type == CrawledData.COURSE_TIMETABLE
     #     timetable.import_timetable(crawled_data.pending_data)
@@ -74,6 +76,18 @@ def crawl_program_url(url, program_code=None):
     new_data = [orc._crawl_course_data(url)]
     return CrawledData.objects.handle_new_crawled_data(
         new_data, resource_name, CrawledData.ORC_DEPARTMENT_COURSES
+    )
+
+
+@shared_task
+@task_utils.email_if_fails
+def crawl_gc_course_offerings():
+    offerings = gc_offerings.crawl_gc_offerings()
+    term = offerings[0]["term"]
+    return CrawledData.objects.handle_new_crawled_data(
+        offerings,
+        f"{term}_gc_course_offerings",
+        CrawledData.COURSE_TIMETABLE,
     )
 
 
