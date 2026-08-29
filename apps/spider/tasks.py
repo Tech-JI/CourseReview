@@ -83,10 +83,9 @@ def crawl_program_url(url, program_code=None):
 @task_utils.email_if_fails
 def crawl_gc_course_offerings():
     offerings = gc_offerings.crawl_gc_offerings()
-    term = offerings[0]["term"]
     return CrawledData.objects.handle_new_crawled_data(
         offerings,
-        f"{term}_gc_course_offerings",
+        "gc_course_offerings",
         CrawledData.COURSE_TIMETABLE,
     )
 
