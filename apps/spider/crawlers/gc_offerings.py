@@ -39,29 +39,29 @@ def crawl_gc_offerings(url=OFFERINGS_URL, timeout=30):
 
 def parse_gc_offerings(html, source_url=OFFERINGS_URL):
     soup = BeautifulSoup(html, "html.parser")
-    heading = _find_offerings_heading(soup)
-    term = _term_from_heading(heading.get_text(" ", strip=True))
-    table = heading.find_next("table")
-    if table is None:
-        raise GCOfferingsParseError("course offerings table was not found")
-
     offerings = []
-    section_counts = {}
-    for values in _expand_table_rows(table, column_count=5):
-        if not values or values[0].casefold() == "course code":
-            continue
-        current_course = _parse_course_cells(values[:4], source_url)
-        instructor_text = values[4]
-        course_code = current_course["course_code"]
-        section_counts[course_code] = section_counts.get(course_code, 0) + 1
-        offerings.append(
-            {
-                **current_course,
-                "term": term,
-                "section": section_counts[course_code],
-                "instructors": _parse_instructors(instructor_text),
-            }
-        )
+    for heading in _find_offerings_headings(soup):
+        term = _term_from_heading(heading.get_text(" ", strip=True))
+        table = heading.find_next("table")
+        if table is None:
+            raise GCOfferingsParseError("course offerings table was not found")
+
+        section_counts = {}
+        for values in _expand_table_rows(table, column_count=5):
+            if not values or values[0].casefold() == "course code":
+                continue
+            current_course = _parse_course_cells(values[:4], source_url)
+            instructor_text = values[4]
+            course_code = current_course["course_code"]
+            section_counts[course_code] = section_counts.get(course_code, 0) + 1
+            offerings.append(
+                {
+                    **current_course,
+                    "term": term,
+                    "section": section_counts[course_code],
+                    "instructors": _parse_instructors(instructor_text),
+                }
+            )
 
     if not offerings:
         raise GCOfferingsParseError("course offerings table contained no courses")
@@ -79,9 +79,10 @@ def _coalesce_course_metadata(offerings):
     )
     by_code = {}
     for item in offerings:
-        by_code.setdefault(item["course_code"], []).append(item)
+        key = (item["term"], item["course_code"])
+        by_code.setdefault(key, []).append(item)
 
-    for course_code, items in by_code.items():
+    for (_, course_code), items in by_code.items():
         for field in fields:
             populated = {
                 item[field] for item in items if item[field] not in (None, "")
@@ -142,11 +143,15 @@ def _expand_table_rows(table, column_count):
         yield values
 
 
-def _find_offerings_heading(soup):
-    for heading in soup.find_all(["h1", "h2", "h3"]):
-        if HEADING_RE.search(heading.get_text(" ", strip=True)):
-            return heading
-    raise GCOfferingsParseError("could not determine semester from page heading")
+def _find_offerings_headings(soup):
+    headings = [
+        heading
+        for heading in soup.find_all(["h1", "h2", "h3"])
+        if HEADING_RE.search(heading.get_text(" ", strip=True))
+    ]
+    if not headings:
+        raise GCOfferingsParseError("could not determine semester from page heading")
+    return headings
 
 
 def _term_from_heading(heading):
@@ -205,6 +210,8 @@ def import_gc_courses(offerings):
     imported_codes = set()
 
     for item in offerings:
+        if item["course_code"] in imported_codes:
+            continue
         Course.objects.update_or_create(
             course_code=item["course_code"],
             defaults={

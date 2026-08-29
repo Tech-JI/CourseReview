@@ -75,6 +75,40 @@ def test_parse_gc_offerings_fills_missing_credits_from_another_section():
     assert [row["course_credits"] for row in rows] == [2, 2]
 
 
+def test_parse_gc_offerings_reads_all_semester_tables():
+    html = """
+    <h1>Courses Offered in Summer 2026</h1>
+    <table>
+      <tr><td>Course Code</td><td>Course Title -CHN</td>
+          <td>Course Title -ENG</td><td>Crs</td><td>Instructor(s)</td></tr>
+      <tr><td>SUM1000J</td><td>夏季课程</td><td>Summer Course</td>
+          <td>4</td><td>Teacher A</td></tr>
+    </table>
+    <h1>Courses Offered in Spring 2026</h1>
+    <table>
+      <tr><td>Course Code</td><td>Course Title -CHN</td>
+          <td>Course Title -ENG</td><td>Crs</td><td>Instructor(s)</td></tr>
+      <tr><td>SPR1000J</td><td>春季课程</td><td>Spring Course</td>
+          <td>3</td><td>Teacher B</td></tr>
+    </table>
+    <h1>Courses Offered in Fall 2025</h1>
+    <table>
+      <tr><td>Course Code</td><td>Course Title -CHN</td>
+          <td>Course Title -ENG</td><td>Crs</td><td>Instructor(s)</td></tr>
+      <tr><td>FAL1000J</td><td>秋季课程</td><td>Fall Course</td>
+          <td>2</td><td>Teacher C</td></tr>
+    </table>
+    """
+
+    rows = parse_gc_offerings(html)
+
+    assert [(row["course_code"], row["term"]) for row in rows] == [
+        ("SUM1000J", "26SU"),
+        ("SPR1000J", "26SP"),
+        ("FAL1000J", "25FA"),
+    ]
+
+
 @pytest.mark.skipif(
     "postgresql" not in settings.DATABASES["default"]["ENGINE"],
     reason="project migrations use PostgreSQL-only ArrayField columns",
