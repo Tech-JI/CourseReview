@@ -99,7 +99,7 @@ def min_len():
 def valid_review_data(min_len):
     """Generates a valid payload for review creation/update tests."""
     return {
-        "term": "23F",
+        "term": "23FA",
         "professor": "Dr. Testing",
         "comments": "a" * min_len,
     }

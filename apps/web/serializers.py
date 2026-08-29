@@ -12,7 +12,7 @@ from apps.web.models import (
     Vote,
 )
 from lib import constants
-from lib.terms import is_valid_term
+from lib.terms import is_valid_term, normalize_term
 
 
 class DistributiveRequirementSerializer(serializers.ModelSerializer):
@@ -73,9 +73,9 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def validate_term(self, value):
         """Validate term format"""
-        term = value.upper()
+        term = normalize_term(value)
 
-        if is_valid_term(term):
+        if term and is_valid_term(term):
             return term
         else:
             raise serializers.ValidationError(
