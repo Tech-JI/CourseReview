@@ -256,8 +256,13 @@ class CourseSerializer(serializers.ModelSerializer):
     def get_review_set(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
+            sort_by = request.query_params.get("review_sort_by", "term")
+            if sort_by == "professor":
+                queryset = obj.review_set.order_by("professor")
+            else:
+                queryset = obj.review_set.order_by("-term")
             return ReviewSerializer(
-                obj.review_set.all(), many=True, context=self.context
+                queryset, many=True, context=self.context
             ).data
         return []
 
