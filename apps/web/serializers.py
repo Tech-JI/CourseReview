@@ -261,9 +261,7 @@ class CourseSerializer(serializers.ModelSerializer):
                 queryset = obj.review_set.order_by("professor")
             else:
                 queryset = obj.review_set.order_by("-term")
-            return ReviewSerializer(
-                queryset, many=True, context=self.context
-            ).data
+            return ReviewSerializer(queryset, many=True, context=self.context).data
         return []
 
     def get_review_count(self, obj):
