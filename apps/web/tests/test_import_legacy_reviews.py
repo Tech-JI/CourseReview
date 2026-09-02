@@ -44,6 +44,11 @@ def test_actual_csv_has_expected_eligible_count():
     assert total == 350
     assert skipped == 11
     assert len(rows) == 339
+    course_codes = {row.course_code for row in rows}
+    assert "HIS1020" not in course_codes
+    assert "PHY1500J" not in course_codes
+    assert "PHY1600J" not in course_codes
+    assert {"HIS1020J", "PHYS1500J", "PHYS1600J"} <= course_codes
 
 
 @pytest.mark.django_db
@@ -64,14 +69,28 @@ def test_dry_run_skips_missing_professor_and_writes_nothing(tmp_path):
 
 
 @pytest.mark.django_db
-def test_unmatched_course_aborts_without_writes(tmp_path):
-    csv_path = write_csv(tmp_path / "reviews.csv", [row(course_code="MISSING")])
+def test_unmatched_course_is_reported_and_skipped(tmp_path):
+    course = Course.objects.create(course_code="TEST1000J")
+    csv_path = write_csv(
+        tmp_path / "reviews.csv",
+        [row(), row(course_code="MISSING", comment="Kept only in CSV")],
+    )
+    stdout = StringIO()
 
-    with pytest.raises(CommandError, match="unmatched"):
-        call_command("import_legacy_reviews", csv_path, expected_count=1)
+    call_command(
+        "import_legacy_reviews",
+        csv_path,
+        expected_count=2,
+        execute=True,
+        stdout=stdout,
+    )
 
-    assert Review.objects.count() == 0
-    assert not User.objects.filter(username=IMPORT_USERNAME).exists()
+    assert "Unmatched courses: 1" in stdout.getvalue()
+    assert "Skipped unmatched reviews: 1" in stdout.getvalue()
+    assert "MISSING" in stdout.getvalue()
+    review = Review.objects.get()
+    assert review.course == course
+    assert review.comments == "Comment"
 
 
 @pytest.mark.django_db
