@@ -131,6 +131,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -158,7 +159,8 @@ TEMPLATES = [
     }
 ]
 
-STATIC_URL = "/dummy/"  # Required by Django staticfiles but not used in this setup
+STATIC_URL = "/static/"
+STATIC_ROOT = "/app/staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-us"
