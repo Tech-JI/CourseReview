@@ -262,10 +262,11 @@ def verify_callback_api(request):
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
         # Additional validation: check submission is after initiation and within window.
-        # The WJ platform's server clock is measurably slow (~39s, verified via
-        # its HTTP Date header), so tolerate a small negative offset instead of
-        # rejecting valid submissions.
-        timestamp_tolerance = 60
+        # The WJ platform's server clock is measurably slow and drifts over time
+        # (measured ~39s slow on 2026-08-13, ~156s slow on 2026-08-29, drifting
+        # ~7s/day). Tolerance raised to 220s to absorb current drift; revisit if
+        # drift continues to grow (see dynamic calibration as the durable fix).
+        timestamp_tolerance = 220
         if (
             submitted_at + timestamp_tolerance < initiated_at
             or (submitted_at - initiated_at) > OTP_TIMEOUT
