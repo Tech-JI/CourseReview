@@ -1,0 +1,34 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <div id="content-main">
+    <p>
+      Upload a UTF-8 CSV, run a dry-run, then explicitly confirm the import.
+      Only reviews for matched courses are inserted; unmatched rows remain in the CSV.
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ upload_form.as_p }}
+      <input type="hidden" name="action" value="preview">
+      <input type="submit" value="Run dry-run">
+    </form>
+
+    {% if output %}
+      <h2>Import report</h2>
+      <pre>{{ output }}</pre>
+    {% endif %}
+
+    {% if error %}
+      <p class="errornote">{{ error }}</p>
+    {% endif %}
+
+    {% if preview_ready %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="execute">
+        <input type="submit" value="Confirm and import reviews">
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}
