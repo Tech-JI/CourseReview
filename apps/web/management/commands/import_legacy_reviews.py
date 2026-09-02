@@ -68,17 +68,20 @@ class Command(BaseCommand):
             except Course.DoesNotExist:
                 unmatched.append(course_code)
 
+        matched_rows = [row for row in unique_rows if row.course_code in courses]
+        unmatched_rows = [row for row in unique_rows if row.course_code not in courses]
         existing_keys = set()
-        if not unmatched:
-            for row in unique_rows:
-                if Review.objects.filter(
-                    course=courses[row.course_code],
-                    professor=row.professor,
-                    comments=row.comments,
-                ).exists():
-                    existing_keys.add(row.duplicate_key)
+        for row in matched_rows:
+            if Review.objects.filter(
+                course=courses[row.course_code],
+                professor=row.professor,
+                comments=row.comments,
+            ).exists():
+                existing_keys.add(row.duplicate_key)
 
-        pending = [row for row in unique_rows if row.duplicate_key not in existing_keys]
+        pending = [
+            row for row in matched_rows if row.duplicate_key not in existing_keys
+        ]
         self._write_stats(
             total=total,
             skipped_missing_professor=skipped_missing_professor,
@@ -86,37 +89,36 @@ class Command(BaseCommand):
             unique_course_codes=len(course_codes),
             matched_courses=len(courses),
             unmatched=unmatched,
+            unmatched_reviews=len(unmatched_rows),
             duplicate_in_csv=duplicate_in_csv,
             already_in_database=len(existing_keys),
             pending_inserts=len(pending),
         )
 
         if unmatched:
-            self.stderr.write("Unmatched course codes:")
+            self.stdout.write("Unmatched course codes (kept in CSV, not imported):")
             for course_code in unmatched:
-                self.stderr.write(f"  {course_code}")
-            raise CommandError(
-                "One or more courses are unmatched; no data was written."
-            )
+                self.stdout.write(f"  {course_code}")
 
         if not options["execute"]:
             self.stdout.write(self.style.WARNING("DRY-RUN only; no data was written."))
             return
 
-        with transaction.atomic():
-            user = self._get_import_user()
-            Review.objects.bulk_create(
-                [
-                    Review(
-                        course=courses[row.course_code],
-                        user=user,
-                        professor=row.professor,
-                        term=row.term,
-                        comments=row.comments,
-                    )
-                    for row in pending
-                ]
-            )
+        if pending:
+            with transaction.atomic():
+                user = self._get_import_user()
+                Review.objects.bulk_create(
+                    [
+                        Review(
+                            course=courses[row.course_code],
+                            user=user,
+                            professor=row.professor,
+                            term=row.term,
+                            comments=row.comments,
+                        )
+                        for row in pending
+                    ]
+                )
 
         self.stdout.write(self.style.SUCCESS(f"Inserted reviews: {len(pending)}"))
         self.stdout.write(
@@ -196,6 +198,7 @@ class Command(BaseCommand):
         unique_course_codes=0,
         matched_courses=0,
         unmatched=(),
+        unmatched_reviews=0,
         duplicate_in_csv=0,
         already_in_database=0,
         pending_inserts=0,
@@ -208,6 +211,7 @@ class Command(BaseCommand):
             f"Unique course codes: {unique_course_codes}",
             f"Matched courses: {matched_courses}",
             f"Unmatched courses: {len(unmatched)}",
+            f"Skipped unmatched reviews: {unmatched_reviews}",
             f"Duplicate in CSV: {duplicate_in_csv}",
             f"Already in database: {already_in_database}",
             f"Pending inserts: {pending_inserts}",
