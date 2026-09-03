@@ -64,80 +64,95 @@ def _crawl_course_data(course_url):
         return None  # Return early if no h2 element found
 
     course_heading = course_heading_element.get_text()
-    if course_heading:
-        split_course_heading = course_heading.split(" – ")
-        children = list(soup.find_all(class_="et_pb_text_inner")[3].children)
+    if not course_heading:
+        return None
+    split_course_heading = course_heading.split(" – ")
+    if len(split_course_heading) < 2:
+        return None
 
-        course_code = split_course_heading[0]
-        department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
-        number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
-        course_title = split_course_heading[1]
+    course_code = split_course_heading[0]
+    department = re.findall(r"^([A-Z]{2,4})\d+", course_code)[0]
+    number = re.findall(r"^[A-Z]{2,4}(\d{3})", course_code)[0]
+    course_title = split_course_heading[1]
 
-        course_credits = 0
-        pre_requisites = ""
-        description = ""
-        course_topics = []
-        instructors = []
+    # The GC site wraps the labelled fields in nested divs (and lists topics
+    # as plain <p>s rather than <li>s), so parse the flattened text stream of
+    # the detail block instead of assuming direct children.
+    content_sections = soup.find_all(class_="et_pb_text_inner")
+    if len(content_sections) < 4:
+        return None
+    content_lines = [
+        line.strip()
+        for line in content_sections[3].get_text(separator="\n", strip=True).split("\n")
+        if line.strip()
+    ]
 
-        for i, child in enumerate(children):
-            text = child.get_text(strip=True) if hasattr(child, "get_text") else ""
-            if "Credits:" in text:
-                course_credits = int(re.findall(r"\d+", text)[0])
-            elif "Pre-requisites:" in text:
-                pre_requisites = extract_prerequisites(text)
-            elif "Description:" in text:
-                description = (
-                    children[i + 2].get_text(strip=True)
-                    if i + 2 < len(children)
-                    else ""
-                )
-                if description == "\n" or "Course Topics" in description:
-                    description = ""
-            elif "Course Topics:" in text:
-                course_topics = (
-                    [li.get_text(strip=True) for li in children[i + 2].find_all("li")]
-                    if i + 2 < len(children)
-                    else []
-                )
-            elif "Instructors:" in text:
-                instructors_text = (
-                    children[i + 2].get_text(strip=True)
-                    if i + 2 < len(children)
-                    else ""
-                )
-                instructors = [
-                    name.strip() for name in instructors_text.split(";") if name.strip()
-                ]
+    section_markers = (
+        "Instructors:",
+        "Credits:",
+        "Pre-requisites:",
+        "Description:",
+        "Course Topics:",
+    )
+    current_section = None
+    section_lines = {}
+    structure_recognized = False
+    for line in content_lines:
+        marker = next((m for m in section_markers if m in line), None)
+        if marker is not None:
+            current_section = marker
+            structure_recognized = True
+        elif current_section is not None:
+            section_lines.setdefault(current_section, []).append(line)
 
-        result = {
-            "course_code": course_code,
-            "course_title": course_title,
-            "department": department,
-            "number": number,
-            "course_credits": course_credits,
-            "pre_requisites": pre_requisites,
-            "description": description,
-            "course_topics": course_topics,
-            "instructors": instructors,
-            "url": course_url,
-        }
-        return result
-        # return {
-        #     "course_code": "QWER1234J",
-        #     "course_title": "Test Course",
-        #     "department": "QWER",
-        #     "number": 1234,
-        #     "course_credits": 4,
-        #     "pre_requisites": None,
-        #     "description": "This is a test course",
-        #     "course_topics": ["Test Topic"],
-        #     "instructors": ["Test Instructor"],
-        #     "url": course_url,
-        # }
+    course_credits = 0
+    if "Credits:" in section_lines:
+        credits_match = re.findall(r"\d+", " ".join(section_lines["Credits:"]))
+        if credits_match:
+            course_credits = int(credits_match[0])
+    pre_requisites = ""
+    if "Pre-requisites:" in section_lines:
+        pre_requisites = extract_prerequisites(
+            "Pre-requisites: " + " ".join(section_lines["Pre-requisites:"])
+        )
+    description = " ".join(section_lines.get("Description:", [])).strip()
+    course_topics = list(section_lines.get("Course Topics:", []))
+    instructors = []
+    for name_line in section_lines.get("Instructors:", []):
+        instructors.extend(
+            name.strip() for name in name_line.split(";") if name.strip()
+        )
+
+    return {
+        "course_code": course_code,
+        "course_title": course_title,
+        "department": department,
+        "number": number,
+        "course_credits": course_credits,
+        "pre_requisites": pre_requisites,
+        "description": description,
+        "course_topics": course_topics,
+        "instructors": instructors,
+        "url": course_url,
+        # False when the page carried none of the known section markers; used
+        # by import_department to skip updates so a broken crawl cannot wipe
+        # existing course data. Stored records without this key default to
+        # recognized for backward compatibility.
+        "structure_recognized": structure_recognized,
+    }
 
 
 def import_department(department_data):
     for course_data in department_data:
+        # Skip pages whose structure was not recognized: importing them would
+        # overwrite stored course fields with empty values.
+        if not course_data.get("structure_recognized", True):
+            print(
+                "Skipping {}: unrecognized page structure".format(
+                    course_data.get("course_code", "<unknown>")
+                )
+            )
+            continue
         course, created = Course.objects.update_or_create(
             course_code=course_data["course_code"],
             defaults={
