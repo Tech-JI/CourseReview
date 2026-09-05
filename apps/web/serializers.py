@@ -404,8 +404,12 @@ class CourseSerializer(serializers.ModelSerializer):
         return False
 
     def get_instructors(self, obj):
-        """Return instructor {id, name} pairs so clients can key uploads on them"""
-        instructors = obj.get_instructors()
+        """Return instructor {id, name} pairs so clients can key uploads on them.
+
+        Term-agnostic: a syllabus can exist for any instructor who ever taught
+        the course, and uploads should not be blocked by term bookkeeping.
+        """
+        instructors = obj.get_instructors(term=None)
         return [{"id": i.id, "name": i.name} for i in instructors]
 
     def get_course_topics(self, obj):

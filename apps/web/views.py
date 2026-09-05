@@ -630,6 +630,12 @@ class CourseSyllabiAPI(
             return SyllabusCreateSerializer
         return SyllabusSerializer
 
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
+
     def list(self, request, *args, **kwargs):
         course_id = self.kwargs.get("course_id")
         if not Course.objects.filter(pk=course_id).exists():
@@ -699,6 +705,8 @@ class CourseSyllabiAPI(
             process_syllabus.delay(syllabus.id)
         except Exception:  # noqa: BLE001 - broker down; task stays pending
             logger.exception("Failed to enqueue syllabus analysis %d", syllabus.id)
+        # Eager execution (tests) may already have analyzed this row.
+        syllabus.refresh_from_db()
         return Response(
             SyllabusSerializer(syllabus).data, status=status.HTTP_201_CREATED
         )
@@ -725,6 +733,9 @@ class SyllabusDetailAPI(
         if self.request.method in ("PUT", "PATCH"):
             return [IsAdminUser()]
         return [AllowAny()]
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
     def patch(self, request, *args, **kwargs):
         syllabus = self.get_object()
