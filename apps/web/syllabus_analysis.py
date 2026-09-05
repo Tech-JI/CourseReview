@@ -96,7 +96,7 @@ def ocr_pages(images: list[bytes]) -> str:
         [{"role": "user", "content": parts}],
         format_json=False,
     )
-    return (response.get("content") or "").strip()
+    return (response.get("message") or {}).get("content", "").strip()
 
 
 def ollama_chat(messages: list[dict], format_json: bool = False) -> dict:
@@ -112,6 +112,9 @@ def ollama_chat(messages: list[dict], format_json: bool = False) -> dict:
         "options": {
             "num_ctx": ollama["NUM_CTX"],
             "temperature": 0.2,
+            # qwen3 thinking models: with JSON format enabled the final answer
+            # lands in `message.thinking` and `content` comes back empty.
+            "think": False,
         },
     }
     if format_json:
@@ -128,7 +131,16 @@ def ollama_chat(messages: list[dict], format_json: bool = False) -> dict:
             with httpx.Client(timeout=timeout) as client:
                 response = client.post(url, json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            if not (data.get("message") or {}).get("content"):
+                logger.warning(
+                    "Ollama returned empty content: done=%s eval=%d ctx=%d model=%s",
+                    data.get("done_reason"),
+                    data.get("eval_count"),
+                    data.get("prompt_eval_count"),
+                    payload["model"],
+                )
+            return data
         except (httpx.ConnectError, httpx.ReadTimeout) as exc:
             last_error = exc
             logger.warning("Ollama unreachable (attempt %d/3): %s", attempt + 1, exc)
@@ -227,7 +239,7 @@ def analyze(course, instructor, syllabus_text: str) -> dict:
         course, instructor, _truncate(syllabus_text, MAX_SYLLABUS_CHARS)
     )
     response = ollama_chat([{"role": "user", "content": prompt}], format_json=True)
-    verdict = parse_json_response(response.get("content") or "")
+    verdict = parse_json_response((response.get("message") or {}).get("content") or "")
     # summary_md is nested inside the verdict JSON by the model.
     return verdict
 
@@ -241,4 +253,4 @@ def compare(course, instructor, new_text: str, old_text: str) -> dict:
         _truncate(old_text, MAX_SYLLABUS_CHARS),
     )
     response = ollama_chat([{"role": "user", "content": prompt}], format_json=True)
-    return parse_json_response(response.get("content") or "")
+    return parse_json_response((response.get("message") or {}).get("content") or "")

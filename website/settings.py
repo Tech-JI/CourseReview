@@ -62,7 +62,7 @@ DEFAULTS = {
         "BASE_URL": "http://127.0.0.1:11434",
         "MODEL": "qwen3.8:latest",
         "TIMEOUT": 600,
-        "NUM_CTX": 262144,
+        "NUM_CTX": 32768,  # 27B Q4 ~17GB weights; 262k ctx KV spills model to CPU
         "MAX_PAGES": 30,
     },
 }
