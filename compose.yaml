@@ -77,7 +77,7 @@ services:
       OLLAMA__BASE_URL: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ["celery", "-A", "website.celery", "worker", "--loglevel=info", "--pool=solo"]
+    command: ["celery", "-A", "website.celery", "worker", "--beat", "--loglevel=info", "--pool=solo"]
     restart: unless-stopped
 
   tunnel:
