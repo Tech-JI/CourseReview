@@ -10,6 +10,7 @@ from apps.web.tests.factories import (
     CourseOfferingFactory,
     InstructorFactory,
     SyllabusFactory,
+    SyllabusFileFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -52,7 +53,10 @@ def syllabus_urls(course):
 
 @pytest.fixture
 def fake_ollama(monkeypatch):
-    """Runs analysis inline with a canned verdict; comparison switches on prompt."""
+    """Runs analysis inline with a canned verdict; comparison switches on prompt.
+
+    Tests can mutate ``chat.state["match_score"]`` (etc.) to steer the verdict.
+    """
 
     def _chat(messages, format_json=False):
         prompt = messages[0]["content"]
@@ -68,7 +72,7 @@ def fake_ollama(monkeypatch):
             }
         else:
             result = {
-                "match_score": 88,
+                "match_score": _chat.state["match_score"],
                 "matches_course_content": True,
                 "is_legitimate": True,
                 "flags": [],
@@ -77,6 +81,7 @@ def fake_ollama(monkeypatch):
         # Ollama /api/chat nests content under message.content.
         return {"message": {"content": json.dumps(result)}}
 
+    _chat.state = {"match_score": 88}
     monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat)
     return _chat
 
@@ -401,3 +406,128 @@ class TestPayloads:
         anonymous = APIClient()
         response = anonymous.get(reverse("user_status"))
         assert response.data["isAuthenticated"] is False
+
+
+# ---------------------------------------------------------------------------
+# Low-match rejection + recycle
+# ---------------------------------------------------------------------------
+
+
+class TestLowMatchRejection:
+    def test_low_match_score_rejects_and_recycles_file(
+        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+    ):
+        fake_ollama.state["match_score"] = 15
+        instructor = _offering_with_instructor(course)
+        response = auth_client.post(
+            syllabus_urls["list"],
+            {"file": _make_pdf_upload(), "instructor": instructor.id},
+            format="multipart",
+        )
+        assert response.status_code == 201
+        data = response.data
+        assert data["status"] == Syllabus.Status.REJECTED
+        assert data["is_primary"] is False
+        assert data["verdict"]["match_score"] == 15
+
+        file_obj = SyllabusFile.objects.get(pk=data["file"]["id"])
+        assert file_obj.file.name.startswith("recycle/")
+
+    def test_boundary_score_60_is_analyzed(
+        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+    ):
+        fake_ollama.state["match_score"] = 60
+        instructor = _offering_with_instructor(course)
+        response = auth_client.post(
+            syllabus_urls["list"],
+            {"file": _make_pdf_upload(), "instructor": instructor.id},
+            format="multipart",
+        )
+        assert response.status_code == 201
+        assert response.data["status"] == Syllabus.Status.ANALYZED
+        file_obj = SyllabusFile.objects.get(pk=response.data["file"]["id"])
+        assert file_obj.file.name.startswith("syllabi/")
+
+    def test_shared_file_not_recycled_while_referenced(
+        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+    ):
+        instructor_a = _offering_with_instructor(course)
+        instructor_b = InstructorFactory()
+        offering_b = CourseOfferingFactory(course=course)
+        offering_b.instructors.add(instructor_b)
+
+        first = auth_client.post(
+            syllabus_urls["list"],
+            {"file": _make_pdf_upload(), "instructor": instructor_a.id},
+            format="multipart",
+        )
+        assert first.status_code == 201
+
+        fake_ollama.state["match_score"] = 5
+        second = auth_client.post(
+            syllabus_urls["list"],
+            {"file": _make_pdf_upload(), "instructor": instructor_b.id},
+            format="multipart",
+        )
+        assert second.status_code == 201
+        assert second.data["status"] == Syllabus.Status.REJECTED
+        assert second.data["file"]["id"] == first.data["file"]["id"]
+
+        # Still referenced by the analyzed first syllabus -> not recycled.
+        file_obj = SyllabusFile.objects.get(pk=first.data["file"]["id"])
+        assert file_obj.file.name.startswith("syllabi/")
+
+
+# ---------------------------------------------------------------------------
+# Deletion (API + signal-driven recycle)
+# ---------------------------------------------------------------------------
+
+
+class TestSyllabusDelete:
+    def test_delete_requires_staff(self, auth_client, user, course, syllabus_urls):
+        instructor = _offering_with_instructor(course)
+        syllabus = SyllabusFactory(
+            course=course, instructor=instructor, uploaded_by=user
+        )
+        response = auth_client.delete(syllabus_urls["detail"](syllabus.id))
+        assert response.status_code == 403
+        assert Syllabus.objects.filter(pk=syllabus.pk).exists()
+
+    def test_staff_delete_recycles_orphan_file(
+        self, staff_client, user, course, syllabus_urls
+    ):
+        instructor = _offering_with_instructor(course)
+        syllabus = SyllabusFactory(
+            course=course, instructor=instructor, uploaded_by=user
+        )
+        file_obj = syllabus.file
+        assert file_obj.file.name.startswith("syllabi/")
+
+        response = staff_client.delete(syllabus_urls["detail"](syllabus.id))
+        assert response.status_code == 204
+        assert not Syllabus.objects.filter(pk=syllabus.pk).exists()
+        file_obj.refresh_from_db()
+        assert file_obj.file.name.startswith("recycle/")
+
+    def test_queryset_delete_recycles_each_orphan_and_keeps_shared(self, course):
+        """QuerySet.delete (admin delete_selected path) fires post_delete."""
+        instructor_a = _offering_with_instructor(course)
+        instructor_b = InstructorFactory()
+        offering_b = CourseOfferingFactory(course=course)
+        offering_b.instructors.add(instructor_b)
+
+        shared_file = SyllabusFileFactory()
+        first = SyllabusFactory(
+            course=course, instructor=instructor_a, file=shared_file
+        )
+        second = SyllabusFactory(
+            course=course, instructor=instructor_b, file=shared_file
+        )
+
+        Syllabus.objects.filter(pk=second.pk).delete()
+        shared_file.refresh_from_db()
+        assert shared_file.file.name.startswith("syllabi/")  # first still refs it
+
+        Syllabus.objects.filter(pk=first.pk).delete()
+        shared_file.refresh_from_db()
+        assert shared_file.file.name.startswith("recycle/")

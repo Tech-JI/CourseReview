@@ -58,6 +58,8 @@ DEFAULTS = {
     "SYLLABUS": {
         "MAX_UPLOAD_SIZE": 20971520,  # 20 MB
         "ALLOWED_EXTENSIONS": [".pdf", ".docx"],
+        # AI analysis rejects uploads whose match score is below this.
+        "MIN_MATCH_SCORE": 60,
     },
     "OLLAMA": {
         "BASE_URL": "http://127.0.0.1:11434",

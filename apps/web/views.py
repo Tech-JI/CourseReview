@@ -715,10 +715,14 @@ class CourseSyllabiAPI(
 
 
 class SyllabusDetailAPI(
-    generics.GenericAPIView, mixins.RetrieveModelMixin, mixins.UpdateModelMixin
+    generics.GenericAPIView,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
 ):
     """
-    Syllabus detail. GET public; PATCH staff-only (summary/verdict/primary).
+    Syllabus detail. GET public; PATCH/DELETE staff-only (summary/verdict/
+    primary; deletion also recycles the file when unreferenced).
     """
 
     serializer_class = SyllabusSerializer
@@ -732,12 +736,15 @@ class SyllabusDetailAPI(
         return SyllabusSerializer
 
     def get_permissions(self):
-        if self.request.method in ("PUT", "PATCH"):
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
             return [IsAdminUser()]
         return [AllowAny()]
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
     def patch(self, request, *args, **kwargs):
         syllabus = self.get_object()

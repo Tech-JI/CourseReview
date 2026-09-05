@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Syllabus(models.Model):
@@ -16,12 +18,14 @@ class Syllabus(models.Model):
         PENDING = "pending"
         PROCESSING = "processing"
         ANALYZED = "analyzed"
+        REJECTED = "rejected"
         FAILED = "failed"
 
     STATUS_CHOICES = [
         (Status.PENDING, "Pending"),
         (Status.PROCESSING, "Processing"),
         (Status.ANALYZED, "Analyzed"),
+        (Status.REJECTED, "Rejected"),
         (Status.FAILED, "Failed"),
     ]
 
@@ -64,3 +68,15 @@ class Syllabus(models.Model):
 
     def __str__(self):
         return f"{self.course_id} / {self.instructor_id} / {self.status}"
+
+
+@receiver(post_delete, sender=Syllabus)
+def recycle_orphan_syllabus_file(sender, instance, **kwargs):
+    """After a Syllabus row is deleted, move its now-unreferenced file to recycle.
+
+    Files are deduped by sha256 and shared across syllabi; a file is moved
+    only when this was the last reference. Imported lazily to avoid a cycle.
+    """
+    from apps.web.syllabus_files import recycle_file_if_unreferenced
+
+    recycle_file_if_unreferenced(instance.file)
