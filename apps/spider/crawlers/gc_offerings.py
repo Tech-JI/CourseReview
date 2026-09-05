@@ -165,6 +165,27 @@ def resolve_instructor(clean_name, existing=None):
     return instructor
 
 
+def expand_instructor_names(raw_names, existing):
+    """Resolve raw GC cell text to Instructor rows, self-defensively.
+
+    Applies cleaning, junk filtering, and curated multi-person splits so the
+    importer behaves correctly even when handed payloads stored before the
+    canonicalization logic existed. Returns a deduped list of Instructor rows.
+    """
+    resolved = []
+    for raw in raw_names:
+        cleaned = clean_instructor_name(raw)
+        if not cleaned or cleaned.lower() in JUNK_INSTRUCTOR_NAMES:
+            continue
+        for name in INSTRUCTOR_SPLITS.get(cleaned, [cleaned]):
+            inst = resolve_instructor(name, existing)
+            if all(row.id != inst.id for row in existing):
+                existing.append(inst)
+            if not any(row.id == inst.id for row in resolved):
+                resolved.append(inst)
+    return resolved
+
+
 class GCOfferingsParseError(ValueError):
     pass
 
@@ -368,12 +389,7 @@ def import_gc_courses(offerings):
             )
             courses_by_code[item["course_code"]] = course
 
-        instructors = []
-        for name in item["instructors"]:
-            inst = resolve_instructor(name, existing)
-            if all(row.id != inst.id for row in existing):
-                existing.append(inst)
-            instructors.append(inst)
+        instructors = expand_instructor_names(item["instructors"], existing)
         # Sections are numbered by row order within the GC page table, not by
         # the registrar's section numbers (the page has no such column).
         offering, _ = CourseOffering.objects.get_or_create(

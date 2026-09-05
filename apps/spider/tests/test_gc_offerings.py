@@ -260,3 +260,38 @@ def test_import_filters_junk_and_expands_merged_cells():
     html2 = html.replace("Dr. Lin Yun, 教师, YAN Xu 闫旭", "Zhaoguang Wang Ting Sun")
     rows2 = parse_gc_offerings(html2)
     assert rows2[0]["instructors"] == ["Zhaoguang Wang", "Ting Sun"]
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_splits_merged_cells_from_stale_payloads():
+    """Payloads stored before canonicalization carry unsplit merged cells;
+    the importer must still split them instead of collapsing to one person."""
+    rows = parse_gc_offerings(SAMPLE_HTML)
+    rows.append(
+        {
+            "course_code": "ME3950J",
+            "crosslisted_codes": [],
+            "course_title": "Laboratory I",
+            "course_title_chn": "",
+            "department": "ME",
+            "number": 3950,
+            "course_credits": 4,
+            "url": "https://gc.sjtu.edu.cn/",
+            "term": "25FA",
+            "section": 1,
+            "instructors": ["Zhaoguang Wang Ting Sun"],
+        }
+    )
+    assert import_gc_courses(rows) == 6
+
+    offering = CourseOffering.objects.get(
+        course__course_code="ME3950J", term="25FA", section=1
+    )
+    assert {i.name for i in offering.instructors.all()} == {
+        "Zhaoguang Wang",
+        "Ting Sun",
+    }
