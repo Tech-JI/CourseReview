@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 import requests
 from bs4 import BeautifulSoup
-from django.db import transaction
+from django.db import models, transaction
 
 from apps.web.models import Course, CourseOffering, Instructor
 
@@ -18,6 +18,151 @@ COURSE_CODE_RE = re.compile(
 INSTRUCTOR_SEPARATOR_RE = re.compile(r"\s*[,，;；]\s*")
 TERM_CODES = {"spring": "SP", "summer": "SU", "fall": "FA"}
 MIN_EXPECTED_OFFERINGS = 20
+
+# ---------------------------------------------------------------------------
+# Instructor name canonicalization
+#
+# The GC page itself is inconsistent: the same person appears under different
+# spellings across terms (case, hyphens, middle names, term annotations like
+# "(Fall)", CJK annotations like "闫旭", or even full-name/short-name
+# alternation). Importing each cell verbatim with get_or_create(name) silently
+# forks one teacher into several Instructor rows every time the page rotates.
+# These helpers clean the raw cell text and, at import time, resolve names to
+# already-existing Instructor rows before falling back to creation.
+# ---------------------------------------------------------------------------
+
+CJK_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]+")
+PAREN_RE = re.compile(r"[\(（][^)）]*[\)）]")
+TITLE_RE = re.compile(r"^(dr|prof|ms|mr|mrs|miss)\.?\s+", re.IGNORECASE)
+QUOTE_RE = re.compile(r"[\"'“”‘’]")
+TRAILING_PUNCT_RE = re.compile(r"[\s.,;:]+$")
+JUNK_INSTRUCTOR_NAMES = {
+    ",",
+    "，",
+    ";",
+    "；",
+    "-",
+    "–",
+    "—",
+    ".",
+    "教师",
+    "教授",
+    "老师",
+    "staff",
+    "tbd",
+    "tba",
+}
+
+# GC cells that cram several instructors into one string without separators.
+INSTRUCTOR_SPLITS = {
+    "Zhaoguang Wang Ting Sun": ["Zhaoguang Wang", "Ting Sun"],
+}
+
+# Token-level nicknames that plain subsequence matching cannot catch
+# (Nick/Nicholas is not a prefix relationship).
+TOKEN_ALIASES = {"nick": "nicholas"}
+
+
+def clean_instructor_name(name):
+    """Strip GC-page annotations so stored names are clean and matchable.
+
+    Removes leading titles (Dr./Prof./...), parenthetical annotations
+    ("(Fall)", "(Summer).", "(余琼)", "(UM)"), trailing CJK annotations
+    ("YAN Xu 闫旭"), quotes ("Jaehyung “Joshua” Ju"), and stray trailing
+    punctuation. Returns "" when nothing meaningful remains.
+    """
+    n = (name or "").replace("\u00a0", " ")
+    n = TITLE_RE.sub("", n)
+    n = PAREN_RE.sub(" ", n)
+    n = CJK_RE.sub(" ", n)
+    n = QUOTE_RE.sub("", n)
+    n = TRAILING_PUNCT_RE.sub("", n)
+    n = re.sub(r"\s+", " ", n).strip()
+    return n
+
+
+def _name_tokens(name):
+    """Lowercased letter tokens; hyphens/punctuation inside a token are merged
+    (e.g. 'Welch-Bolen' -> 'welchbolen') so hyphen variants compare equal."""
+    tokens = []
+    for raw in name.split():
+        token = re.sub(r"[^a-z]", "", raw.lower())
+        if token:
+            tokens.append(token)
+    return tokens
+
+
+def _tokens_equivalent(a, b):
+    return a == b or TOKEN_ALIASES.get(a, a) == b or a == TOKEN_ALIASES.get(b, b)
+
+
+def _is_subsequence(short, long):
+    """Ordered subsequence with token-alias awareness (e.g. nick~nicholas)."""
+    it = iter(long)
+    return all(any(_tokens_equivalent(w, cand) for cand in it) for w in short)
+
+
+def _best_instructor_match(clean_name, existing):
+    """Find the Instructor row a cleaned name should map to.
+
+    Matching ladder, first hit wins (candidates tie-broken by most offerings,
+    i.e. the most-used spelling becomes canonical):
+      1. exact name
+      2. identical letter sequence (case/punctuation/hyphen variants)
+      3. same word set (word-order / given-vs-family-first variants)
+      4. word subsequence with >=2 matching words (middle names dropped,
+         initials, nickname aliases)
+    Returns None when nothing plausibly matches.
+    """
+    tokens = _name_tokens(clean_name)
+    letters = "".join(tokens)
+    if not letters:
+        return None
+
+    def score(row):
+        row_tokens = _name_tokens(row.name)
+        row_letters = "".join(row_tokens)
+        if row.name == clean_name:
+            return (1, 0)
+        if row_letters == letters:
+            return (2, 0)
+        if len(row_tokens) >= 2 and len(tokens) >= 2 and set(row_tokens) == set(tokens):
+            return (3, 0)
+        if len(row_tokens) >= 2 and _is_subsequence(row_tokens, tokens):
+            return (4, -len(row_tokens))
+        if len(tokens) >= 2 and _is_subsequence(tokens, row_tokens):
+            return (5, -len(tokens))
+        return (9, 0)
+
+    ranked = sorted(
+        existing,
+        key=lambda r: (score(r)[0], score(r)[1], -_offering_count(r), r.id),
+    )
+    if ranked and score(ranked[0])[0] < 9:
+        return ranked[0]
+    return None
+
+
+def _offering_count(row):
+    """Offering count for tie-breaking, honoring a prefetched annotation."""
+    count = getattr(row, "_offering_count", None)
+    if count is not None:
+        return count
+    return row.courseoffering_set.count()
+
+
+def resolve_instructor(clean_name, existing=None):
+    """Return the Instructor row for a cleaned name, reusing existing rows
+    across spelling variants. Creates a new row only when no existing
+    instructor plausibly matches."""
+    existing = (
+        list(existing) if existing is not None else list(Instructor.objects.all())
+    )
+    match = _best_instructor_match(clean_name, existing)
+    if match is not None:
+        return match
+    instructor, _ = Instructor.objects.get_or_create(name=clean_name)
+    return instructor
 
 
 class GCOfferingsParseError(ValueError):
@@ -189,10 +334,14 @@ def _parse_course_cells(values, source_url):
 
 
 def _parse_instructors(value):
-    value = value.strip()
-    if not value or value in {"-", "–", "—"}:
-        return []
-    return [name for name in INSTRUCTOR_SEPARATOR_RE.split(value) if name]
+    names = []
+    for raw in INSTRUCTOR_SEPARATOR_RE.split(value or ""):
+        cleaned = clean_instructor_name(raw)
+        if not cleaned or cleaned.lower() in JUNK_INSTRUCTOR_NAMES:
+            continue
+        # Expand cells that cram several instructors together (curated).
+        names.extend(INSTRUCTOR_SPLITS.get(cleaned, [cleaned]))
+    return names
 
 
 @transaction.atomic
@@ -200,6 +349,9 @@ def import_gc_courses(offerings):
     if not offerings:
         raise ValueError("refusing to import an empty course list")
     courses_by_code = {}
+    existing = list(
+        Instructor.objects.annotate(_offering_count=models.Count("courseoffering"))
+    )
 
     for item in offerings:
         course = courses_by_code.get(item["course_code"])
@@ -216,10 +368,12 @@ def import_gc_courses(offerings):
             )
             courses_by_code[item["course_code"]] = course
 
-        instructors = [
-            Instructor.objects.get_or_create(name=name)[0]
-            for name in item["instructors"]
-        ]
+        instructors = []
+        for name in item["instructors"]:
+            inst = resolve_instructor(name, existing)
+            if all(row.id != inst.id for row in existing):
+                existing.append(inst)
+            instructors.append(inst)
         # Sections are numbered by row order within the GC page table, not by
         # the registrar's section numbers (the page has no such column).
         offering, _ = CourseOffering.objects.get_or_create(
