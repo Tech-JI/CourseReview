@@ -1,0 +1,6 @@
+# Local dev/media artifacts must not end up in the image (uploads persist
+# on /mnt/data/GCAtlas via bind mount).
+media/
+.venv/
+.git/
+data/backups/

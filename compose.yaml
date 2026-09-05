@@ -28,7 +28,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./.env:/app/.env:ro
-      - syllabus_media:/app/media
+      - /mnt/data/GCAtlas:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -66,7 +66,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./.env:/app/.env:ro
-      - syllabus_media:/app/media
+      - /mnt/data/GCAtlas:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -90,4 +90,3 @@ services:
 
 volumes:
   postgres18_data:
-  syllabus_media:
