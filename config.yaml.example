@@ -61,3 +61,14 @@ QUEST:
     URL: "https://wj.sjtu.edu.cn/q/dummy2"
     QUESTIONID: 10000002
 # AUTO_IMPORT_CRAWLED_DATA: true
+
+# SYLLABUS:
+#   MAX_UPLOAD_SIZE: 20971520 # 20 MB
+#   ALLOWED_EXTENSIONS: [".pdf", ".docx"]
+
+# OLLAMA: # local LLM used for syllabus analysis/OCR (env: OLLAMA__BASE_URL etc.)
+#   BASE_URL: "http://127.0.0.1:11434"
+#   MODEL: "qwen3.8:latest"
+#   TIMEOUT: 600
+#   NUM_CTX: 262144
+#   MAX_PAGES: 30
