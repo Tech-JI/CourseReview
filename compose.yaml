@@ -77,7 +77,19 @@ services:
       OLLAMA__BASE_URL: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ["celery", "-A", "website.celery", "worker", "--beat", "--loglevel=info", "--pool=solo"]
+    # distroless image runs non-root with an unwritable CWD; the default
+    # ./celerybeat-schedule would raise PermissionError and kill beat.
+    command:
+      [
+        "celery",
+        "-A",
+        "website.celery",
+        "worker",
+        "--beat",
+        "--loglevel=info",
+        "--pool=solo",
+        "--schedule=/tmp/celerybeat-schedule",
+      ]
     restart: unless-stopped
 
   tunnel:
