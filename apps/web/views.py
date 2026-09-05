@@ -760,7 +760,10 @@ def syllabus_download(request, syllabus_id):
     try:
         syllabus = Syllabus.objects.select_related("file").get(pk=syllabus_id)
     except Syllabus.DoesNotExist:
-        logger.warning("Syllabus %s not found for download", syllabus_id)
+        # The URL pattern already restricts syllabus_id to digits, but strip
+        # CR/LF anyway so the value can never forge log lines.
+        safe_id = str(syllabus_id).replace("\r", "").replace("\n", "")
+        logger.warning("Syllabus %s not found for download", safe_id)
         return Response({"detail": "Syllabus not found"}, status=404)
     file_obj = syllabus.file
     response = FileResponse(

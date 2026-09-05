@@ -162,12 +162,14 @@ def parse_json_response(content: str) -> dict:
         if isinstance(parsed, dict):
             return parsed
     except json.JSONDecodeError:
+        # Not clean JSON yet; fall through to fence-stripping / regex below.
         pass
     match = re.search(r"\{.*\}", text, flags=re.DOTALL)
     if match:
         try:
             return json.loads(match.group(0))
         except json.JSONDecodeError:
+            # Regex extraction failed too; the final raise reports the failure.
             pass
     raise SyllabusAnalysisError("Model output was not parseable JSON")
 
