@@ -55,6 +55,17 @@ DEFAULTS = {
         },
     },
     "AUTO_IMPORT_CRAWLED_DATA": True,
+    "SYLLABUS": {
+        "MAX_UPLOAD_SIZE": 20971520,  # 20 MB
+        "ALLOWED_EXTENSIONS": [".pdf", ".docx"],
+    },
+    "OLLAMA": {
+        "BASE_URL": "http://127.0.0.1:11434",
+        "MODEL": "qwen3.8:latest",
+        "TIMEOUT": 600,
+        "NUM_CTX": 32768,  # 27B Q4 ~17GB weights; 262k ctx KV spills model to CPU
+        "MAX_PAGES": 30,
+    },
 }
 
 config = Config(config_path=BASE_DIR / "config.yaml", defaults=DEFAULTS)
@@ -103,6 +114,12 @@ TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
 AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 
 QUEST = config.get("QUEST")
+SYLLABUS = config.get("SYLLABUS")
+OLLAMA = config.get("OLLAMA")
+CELERY_BROKER_URL = config.get("REDIS.URL")
+
+# Django admin error emails (empty by default; no mail backend configured)
+ADMINS = []
 
 
 # ==============================================================================
@@ -161,6 +178,8 @@ TEMPLATES = [
 
 STATIC_URL = "/static/"
 STATIC_ROOT = "/app/staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"  # not served directly; downloads go through the API
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-us"

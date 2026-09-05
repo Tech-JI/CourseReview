@@ -129,6 +129,4 @@ def test_import_gc_courses_updates_courses_without_changing_offerings():
     assert physics.course_title == "Physics I"
     assert physics.course_credits == 4
     assert not physics.courseoffering_set.exists()
-    assert CourseOffering.objects.filter(
-        course=stale_course, term="26SU"
-    ).exists()
+    assert CourseOffering.objects.filter(course=stale_course, term="26SU").exists()

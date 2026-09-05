@@ -7,9 +7,7 @@ from django.db import transaction
 
 from apps.web.models import Course
 
-OFFERINGS_URL = (
-    "https://gc.sjtu.edu.cn/academics/courses/present-course-offerings/"
-)
+OFFERINGS_URL = "https://gc.sjtu.edu.cn/academics/courses/present-course-offerings/"
 HEADING_RE = re.compile(
     r"Courses\s+Offered\s+in\s+(Spring|Summer|Fall)\s+(20\d{2})",
     re.IGNORECASE,
@@ -84,9 +82,7 @@ def _coalesce_course_metadata(offerings):
 
     for (_, course_code), items in by_code.items():
         for field in fields:
-            populated = {
-                item[field] for item in items if item[field] not in (None, "")
-            }
+            populated = {item[field] for item in items if item[field] not in (None, "")}
             if len(populated) > 1:
                 raise GCOfferingsParseError(
                     f"conflicting {field} values for {course_code}: "
@@ -97,11 +93,7 @@ def _coalesce_course_metadata(offerings):
                 item[field] = value
 
         crosslisted_codes = sorted(
-            {
-                code
-                for item in items
-                for code in item.get("crosslisted_codes", [])
-            }
+            {code for item in items for code in item.get("crosslisted_codes", [])}
         )
         for item in items:
             item["crosslisted_codes"] = crosslisted_codes

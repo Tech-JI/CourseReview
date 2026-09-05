@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.shortcuts import render
@@ -20,6 +21,8 @@ from .models import (
     Review,
     ReviewVote,
     Student,
+    Syllabus,
+    SyllabusFile,
     Vote,
 )
 
@@ -89,7 +92,9 @@ class ReviewAdmin(admin.ModelAdmin):
             if form.is_valid():
                 upload = form.cleaned_data["csv_file"]
                 if upload.size > self.max_upload_size:
-                    form.add_error("csv_file", "CSV files must be no larger than 1 MiB.")
+                    form.add_error(
+                        "csv_file", "CSV files must be no larger than 1 MiB."
+                    )
                 else:
                     try:
                         csv_text = upload.read().decode("utf-8-sig")
@@ -150,3 +155,44 @@ admin.site.register(Review, ReviewAdmin)
 admin.site.register(ReviewVote)
 admin.site.register(Vote)
 admin.site.register(Student)
+
+
+@admin.register(SyllabusFile)
+class SyllabusFileAdmin(admin.ModelAdmin):
+    list_display = ("id", "original_filename", "sha256", "size", "created_at")
+    search_fields = ("original_filename", "sha256")
+    readonly_fields = ("sha256", "original_filename", "size", "created_at")
+    fields = ("file", "sha256", "original_filename", "size", "content_type")
+
+
+@admin.register(Syllabus)
+class SyllabusAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "course",
+        "instructor",
+        "status",
+        "is_primary",
+        "uploaded_by",
+        "created_at",
+    )
+    list_filter = ("status", "is_primary")
+    search_fields = ("course__course_code", "course__course_title", "instructor__name")
+    actions = ("reject_syllabi",)
+
+    def formfield_for_dbfield(self, db_field, **kwargs):
+        form_field = super().formfield_for_dbfield(db_field, **kwargs)
+        if isinstance(db_field, models.TextField) and db_field.name == "summary_md":
+            form_field.widget = forms.Textarea(attrs={"rows": 10, "cols": 80})
+        return form_field
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.is_primary:
+            Syllabus.objects.filter(
+                course=obj.course, instructor=obj.instructor
+            ).exclude(pk=obj.pk).update(is_primary=False)
+
+    @admin.action(description="Reject selected syllabi (mark failed, unset primary)")
+    def reject_syllabi(self, request, queryset):
+        queryset.update(status=Syllabus.Status.FAILED, is_primary=False)

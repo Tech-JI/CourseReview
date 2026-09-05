@@ -10,7 +10,9 @@ from apps.web.management.commands.import_legacy_reviews import IMPORT_USERNAME
 from apps.web.models import Course, Review
 
 
-def review_csv(*, course_code="TEST1000J", professor="Professor", term="", comment="Comment"):
+def review_csv(
+    *, course_code="TEST1000J", professor="Professor", term="", comment="Comment"
+):
     content = StringIO()
     writer = csv.DictWriter(
         content, fieldnames=["course_code", "professor", "term", "comment"]
@@ -25,7 +27,9 @@ def review_csv(*, course_code="TEST1000J", professor="Professor", term="", comme
         }
     )
     return SimpleUploadedFile(
-        "legacy_reviews.csv", content.getvalue().encode("utf-8"), content_type="text/csv"
+        "legacy_reviews.csv",
+        content.getvalue().encode("utf-8"),
+        content_type="text/csv",
     )
 
 
@@ -52,9 +56,7 @@ def test_only_superusers_can_access_legacy_review_import(client, import_url):
 
 
 @pytest.mark.django_db
-def test_admin_preview_then_confirm_imports_uploaded_csv(
-    client, superuser, import_url
-):
+def test_admin_preview_then_confirm_imports_uploaded_csv(client, superuser, import_url):
     Course.objects.create(course_code="TEST1000J")
     client.force_login(superuser)
 

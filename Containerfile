@@ -17,6 +17,9 @@ COPY --from=builder /usr/local /usr/local
 
 COPY --from=builder /app /app
 
+# Media uploads land here; make the named volume writable by nonroot.
+RUN mkdir -p /app/media && chown -R nonroot:nonroot /app/media
+
 WORKDIR /app
 
 USER nonroot
