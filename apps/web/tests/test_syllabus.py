@@ -74,7 +74,8 @@ def fake_ollama(monkeypatch):
                 "flags": [],
                 "summary_md": "## Summary\n\nMock grading summary.",
             }
-        return {"content": json.dumps(result)}
+        # Ollama /api/chat nests content under message.content.
+        return {"message": {"content": json.dumps(result)}}
 
     monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat)
     return _chat
