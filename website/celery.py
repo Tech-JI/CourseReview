@@ -27,13 +27,9 @@ app.conf.beat_schedule = {
         "task": "apps.spider.tasks.crawl_orc",
         "schedule": crontab(minute=0, hour=1),  # 1AM
     },
-    "crawl_timetable": {
-        "task": "apps.spider.tasks.crawl_timetable",
-        "schedule": crontab(minute=30, hour=1),  # 1:30AM
-    },
-    "crawl_medians": {
-        "task": "apps.spider.tasks.crawl_medians",
-        "schedule": crontab(minute=0, hour=2),  # 2AM
+    "crawl_gc_course_offerings": {
+        "task": "apps.spider.tasks.crawl_gc_course_offerings",
+        "schedule": crontab(minute=15, hour=1),  # 1:15AM
     },
     "request_term_change": {
         "task": "apps.analytics.tasks.possibly_request_term_update",

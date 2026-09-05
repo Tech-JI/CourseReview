@@ -5,7 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from django.db import transaction
 
-from apps.web.models import Course
+from apps.web.models import Course, CourseOffering, Instructor
 
 OFFERINGS_URL = "https://gc.sjtu.edu.cn/academics/courses/present-course-offerings/"
 HEADING_RE = re.compile(
@@ -199,21 +199,35 @@ def _parse_instructors(value):
 def import_gc_courses(offerings):
     if not offerings:
         raise ValueError("refusing to import an empty course list")
-    imported_codes = set()
+    courses_by_code = {}
 
     for item in offerings:
-        if item["course_code"] in imported_codes:
-            continue
-        Course.objects.update_or_create(
-            course_code=item["course_code"],
-            defaults={
-                "course_title": item["course_title"],
-                "department": item["department"],
-                "number": item["number"],
-                "course_credits": item["course_credits"],
-                "url": item["url"],
-            },
-        )
-        imported_codes.add(item["course_code"])
+        course = courses_by_code.get(item["course_code"])
+        if course is None:
+            course, _ = Course.objects.update_or_create(
+                course_code=item["course_code"],
+                defaults={
+                    "course_title": item["course_title"],
+                    "department": item["department"],
+                    "number": item["number"],
+                    "course_credits": item["course_credits"],
+                    "url": item["url"],
+                },
+            )
+            courses_by_code[item["course_code"]] = course
 
-    return len(imported_codes)
+        instructors = [
+            Instructor.objects.get_or_create(name=name)[0]
+            for name in item["instructors"]
+        ]
+        # Sections are numbered by row order within the GC page table, not by
+        # the registrar's section numbers (the page has no such column).
+        offering, _ = CourseOffering.objects.get_or_create(
+            course=course,
+            term=item["term"],
+            section=item["section"],
+            defaults={"period": ""},
+        )
+        offering.instructors.set(instructors)
+
+    return len(courses_by_code)

@@ -6,7 +6,7 @@ from apps.spider.crawlers.gc_offerings import (
     import_gc_courses,
     parse_gc_offerings,
 )
-from apps.web.models import Course, CourseOffering
+from apps.web.models import Course, CourseOffering, Instructor
 
 
 SAMPLE_HTML = """
@@ -114,12 +114,12 @@ def test_parse_gc_offerings_reads_all_semester_tables():
     reason="project migrations use PostgreSQL-only ArrayField columns",
 )
 @pytest.mark.django_db
-def test_import_gc_courses_updates_courses_without_changing_offerings():
+def test_import_gc_courses_updates_courses_and_creates_offerings():
     rows = parse_gc_offerings(SAMPLE_HTML)
     stale_course = Course.objects.create(
         course_code="OLD1000J", course_title="Old", department="OLD", number=1000
     )
-    CourseOffering.objects.create(
+    stale_offering = CourseOffering.objects.create(
         course=stale_course, term="26SU", section=1, period=""
     )
 
@@ -128,5 +128,58 @@ def test_import_gc_courses_updates_courses_without_changing_offerings():
     physics = Course.objects.get(course_code="PHYS1500J")
     assert physics.course_title == "Physics I"
     assert physics.course_credits == 4
-    assert not physics.courseoffering_set.exists()
-    assert CourseOffering.objects.filter(course=stale_course, term="26SU").exists()
+    # Unrelated offerings are untouched.
+    assert CourseOffering.objects.get(pk=stale_offering.pk).course == stale_course
+
+    offerings = list(physics.courseoffering_set.order_by("section"))
+    assert [(o.term, o.section) for o in offerings] == [("26SU", 1), ("26SU", 2)]
+    assert [o.instructors_string() for o in offerings] == [
+        "Richard Grumitt",
+        "Mesli Abdelmadjid",
+    ]
+
+    # Crosslisted code imports under its primary code only.
+    assert Course.objects.filter(course_code="VK335").count() == 0
+
+    # A row with no instructor ("–") still gets an offering, without instructors.
+    materials = Course.objects.get(course_code="MSE3350J")
+    assert materials.courseoffering_set.get().instructors.count() == 0
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_gc_courses_is_idempotent():
+    rows = parse_gc_offerings(SAMPLE_HTML)
+
+    assert import_gc_courses(rows) == 5
+    assert import_gc_courses(rows) == 5
+
+    assert CourseOffering.objects.count() == 6
+    assert Instructor.objects.count() == 6  # 6 unique names across 6 rows
+    physics = Course.objects.get(course_code="PHYS1500J")
+    assert physics.courseoffering_set.count() == 2
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_gc_courses_syncs_changed_instructors():
+    rows = parse_gc_offerings(SAMPLE_HTML)
+    assert import_gc_courses(rows) == 5
+
+    physics_rows = [row for row in rows if row["course_code"] == "PHYS1500J"]
+    physics_rows[0]["instructors"] = ["New Professor"]
+    assert import_gc_courses(rows) == 5
+
+    physics = Course.objects.get(course_code="PHYS1500J")
+    section_one = physics.courseoffering_set.get(term="26SU", section=1)
+    assert [i.name for i in section_one.instructors.all()] == ["New Professor"]
+    section_two = physics.courseoffering_set.get(term="26SU", section=2)
+    assert [i.name for i in section_two.instructors.all()] == ["Mesli Abdelmadjid"]
+    # Instructor rows are never deleted, only unbound.
+    assert Instructor.objects.filter(name="Richard Grumitt").exists()
