@@ -3,11 +3,8 @@ from urllib.parse import urljoin
 
 from django.db import models
 
-from apps.spider.crawlers.gc_offerings import (
-    JUNK_INSTRUCTOR_NAMES,
-    clean_instructor_name,
-    expand_instructor_names,
-)
+from lib.name_normalization import JUNK_INSTRUCTOR_NAMES, clean_instructor_name
+from apps.spider.crawlers.gc_offerings import expand_instructor_names
 from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM

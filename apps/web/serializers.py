@@ -14,6 +14,7 @@ from apps.web.models import (
     Vote,
 )
 from lib import constants
+from lib.name_normalization import canonicalize_professor
 from lib.terms import is_valid_term, normalize_term
 
 
@@ -153,15 +154,32 @@ class ReviewSerializer(serializers.ModelSerializer):
             )
 
     def validate_professor(self, value):
-        """Validate professor name format"""
-        names = value.split(" ")
+        """Validate and canonicalize professor name.
 
-        if len(names) < 2:
+        The name is matched against the course's canonical instructors
+        (from course offerings): reversed, misspelled, or annotated variants
+        are corrected to the canonical spelling. Only when nothing matches is
+        the submitted name kept as its own professor.
+        """
+        course = self.context.get("course")
+        if course is None and self.instance is not None:
+            course = self.instance.course
+
+        candidate_names = []
+        if course is not None:
+            candidate_names = (
+                Instructor.objects.filter(courseoffering__course=course)
+                .values_list("name", flat=True)
+                .distinct()
+            )
+        normalized = canonicalize_professor(value, candidate_names)
+
+        if len(normalized.split()) < 2:
             raise serializers.ValidationError(
                 "Please use a valid professor name, e.g. John Smith"
             )
 
-        return " ".join([n.capitalize() for n in names])
+        return normalized
 
     def validate_comments(self, value):
         """Validate review minimum length"""

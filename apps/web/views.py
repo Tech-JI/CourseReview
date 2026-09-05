@@ -301,7 +301,7 @@ class CoursesReviewsAPI(
             )
 
         # Validate and save review using ReviewSerializer
-        serializer = ReviewSerializer(data=request.data)
+        serializer = ReviewSerializer(data=request.data, context={"course": course})
         if not serializer.is_valid():
             logger.warning("Review serializer errors: %s", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
