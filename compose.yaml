@@ -28,6 +28,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./.env:/app/.env:ro
+      - syllabus_media:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -60,6 +61,25 @@ services:
     command: ["python", "django_manage.py", "migrate"]
     restart: "no"
 
+  worker:
+    image: coursereview-backend
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./.env:/app/.env:ro
+      - syllabus_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OLLAMA__BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["celery", "-A", "website.celery", "worker", "--loglevel=info", "--pool=solo"]
+    restart: unless-stopped
+
   tunnel:
     image: cloudflare/cloudflared:latest
     command: tunnel run --protocol http2 --token ${TUNNEL_TOKEN}
@@ -70,3 +90,4 @@ services:
 
 volumes:
   postgres18_data:
+  syllabus_media:
