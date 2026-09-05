@@ -124,9 +124,46 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
    - Looks up the state record in Redis using the SHA256 hash of the `temp_token`.
    - Verifies the status is `pending`. If it's already `verified` or missing, return an error.
 3. **Security**: Applies strict rate limiting per _valid_ `temp_token` to prevent brute-force attempts on a single verification flow. Check and set rate limit (or attempts count) in Redis.
-4. **API Query**: Fetches recent submissions from the questionnaire platform for the given `account`.
-5. **Find Submission**: Locates the specific submission matching the `answer_id`. If not found, returns an error.
-6. **Extract Data**: Extracts the `submitted_otp` and the questionnaire's unique ID (`quest_id`) from the submission.
+4. **API Query**: Fetches recent submissions from the questionnaire platform for the given `account`. The configured API endpoint is the WJ development export endpoint shown in each questionnaire's edit page; it returns JSON in the following shape:
+
+   ```jsonc
+   {
+     "success": true,
+     "message": "ok",
+     "data": {
+       "rows": [
+         {
+           "answers": [
+             {
+               "answer": "12345678",
+               "question": {
+                 "answer_name": "12345678",
+                 "id": 10469990, // question_id configured for this action
+                 "question_type": "填空题",
+                 "title": "请输入8位随机码"
+               }
+             }
+           ],
+           "id": 3913814, // answer_id from the callback URL
+           "ip_address": "127.0.0.1",
+           "status": 0,
+           "submitted_at": "2025-09-10T15:34:07.972+08:00",
+           "tags": [],
+           "user": {
+             "account": "xxxxx", // JAccount
+             "name": "xxx", // real name
+             "organization": "密西根学院"
+           }
+         }
+       ],
+       "total": 2
+     },
+     "code": 0
+   }
+   ```
+
+5. **Find Submission**: Locates the latest submission for the requested account and checks that it matches the `answer_id`. If not found, returns an error.
+6. **Extract Data**: Reads `user.account`, `submitted_at`, and the OTP answer whose nested `question.id` matches the configured `QUESTIONID` for this action.
 7. ~~**Intent Verification**: Confirms that the `quest_id` from the submission correctly maps to the `action` specified in the request, preventing cross-flow attacks.~~ Not needed, different quesitonnaires use different API, cross-flow attacks are not possible.
 8. **OTP & Token Link Validation**:
    - Atomically retrieves the expected `temp_token` associated with the `submitted_otp` and deletes the OTP record to prevent reuse. Use atomic `GETDEL` to prevent race condition.
