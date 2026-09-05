@@ -20,6 +20,29 @@ services:
       REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - syllabus_media:/app/media
+
+  worker:
+    build:
+      context: .
+      dockerfile: Containerfile
+    command: ["celery", "-A", "website.celery", "worker", "--loglevel=info"]
+    env_file:
+      - .env
+    environment:
+      DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
+      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+      # Local Ollama runs on the host; podman host-gateway hostname.
+      OLLAMA__BASE_URL: ${OLLAMA__BASE_URL:-http://host.containers.internal:11434}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - syllabus_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    restart: unless-stopped
 
   migrate:
     build:
@@ -32,3 +55,6 @@ services:
       REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+
+volumes:
+  syllabus_media:
