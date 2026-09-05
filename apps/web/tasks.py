@@ -1,9 +1,11 @@
 import logging
 
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
 
 from apps.web.models import Syllabus, SyllabusFile
+from apps.web.syllabus_files import recycle_file_if_unreferenced
 from apps.web.syllabus_analysis import (
     TEXT_OCR_THRESHOLD,
     SyllabusAnalysisError,
@@ -22,8 +24,10 @@ logger = logging.getLogger(__name__)
 def process_syllabus(syllabus_id):
     """Extract text, analyze against course data, and resolve the primary copy.
 
-    Never deletes files: every upload is kept; comparison only decides which
-    of the duplicates is marked primary.
+    Uploads whose verdict match_score is below the configured threshold are
+    rejected (status ``rejected``, kept for audit, hidden from course pages)
+    and their file moved to the recycle dir when no other syllabus shares it.
+    Comparison only decides which of the duplicates is marked primary.
 
     Failure bookkeeping lives outside the atomic block: a raise inside it
     would roll the FAILED status back with the rest of the work.
@@ -62,6 +66,21 @@ def _analyze_and_resolve(syllabus_id):
     summary_md = str(verdict.get("summary_md", "")).strip()
     if not summary_md:
         raise SyllabusAnalysisError("Model returned no summary")
+
+    # Reject uploads that clearly do not belong to this course: keep the row
+    # for audit (admin can still see and restore it) but hide it from the
+    # course page, and recycle the file once nothing references it.
+    match_score = verdict.get("match_score")
+    if isinstance(match_score, (int, float)) and (
+        match_score < settings.SYLLABUS["MIN_MATCH_SCORE"]
+    ):
+        syllabus.summary_md = summary_md
+        syllabus.verdict = verdict
+        syllabus.status = Syllabus.Status.REJECTED
+        syllabus.error_message = ""
+        syllabus.save()
+        recycle_file_if_unreferenced(syllabus.file, exclude_syllabus=syllabus)
+        return
 
     syllabus.summary_md = summary_md
     syllabus.verdict = verdict
