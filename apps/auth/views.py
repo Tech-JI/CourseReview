@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 AUTH_SETTINGS = settings.AUTH
-OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+OTP_TIMEOUT = int(AUTH_SETTINGS["OTP_TIMEOUT"])
 TEMP_TOKEN_TIMEOUT = AUTH_SETTINGS["TEMP_TOKEN_TIMEOUT"]
 ACTION_LIST = AUTH_SETTINGS["ACTION_LIST"]
 TOKEN_RATE_LIMIT = AUTH_SETTINGS["TOKEN_RATE_LIMIT"]
@@ -261,15 +261,68 @@ def verify_callback_api(request):
 
         submitted_at = dateutil.parser.parse(submitted_at_str).timestamp()
 
-        # Additional validation: check submission is after initiation and within window
-        if submitted_at < initiated_at or (submitted_at - initiated_at) > OTP_TIMEOUT:
+        # Validation: submission must be after initiation and within the OTP
+        # window. The WJ platform's server clock runs slow and drifts over
+        # time (~7s/day; measured ~-230s on 2026-09-08), so we dynamically
+        # correct submitted_at by the WJ clock offset before checking. The
+        # offset is sampled from the WJ API response's Date header on every
+        # get_latest_answer call (NTP-style, same clock domain as
+        # submitted_at); we prefer this request's fresh sample, falling back
+        # to the rolling EWMA in Redis, then to legacy fixed tolerance.
+        clock_offset = latest_answer.get("server_clock_offset")
+        if clock_offset is None:
+            clock_offset = utils.get_cached_wj_clock_offset()
+
+        if clock_offset is not None:
+            corrected_submitted_at = submitted_at - clock_offset
+            timestamp_tolerance = AUTH_SETTINGS.get("TIMESTAMP_JITTER_TOLERANCE", 60)
+        else:
+            # No offset data available (cold start with WJ not sending a
+            # usable Date header) — legacy behavior.
+            corrected_submitted_at = submitted_at
+            timestamp_tolerance = 220
+            logger.warning(
+                "No WJ clock offset available; falling back to legacy "
+                "tolerance=220s (submitted_at=%s initiated_at=%s)",
+                submitted_at,
+                initiated_at,
+            )
+
+        if (
+            corrected_submitted_at + timestamp_tolerance < initiated_at
+            or (corrected_submitted_at - initiated_at) > OTP_TIMEOUT + timestamp_tolerance
+        ):  # fmt: skip
+            logger.warning(
+                "Submission timestamp outside validity window: "
+                "submitted_at=%s initiated_at=%s raw_diff=%.1fs "
+                "clock_offset=%.1fs corrected_diff=%.1fs tolerance=%ss",
+                submitted_at,
+                initiated_at,
+                submitted_at - initiated_at,
+                clock_offset if clock_offset is not None else 0.0,
+                corrected_submitted_at - initiated_at,
+                timestamp_tolerance,
+            )
             return Response(
                 {"error": "Submission timestamp outside validity window"},
                 status=401,
             )
 
-    except ValueError, TypeError:
-        logger.error("Error parsing submission timestamp")
+        logger.info(
+            "Clock offset applied: offset=%.1fs raw_diff=%.1fs corrected_diff=%.1fs",
+            clock_offset if clock_offset is not None else 0.0,
+            submitted_at - initiated_at,
+            corrected_submitted_at - initiated_at,
+        )
+
+    except (ValueError, TypeError) as e:
+        logger.error(
+            "Error parsing submission timestamp: submitted_at_str=%r "
+            "initiated_at=%r exception=%s",
+            locals().get("submitted_at_str"),
+            locals().get("initiated_at"),
+            e,
+        )
         return Response({"error": "Invalid submission timestamp"}, status=401)
 
     # Step 7: Update state to verified and add user details

@@ -31,6 +31,11 @@ DEFAULTS = {
         "PASSWORD_LENGTH_MAX": 32,
         "EMAIL_DOMAIN_NAME": "sjtu.edu.cn",
         "ACTION_LIST": ["signup", "login", "reset_password"],
+        # Residual jitter tolerance (seconds) applied to the WJ submission
+        # timestamp AFTER dynamic clock-offset correction (see
+        # apps/auth/utils.estimate_wj_clock_offset). Covers Date-header
+        # 1s resolution, RTT asymmetry, and platform processing delay.
+        "TIMESTAMP_JITTER_TOLERANCE": 60,
     },
     "DATABASE": {"URL": "sqlite:///db.sqlite3"},
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
