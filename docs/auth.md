@@ -124,7 +124,44 @@ On mount, checks `localStorage` for an `auth_flow` state object with `status: 'v
    - Looks up the state record in Redis using the SHA256 hash of the `temp_token`.
    - Verifies the status is `pending`. If it's already `verified` or missing, return an error.
 3. **Security**: Applies strict rate limiting per _valid_ `temp_token` to prevent brute-force attempts on a single verification flow. Check and set rate limit (or attempts count) in Redis.
-4. **API Query**: Fetches recent submissions from the questionnaire platform for the given `account`.
+4. **API Query**: Fetches recent submissions from the questionnaire platform for the given `account`. The WJ API response looks like:
+
+   ```jsonc
+   {
+     "success": true,
+     "message": "ok",
+     "data": {
+       "rows": [
+         {
+           "answers": [
+             {
+               "answer": "12345678",
+               "question": {
+                 "answer_name": "12345678",
+                 "id": 10469990, // question_id
+                 "question_type": "填空题",
+                 "title": "请输入8位随机码"
+               }
+             }
+           ],
+           "id": 3913814, // answer_id
+           "ip_address": "127.0.0.1",
+           "status": 0,
+           "submitted_at": "2025-09-10T15:34:07.972+08:00",
+           "tags": [],
+           "user": {
+             "account": "xxxxx", // JAccount
+             "name": "xxx", // real name
+             "organization": "密西根学院"
+           }
+         }
+       ],
+       "total": 2
+     },
+     "code": 0
+   }
+   ```
+
 5. **Find Submission**: Locates the specific submission matching the `answer_id`. If not found, returns an error.
 6. **Extract Data**: Extracts the `submitted_otp` and the questionnaire's unique ID (`quest_id`) from the submission.
 7. ~~**Intent Verification**: Confirms that the `quest_id` from the submission correctly maps to the `action` specified in the request, preventing cross-flow attacks.~~ Not needed, different quesitonnaires use different API, cross-flow attacks are not possible.
