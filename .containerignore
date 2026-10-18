@@ -3,6 +3,12 @@ run.py
 .git
 .venv
 .env
+.env.*
+!.env.example
+tunnel.env
+secrets.env
+data/backups/
+*.dump
 .ruff_cache
 .pytest_cache
 frontend

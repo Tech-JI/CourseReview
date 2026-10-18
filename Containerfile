@@ -1,17 +1,31 @@
+# syntax=docker/dockerfile:1
 FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS builder
 
 WORKDIR /app
 
-COPY . /app
+ARG UV_DEFAULT_INDEX=https://pypi.org/simple
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}
 
-RUN UV_PROJECT_ENVIRONMENT=/usr/local \
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_PROJECT_ENVIRONMENT=/usr/local \
     uv sync --project=/app --frozen --compile-bytecode --no-dev --no-editable --no-managed-python
 
-FROM gcr.io/distroless/base-debian13:nonroot
+COPY . /app
+
+RUN python django_manage.py collectstatic --noinput
+
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+
+RUN useradd --create-home --shell /bin/bash nonroot
 
 COPY --from=builder /usr/local /usr/local
 
 COPY --from=builder /app /app
+
+# Media uploads land here; make the named volume writable by nonroot.
+RUN mkdir -p /app/media && chown -R nonroot:nonroot /app/media
 
 WORKDIR /app
 

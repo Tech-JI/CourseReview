@@ -168,6 +168,26 @@ Stop the stack:
 ./run.py stack down --mode dev
 ```
 
+### Service layout
+
+`compose.yaml` defines the shared topology only: `db`, `cache`, `backend`,
+`migrate`, `worker`, and `beat`. It has no host-specific bind mounts and no
+Cloudflare Tunnel, so both modes start from the same file.
+
+`compose.dev.yaml` and `compose.prod.yaml` add what differs per mode: where the
+image comes from (`build` versus the pre-built `coursereview-backend`), which
+`env_file` is loaded, and which config or media paths are mounted. `./run.py stack`
+always passes `compose.yaml` plus exactly one overlay.
+
+- `worker` and `beat` are separate services in both modes; beat is never folded
+  into a worker with `--beat`.
+- The Cloudflare Tunnel is defined only in `compose.prod.yaml`, so a dev stack
+  does not start `cloudflared`.
+- Application containers get configuration through `env_file` and `environment`,
+  and mount only `config.yaml`; `.env` is not bind-mounted into a container.
+- `LLM__BASE_URL` is interpolated by the compose process, so it can be set in
+  the shell environment or in `.env` instead of being edited in the compose files.
+
 ## CI testing
 
 Tests are run with `pytest`.
@@ -221,19 +241,25 @@ sudo loginctl enable-linger coursereview
 
 ### Server config layout
 
-Recommended:
+Keep deployment files outside the repository and point Compose at them through
+the environment:
 
-```text
-/etc/coursereview/
-  secrets.env
-  config.yaml
+- `CR_SECRETS_ENV`: environment file loaded by the backend, worker, beat and
+  migrate containers
+- `CR_CONFIG_FILE`: non-secret `config.yaml`
+- `CR_TUNNEL_ENV`: environment file loaded only by the Cloudflare Tunnel
+  container
+- `CR_MEDIA_DIR`: host directory mounted at `/app/media`
+
+Set these in an untracked file and pass it with `--env-file`, for example:
+
+```bash
+./run.py stack --mode prod --env-file /path/to/compose.env up -d
 ```
 
-Suggested ownership and permissions:
-
-- directory owned by `root:coursereview`
-- `secrets.env` readable by group `coursereview`
-- `config.yaml` readable by group `coursereview`
+`tunnel.env` holds only `TUNNEL_TOKEN` and is loaded by the Cloudflare Tunnel
+container alone. Create it from `tunnel.env.example` in the repo. Keep the token
+out of `secrets.env`.
 
 ### Quadlet
 
@@ -250,7 +276,22 @@ Typical units:
 - one network
 - one Postgres container
 - one Valkey container
-- one Django container
+- one Django (gunicorn) container
+- one Celery worker container
+- one Celery beat container
+- one migration unit (oneshot)
+- one Cloudflare Tunnel container, if the site is fronted by a Tunnel
+
+Run beat as its own unit instead of passing `--beat` to a worker. A worker
+started with `--beat` makes scheduled tasks and task execution share one process
+and one restart domain: restarting or scaling the worker stops the schedule, and
+a stuck schedule blocks the worker. Beat needs a writable schedule file, so pass
+`--schedule=/tmp/celerybeat-schedule`; the distroless image runs as a non-root
+user with an unwritable working directory, and the default `./celerybeat-schedule`
+fails with `PermissionError`.
+
+Keep exactly one beat unit. Multiple beat units run every scheduled task more
+than once.
 
 ### Deployment workflow
 
@@ -275,6 +316,23 @@ over floating tags like `latest`.
 Run migrations explicitly during deploy, before restarting the backend.
 
 Do not rely on container startup to hide migration failures.
+
+### Recycled syllabus files
+
+Rejected or deleted syllabus uploads are moved to a `recycle/` directory under
+the media root instead of being unlinked, so a mistaken rejection can be
+recovered.
+
+Orphans are not kept forever. The beat schedule runs
+`purge_recycled_syllabus_files` daily at 04:00, which deletes recycled files
+older than `SYLLABUS.RECYCLE_RETENTION_DAYS` (default 30) and, if the directory
+is still larger than `SYLLABUS.RECYCLE_MAX_FILES` (default 500), the oldest
+entries beyond that count.
+
+The media root must be writable by both the backend and worker containers and
+persistent across deploys. In `compose.yaml` this is the `/app/media` volume or
+bind mount; the same volume must be mounted into the worker, since uploads are
+analyzed and recycled by Celery.
 
 ## Static files and Django admin
 
