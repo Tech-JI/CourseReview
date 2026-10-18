@@ -1,12 +1,17 @@
+import hashlib
+
 import factory
 import factory.fuzzy
 from django.contrib.auth.models import User
 
 # Import models from their individual files
 from apps.web.models.course import Course
+from apps.web.models.course_offering import CourseOffering
+from apps.web.models.instructor import Instructor
 from apps.web.models.review import Review
 from apps.web.models.student import Student
-from apps.web.models.course_offering import CourseOffering
+from apps.web.models.syllabus import Syllabus
+from apps.web.models.syllabus_file import SyllabusFile
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -77,3 +82,49 @@ class DistributiveRequirementFactory(factory.django.DjangoModelFactory):
         model = "web.DistributiveRequirement"
 
     name = factory.Sequence(lambda n: f"Dist{n}")
+
+
+class InstructorFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Instructor
+
+    name = factory.Sequence(lambda n: f"Prof{n} Name{n}")
+
+
+def syllabus_pdf_bytes(seed: str = "syllabus") -> bytes:
+    """Minimal valid-enough PDF bytes; distinct seed => distinct sha256."""
+    return (
+        f"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Info {seed}>>\n%%EOF"
+    ).encode()
+
+
+class SyllabusFileFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = SyllabusFile
+
+    content_type = "application/pdf"
+    original_filename = factory.Sequence(lambda n: f"syllabus-{n}.pdf")
+    # Unique per created file (unique sha256 constraint). Content hash
+    # consistency is the upload view's job, not the factory's.
+    sha256 = factory.Sequence(
+        lambda n: hashlib.sha256(f"factory-seed-{n}".encode()).hexdigest()
+    )
+    size = factory.LazyFunction(lambda: len(syllabus_pdf_bytes()))
+    file = factory.django.FileField(data=syllabus_pdf_bytes(), filename="syllabus.pdf")
+
+
+class SyllabusFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Syllabus
+
+    course = factory.SubFactory(CourseFactory)
+    instructor = factory.SubFactory(InstructorFactory)
+    file = factory.SubFactory(SyllabusFileFactory)
+    status = Syllabus.Status.ANALYZED
+    summary_md = "# Syllabus\n\nGrading: 40% homework, 60% final."
+    verdict = {
+        "match_score": 90,
+        "matches_course_content": True,
+        "is_legitimate": True,
+        "flags": [],
+    }
