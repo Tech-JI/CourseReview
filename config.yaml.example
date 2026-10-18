@@ -67,16 +67,18 @@ QUEST:
 #   MAX_UPLOAD_SIZE: 20971520 # 20 MB
 #   ALLOWED_EXTENSIONS: [".pdf", ".docx"]
 #   MIN_MATCH_SCORE: 60
-#   MAX_ANALYSIS_CHARS: # unset derives it from OLLAMA.NUM_CTX
+#   MAX_ANALYSIS_CHARS: # unset derives it from LLM.NUM_CTX
 #   MAX_EXTRACTED_CHARS: 400000
 #   RECYCLE_RETENTION_DAYS: 30
 #   RECYCLE_MAX_FILES: 500
 #   REQUIRE_COURSE_SIGNAL: true
 #   REQUIRE_EVIDENCE: true
 
-# OLLAMA: # local LLM used for syllabus analysis/OCR (env: OLLAMA__BASE_URL etc.)
+# LLM: # syllabus analysis and OCR model (env: LLM__PROVIDER, LLM__BASE_URL, LLM__API_KEY)
+#   PROVIDER: ollama # ollama or openai (OpenAI-compatible API)
 #   BASE_URL: "http://127.0.0.1:11434"
+#   API_KEY: # bearer token for hosted or proxied endpoints
 #   MODEL: "qwen3.8:latest"
 #   TIMEOUT: 600
-#   NUM_CTX: 262144
+#   NUM_CTX: 32768
 #   MAX_PAGES: 30

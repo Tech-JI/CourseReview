@@ -79,7 +79,7 @@ def extract_pdf_text(pdf_bytes: bytes, max_pages: int | None = None) -> str:
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(pdf_bytes))
-    limit = max_pages or settings.OLLAMA["MAX_PAGES"]
+    limit = max_pages or settings.LLM["MAX_PAGES"]
     pages = list(reader.pages)[:limit]
     return "\n".join(
         (page.extract_text() or "") for page in pages if page.extract_text()
@@ -108,7 +108,7 @@ def render_pdf_pages(pdf_bytes: bytes, max_pages: int | None = None) -> list[byt
     """Render PDF pages to PNG bytes for vision OCR (no system deps)."""
     import pypdfium2 as pdfium
 
-    max_pages = max_pages or settings.OLLAMA["MAX_PAGES"]
+    max_pages = max_pages or settings.LLM["MAX_PAGES"]
     pdf = pdfium.PdfDocument(pdf_bytes)
     try:
         n_pages = min(len(pdf), max_pages)
@@ -149,35 +149,59 @@ def ocr_pages(images: list[bytes]) -> str:
     ]
     for i, page_png in enumerate(images, start=1):
         parts.extend(_image_message(page_png, i))
-    response = ollama_chat(
+    response = llm_chat(
         [{"role": "user", "content": parts}],
         format_json=False,
     )
     return (response.get("message") or {}).get("content", "").strip()
 
 
-def ollama_chat(messages: list[dict], format_json: bool = False) -> dict:
-    """POST /api/chat to the local Ollama; returns the parsed response dict.
+def _llm_request(llm: dict, messages: list[dict], format_json: bool):
+    provider = str(llm.get("PROVIDER") or "ollama").lower()
+    base_url = llm["BASE_URL"].rstrip("/")
+    headers = {}
+    api_key = llm.get("API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
-    Retries transient connection/read-timeout failures with backoff.
-    """
-    ollama = settings.OLLAMA
-    payload: dict = {
-        "model": ollama["MODEL"],
+    if provider == "openai":
+        payload: dict = {
+            "model": llm["MODEL"],
+            "messages": messages,
+            "stream": False,
+            "temperature": 0.2,
+        }
+        if format_json:
+            payload["response_format"] = {"type": "json_object"}
+        return f"{base_url}/chat/completions", payload, headers, provider
+
+    payload = {
+        "model": llm["MODEL"],
         "messages": messages,
         "stream": False,
         "options": {
-            "num_ctx": ollama["NUM_CTX"],
+            "num_ctx": llm["NUM_CTX"],
             "temperature": 0.2,
-            # qwen3 thinking models: with JSON format enabled the final answer
-            # lands in `message.thinking` and `content` comes back empty.
             "think": False,
         },
     }
     if format_json:
         payload["format"] = "json"
-    url = f"{ollama['BASE_URL'].rstrip('/')}/api/chat"
-    timeout = ollama["TIMEOUT"]
+    return f"{base_url}/api/chat", payload, headers, provider
+
+
+def _llm_response(data: dict, provider: str) -> dict:
+    if provider == "openai":
+        choices = data.get("choices") or [{}]
+        message = choices[0].get("message") or {}
+        return {"message": {"content": message.get("content") or ""}, "raw": data}
+    return data
+
+
+def llm_chat(messages: list[dict], format_json: bool = False) -> dict:
+    llm = settings.LLM
+    url, payload, headers, provider = _llm_request(llm, messages, format_json)
+    timeout = llm["TIMEOUT"]
     last_error: Exception | None = None
     for attempt, backoff in enumerate((0, 5, 15)):
         if backoff:
@@ -186,26 +210,24 @@ def ollama_chat(messages: list[dict], format_json: bool = False) -> dict:
             time.sleep(backoff)
         try:
             with httpx.Client(timeout=timeout) as client:
-                response = client.post(url, json=payload)
+                response = client.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            data = response.json()
+            data = _llm_response(response.json(), provider)
             if not (data.get("message") or {}).get("content"):
                 logger.warning(
-                    "Ollama returned empty content: done=%s eval=%d ctx=%d model=%s",
-                    data.get("done_reason"),
-                    data.get("eval_count"),
-                    data.get("prompt_eval_count"),
+                    "LLM returned empty content: provider=%s model=%s",
+                    provider,
                     payload["model"],
                 )
             return data
         except (httpx.ConnectError, httpx.ReadTimeout) as exc:
             last_error = exc
-            logger.warning("Ollama unreachable (attempt %d/3): %s", attempt + 1, exc)
+            logger.warning("LLM unreachable (attempt %d/3): %s", attempt + 1, exc)
         except httpx.HTTPStatusError as exc:
             raise SyllabusAnalysisError(
-                f"Ollama returned HTTP {exc.response.status_code}"
+                f"LLM returned HTTP {exc.response.status_code}"
             ) from exc
-    raise SyllabusAnalysisError(f"Ollama unreachable: {last_error}")
+    raise SyllabusAnalysisError(f"LLM unreachable: {last_error}")
 
 
 def parse_json_response(content: str) -> dict:
@@ -244,7 +266,7 @@ def max_analysis_chars() -> int:
     configured = settings.SYLLABUS["MAX_ANALYSIS_CHARS"]
     if configured:
         return int(configured)
-    return max(2_000, settings.OLLAMA["NUM_CTX"] * 2 - 4_000)
+    return max(2_000, settings.LLM["NUM_CTX"] * 2 - 4_000)
 
 
 def max_extracted_chars() -> int:
@@ -405,7 +427,7 @@ def analyze(course, instructor, syllabus_text: str) -> dict:
         instructor,
         _truncate(scrub_instructions(syllabus_text), max_analysis_chars()),
     )
-    response = ollama_chat([{"role": "user", "content": prompt}], format_json=True)
+    response = llm_chat([{"role": "user", "content": prompt}], format_json=True)
     verdict = parse_json_response((response.get("message") or {}).get("content") or "")
     # summary_md is nested inside the verdict JSON by the model.
     return validate_verdict(verdict)
@@ -419,5 +441,5 @@ def compare(course, instructor, new_text: str, old_text: str) -> dict:
         _truncate(scrub_instructions(new_text), max_analysis_chars()),
         _truncate(scrub_instructions(old_text), max_analysis_chars()),
     )
-    response = ollama_chat([{"role": "user", "content": prompt}], format_json=True)
+    response = llm_chat([{"role": "user", "content": prompt}], format_json=True)
     return parse_json_response((response.get("message") or {}).get("content") or "")

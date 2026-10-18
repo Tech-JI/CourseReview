@@ -67,7 +67,7 @@ DEFAULTS = {
         "ALLOWED_EXTENSIONS": [".pdf", ".docx"],
         # AI analysis rejects uploads whose match score is below this.
         "MIN_MATCH_SCORE": 60,
-        # Prompt budget in characters; None derives it from OLLAMA.NUM_CTX.
+        # Prompt budget in characters; None derives it from LLM.NUM_CTX.
         "MAX_ANALYSIS_CHARS": None,
         # Cap on cached extracted text per uploaded file.
         "MAX_EXTRACTED_CHARS": 400_000,
@@ -78,11 +78,13 @@ DEFAULTS = {
         "REQUIRE_COURSE_SIGNAL": True,
         "REQUIRE_EVIDENCE": True,
     },
-    "OLLAMA": {
+    "LLM": {
+        "PROVIDER": "ollama",
         "BASE_URL": "http://127.0.0.1:11434",
+        "API_KEY": None,
         "MODEL": "qwen3.8:latest",
         "TIMEOUT": 600,
-        "NUM_CTX": 32768,  # 27B Q4 ~17GB weights; 262k ctx KV spills model to CPU
+        "NUM_CTX": 32768,
         "MAX_PAGES": 30,
     },
 }
@@ -143,7 +145,7 @@ AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 
 QUEST = config.get("QUEST")
 SYLLABUS = config.get("SYLLABUS")
-OLLAMA = config.get("OLLAMA")
+LLM = config.get("LLM")
 CELERY_BROKER_URL = config.get("REDIS.URL")
 
 # Django admin error emails (empty by default; no mail backend configured)

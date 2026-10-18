@@ -16,6 +16,7 @@ from apps.web.syllabus_analysis import (
     SyllabusAnalysisError,
     analyze,
     build_analysis_prompt,
+    llm_chat,
     max_analysis_chars,
     max_extracted_chars,
     scrub_instructions,
@@ -71,7 +72,7 @@ def syllabus_urls(course):
 
 
 @pytest.fixture
-def fake_ollama(monkeypatch):
+def fake_llm(monkeypatch):
     """Runs analysis inline with a canned verdict; comparison switches on prompt.
 
     Tests can mutate ``chat.state["match_score"]`` (etc.) to steer the verdict.
@@ -106,7 +107,7 @@ def fake_ollama(monkeypatch):
         "match_score": 88,
         "evidence": ["This course covers calculus"],
     }
-    monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat)
+    monkeypatch.setattr("apps.web.syllabus_analysis.llm_chat", _chat)
     return _chat
 
 
@@ -176,7 +177,7 @@ class TestUpload:
         course,
         user,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         fake_extraction,
     ):
         instructor = _offering_with_instructor(course)
@@ -206,7 +207,7 @@ class TestUpload:
         assert stored.file.name.endswith(".pdf")
 
     def test_same_bytes_share_file_different_syllabus_rows(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
         instructor_a = _offering_with_instructor(course)
         instructor_b = InstructorFactory()
@@ -232,7 +233,7 @@ class TestUpload:
         assert Syllabus.objects.count() == 2
 
     def test_identical_reupload_is_idempotent(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
         instructor = _offering_with_instructor(course)
         first = auth_client.post(
@@ -262,7 +263,7 @@ class TestRead:
         assert response.status_code == 200
 
     def test_second_version_triggers_comparison_and_primary_handover(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
         instructor = _offering_with_instructor(course)
         first = auth_client.post(
@@ -347,7 +348,7 @@ class TestRead:
 
 
 class TestTaskEdgeCases:
-    def test_ollama_failure_marks_syllabus_failed(
+    def test_llm_failure_marks_syllabus_failed(
         self, auth_client, course, syllabus_urls, fake_extraction, monkeypatch
     ):
         from apps.web.syllabus_analysis import SyllabusAnalysisError
@@ -357,7 +358,7 @@ class TestTaskEdgeCases:
         def _chat_down(messages, format_json=False):
             raise SyllabusAnalysisError("model down")
 
-        monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat_down)
+        monkeypatch.setattr("apps.web.syllabus_analysis.llm_chat", _chat_down)
         upload = _make_pdf_upload()
         response = auth_client.post(
             syllabus_urls["list"],
@@ -370,9 +371,9 @@ class TestTaskEdgeCases:
         assert "model down" in syllabus.error_message
 
     def test_ocr_path_called_for_textless_pdf(
-        self, auth_client, course, syllabus_urls, fake_ollama, monkeypatch
+        self, auth_client, course, syllabus_urls, fake_llm, monkeypatch
     ):
-        fake_ollama.state["evidence"] = ["OCR'd syllabus text"]
+        fake_llm.state["evidence"] = ["OCR'd syllabus text"]
         instructor = _offering_with_instructor(course)
 
         calls = {}
@@ -405,6 +406,66 @@ class TestTaskEdgeCases:
         syllabus = Syllabus.objects.get(pk=response.data["id"])
         assert syllabus.status == Syllabus.Status.ANALYZED
         assert "OCR'd" in syllabus.file.extracted_text
+
+
+class TestLLMClient:
+    def _patch_client(self, monkeypatch, response_data, captured):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return response_data
+
+        class FakeClient:
+            def __init__(self, timeout=None):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def post(self, url, json=None, headers=None):
+                captured.update(url=url, payload=json, headers=headers)
+                return FakeResponse()
+
+        monkeypatch.setattr("apps.web.syllabus_analysis.httpx.Client", FakeClient)
+
+    def test_api_key_is_sent_as_bearer_token(self, settings, monkeypatch):
+        settings.LLM = {**settings.LLM, "PROVIDER": "ollama", "API_KEY": "secret"}
+        captured = {}
+        self._patch_client(monkeypatch, {"message": {"content": "ok"}}, captured)
+        result = llm_chat([{"role": "user", "content": "hi"}])
+        assert result["message"]["content"] == "ok"
+        assert captured["headers"] == {"Authorization": "Bearer secret"}
+        assert captured["url"].endswith("/api/chat")
+
+    def test_no_authorization_header_without_api_key(self, settings, monkeypatch):
+        settings.LLM = {**settings.LLM, "API_KEY": None}
+        captured = {}
+        self._patch_client(monkeypatch, {"message": {"content": "ok"}}, captured)
+        llm_chat([{"role": "user", "content": "hi"}])
+        assert "Authorization" not in captured["headers"]
+
+    def test_openai_provider_uses_chat_completions(self, settings, monkeypatch):
+        settings.LLM = {
+            **settings.LLM,
+            "PROVIDER": "openai",
+            "BASE_URL": "https://llm.example.com/v1",
+            "API_KEY": "secret",
+        }
+        captured = {}
+        self._patch_client(
+            monkeypatch,
+            {"choices": [{"message": {"content": "hello"}}]},
+            captured,
+        )
+        result = llm_chat([{"role": "user", "content": "hi"}], format_json=True)
+        assert result["message"]["content"] == "hello"
+        assert captured["url"] == "https://llm.example.com/v1/chat/completions"
+        assert captured["payload"]["response_format"] == {"type": "json_object"}
 
 
 # ---------------------------------------------------------------------------
@@ -448,9 +509,9 @@ class TestPayloads:
 
 class TestLowMatchRejection:
     def test_low_match_score_rejects_and_recycles_file(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
-        fake_ollama.state["match_score"] = 15
+        fake_llm.state["match_score"] = 15
         instructor = _offering_with_instructor(course)
         response = auth_client.post(
             syllabus_urls["list"],
@@ -467,9 +528,9 @@ class TestLowMatchRejection:
         assert file_obj.file.name.startswith("recycle/")
 
     def test_boundary_score_60_is_analyzed(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
-        fake_ollama.state["match_score"] = 60
+        fake_llm.state["match_score"] = 60
         instructor = _offering_with_instructor(course)
         response = auth_client.post(
             syllabus_urls["list"],
@@ -482,7 +543,7 @@ class TestLowMatchRejection:
         assert file_obj.file.name.startswith("syllabi/")
 
     def test_shared_file_not_recycled_while_referenced(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
         instructor_a = _offering_with_instructor(course)
         instructor_b = InstructorFactory()
@@ -496,7 +557,7 @@ class TestLowMatchRejection:
         )
         assert first.status_code == 201
 
-        fake_ollama.state["match_score"] = 5
+        fake_llm.state["match_score"] = 5
         second = auth_client.post(
             syllabus_urls["list"],
             {"file": _make_pdf_upload(), "instructor": instructor_b.id},
@@ -577,10 +638,10 @@ class TestEvidenceGate:
         auth_client,
         course,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         fake_extraction,
     ):
-        fake_ollama.state["evidence"] = ["Guaranteed A+ for every student"]
+        fake_llm.state["evidence"] = ["Guaranteed A+ for every student"]
         instructor = _offering_with_instructor(course)
         response = auth_client.post(
             syllabus_urls["list"],
@@ -603,10 +664,10 @@ class TestEvidenceGate:
         auth_client,
         course,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         fake_extraction,
     ):
-        fake_ollama.state["evidence"] = ["calculus and linear algebra"]
+        fake_llm.state["evidence"] = ["calculus and linear algebra"]
         instructor = _offering_with_instructor(course)
         response = auth_client.post(
             syllabus_urls["list"],
@@ -683,7 +744,7 @@ class TestPromptInjection:
         auth_client,
         course,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         monkeypatch,
     ):
         prompts = []
@@ -708,7 +769,7 @@ class TestPromptInjection:
                 }
             }
 
-        monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat)
+        monkeypatch.setattr("apps.web.syllabus_analysis.llm_chat", _chat)
 
         def _extract(file_obj):
             return INJECTED_DOCUMENT
@@ -835,8 +896,8 @@ class TestSummarySanitization:
 
 
 class TestSyllabusVisibility:
-    def _reject_one(self, auth_client, course, syllabus_urls, fake_ollama):
-        fake_ollama.state["match_score"] = 5
+    def _reject_one(self, auth_client, course, syllabus_urls, fake_llm):
+        fake_llm.state["match_score"] = 5
         instructor = _offering_with_instructor(course)
         response = auth_client.post(
             syllabus_urls["list"],
@@ -853,10 +914,10 @@ class TestSyllabusVisibility:
         staff_client,
         course,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         fake_extraction,
     ):
-        syllabus_id = self._reject_one(auth_client, course, syllabus_urls, fake_ollama)
+        syllabus_id = self._reject_one(auth_client, course, syllabus_urls, fake_llm)
 
         anonymous = APIClient()
         assert anonymous.get(syllabus_urls["list"]).data == []
@@ -884,7 +945,7 @@ class TestSyllabusVisibility:
         staff_client,
         course,
         syllabus_urls,
-        fake_ollama,
+        fake_llm,
         fake_extraction,
     ):
         instructor = _offering_with_instructor(course)
@@ -1019,7 +1080,7 @@ class TestRecyclePurge:
 
 class TestRecycledFileReuse:
     def test_reupload_of_recycled_bytes_restores_the_file(
-        self, auth_client, course, syllabus_urls, fake_ollama, fake_extraction
+        self, auth_client, course, syllabus_urls, fake_llm, fake_extraction
     ):
         instructor_a = _offering_with_instructor(course)
         content = b"%PDF recycled bytes"
@@ -1061,12 +1122,12 @@ class TestRecycledFileReuse:
 
 class TestCharBudget:
     def test_analysis_budget_is_derived_from_the_context_window(self, settings):
-        settings.OLLAMA = {**settings.OLLAMA, "NUM_CTX": 32768}
+        settings.LLM = {**settings.LLM, "NUM_CTX": 32768}
         settings.SYLLABUS = {**settings.SYLLABUS, "MAX_ANALYSIS_CHARS": None}
         assert max_analysis_chars() == 32768 * 2 - 4_000
 
     def test_small_context_windows_keep_a_usable_floor(self, settings):
-        settings.OLLAMA = {**settings.OLLAMA, "NUM_CTX": 1024}
+        settings.LLM = {**settings.LLM, "NUM_CTX": 1024}
         settings.SYLLABUS = {**settings.SYLLABUS, "MAX_ANALYSIS_CHARS": None}
         assert max_analysis_chars() == 2_000
 
@@ -1088,7 +1149,7 @@ class TestCharBudget:
             prompts.append(messages[0]["content"])
             return {"message": {"content": json.dumps({"match_score": 90})}}
 
-        monkeypatch.setattr("apps.web.syllabus_analysis.ollama_chat", _chat)
+        monkeypatch.setattr("apps.web.syllabus_analysis.llm_chat", _chat)
         analyze(course, InstructorFactory(), "ZYXY " * 5000)
 
         assert len(prompts) == 1
