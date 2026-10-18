@@ -1,13 +1,14 @@
 import csv
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
-from apps.web.models import Course, Review
+from apps.web.models import Course, Instructor, Review
+from lib.name_normalization import canonicalize_professor
 
 
 IMPORT_USERNAME = "LegacyReviewImporter"
@@ -49,16 +50,6 @@ class Command(BaseCommand):
                 f"Eligible count is {eligible}, expected {options['expected_count']}; aborting."
             )
 
-        unique_rows = []
-        seen = set()
-        duplicate_in_csv = 0
-        for row in rows:
-            if row.duplicate_key in seen:
-                duplicate_in_csv += 1
-                continue
-            seen.add(row.duplicate_key)
-            unique_rows.append(row)
-
         course_codes = sorted({row.course_code for row in rows})
         courses = {}
         unmatched = []
@@ -68,13 +59,50 @@ class Command(BaseCommand):
             except Course.DoesNotExist:
                 unmatched.append(course_code)
 
+        # Canonicalize legacy professor names against each course's instructors
+        # (same matching rules as the review-submission path) so reversed /
+        # misspelled CSV variants land on the canonical name and dedupe
+        # correctly against both the CSV and the database.
+        course_instructor_names = {
+            code: list(
+                Instructor.objects.filter(courseoffering__course=course)
+                .values_list("name", flat=True)
+                .distinct()
+            )
+            for code, course in courses.items()
+        }
+        canonical_rows = []
+        for row in rows:
+            if row.course_code not in courses:
+                canonical_rows.append(row)
+                continue
+            canonical = canonicalize_professor(
+                row.professor, course_instructor_names[row.course_code]
+            )
+            canonical_rows.append(replace(row, professor=canonical or row.professor))
+
+        unique_rows = []
+        seen = set()
+        duplicate_in_csv = 0
+        for row in canonical_rows:
+            if row.duplicate_key in seen:
+                duplicate_in_csv += 1
+                continue
+            seen.add(row.duplicate_key)
+            unique_rows.append(row)
+
         matched_rows = [row for row in unique_rows if row.course_code in courses]
         unmatched_rows = [row for row in unique_rows if row.course_code not in courses]
+        # A review already exists if any row for the same course carries the
+        # same comment text. Legacy comments are unique per (course, comment)
+        # (verified for the shipped CSV), and professor spellings were
+        # consolidated to canonical names after import — so matching on the
+        # exact professor string would re-insert duplicate comments whose CSV
+        # variant did not machine-canonicalize (e.g. single-word "Manuel").
         existing_keys = set()
         for row in matched_rows:
             if Review.objects.filter(
                 course=courses[row.course_code],
-                professor=row.professor,
                 comments=row.comments,
             ).exists():
                 existing_keys.add(row.duplicate_key)

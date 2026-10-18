@@ -9,9 +9,13 @@ from apps.web.models import (
     DistributiveRequirement,
     Instructor,
     Review,
+    Syllabus,
+    SyllabusFile,
     Vote,
 )
+from apps.web.markdown_clean import sanitize_markdown
 from lib import constants
+from lib.name_normalization import canonicalize_professor
 from lib.terms import is_valid_term, normalize_term
 
 
@@ -27,6 +31,72 @@ class CourseOfferingSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseOffering
         fields = ("term", "section", "period", "limit", "instructors")
+
+
+class InstructorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Instructor
+        fields = ("id", "name")
+
+
+class SyllabusFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SyllabusFile
+        fields = ("id", "original_filename", "size", "content_type")
+
+
+class SyllabusSerializer(serializers.ModelSerializer):
+    instructor = InstructorSerializer(read_only=True)
+    file = SyllabusFileSerializer(read_only=True)
+
+    class Meta:
+        model = Syllabus
+        fields = (
+            "id",
+            "course",
+            "instructor",
+            "file",
+            "status",
+            "summary_md",
+            "is_primary",
+            "created_at",
+            "updated_at",
+        )
+
+
+class SyllabusCreateSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    instructor = serializers.IntegerField()
+
+    def validate_file(self, value):
+        allowed = settings.SYLLABUS["ALLOWED_EXTENSIONS"]
+        name = value.name.lower()
+        if not any(name.endswith(ext) for ext in allowed):
+            raise serializers.ValidationError(
+                f"Unsupported file type. Allowed: {', '.join(allowed)}"
+            )
+        if value.size > settings.SYLLABUS["MAX_UPLOAD_SIZE"]:
+            raise serializers.ValidationError("File exceeds the 20 MB upload limit")
+        return value
+
+    def validate_instructor(self, value):
+        course = self.context["course"]
+        teaches = Instructor.objects.filter(
+            courseoffering__course=course, pk=value
+        ).exists()
+        if not teaches:
+            raise serializers.ValidationError("Instructor does not teach this course")
+        return value
+
+
+class SyllabusAdminUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Syllabus
+        fields = ("summary_md", "verdict", "comparison", "is_primary")
+        read_only_fields = ("comparison",)
+
+    def validate_summary_md(self, value):
+        return sanitize_markdown(value)
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -83,15 +153,32 @@ class ReviewSerializer(serializers.ModelSerializer):
             )
 
     def validate_professor(self, value):
-        """Validate professor name format"""
-        names = value.split(" ")
+        """Validate and canonicalize professor name.
 
-        if len(names) < 2:
+        The name is matched against the course's canonical instructors
+        (from course offerings): reversed, misspelled, or annotated variants
+        are corrected to the canonical spelling. Only when nothing matches is
+        the submitted name kept as its own professor.
+        """
+        course = self.context.get("course")
+        if course is None and self.instance is not None:
+            course = self.instance.course
+
+        candidate_names = []
+        if course is not None:
+            candidate_names = (
+                Instructor.objects.filter(courseoffering__course=course)
+                .values_list("name", flat=True)
+                .distinct()
+            )
+        normalized = canonicalize_professor(value, candidate_names)
+
+        if len(normalized.split()) < 2:
             raise serializers.ValidationError(
                 "Please use a valid professor name, e.g. John Smith"
             )
 
-        return " ".join([n.capitalize() for n in names])
+        return normalized
 
     def validate_comments(self, value):
         """Validate review minimum length"""
@@ -334,9 +421,13 @@ class CourseSerializer(serializers.ModelSerializer):
         return False
 
     def get_instructors(self, obj):
-        """Return a list of instructor names for the course"""
-        instructors = obj.get_instructors()
-        return [instructor.name for instructor in instructors]
+        """Return instructor {id, name} pairs so clients can key uploads on them.
+
+        Term-agnostic: a syllabus can exist for any instructor who ever taught
+        the course, and uploads should not be blocked by term bookkeeping.
+        """
+        instructors = obj.get_instructors(term=None)
+        return [{"id": i.id, "name": i.name} for i in instructors]
 
     def get_course_topics(self, obj):
         return obj.course_topics

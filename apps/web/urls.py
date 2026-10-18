@@ -32,6 +32,21 @@ urlpatterns = [
         views.CoursesReviewsAPI.as_view(),
         name="course_review_api",
     ),
+    re_path(
+        r"^courses/(?P<course_id>[0-9]+)/syllabi/$",
+        views.CourseSyllabiAPI.as_view(),
+        name="course_syllabi_api",
+    ),
+    re_path(
+        r"^syllabi/(?P<syllabus_id>[0-9]+)/download/$",
+        views.syllabus_download,
+        name="syllabus_download_api",
+    ),
+    re_path(
+        r"^syllabi/(?P<syllabus_id>[0-9]+)/$",
+        views.SyllabusDetailAPI.as_view(),
+        name="syllabus_detail_api",
+    ),
     re_path(r"^reviews/?$", views.UserReviewsAPI.as_view(), name="user_reviews_api"),
     re_path(
         r"^reviews/(?P<review_id>[0-9]+)/$",

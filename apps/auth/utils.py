@@ -1,6 +1,8 @@
 import json
 import logging
 import re
+import time
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -9,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django_redis import get_redis_connection
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 
@@ -19,7 +22,7 @@ logger = logging.getLogger(__name__)
 AUTH_SETTINGS = settings.AUTH
 PASSWORD_LENGTH_MIN = AUTH_SETTINGS["PASSWORD_LENGTH_MIN"]
 PASSWORD_LENGTH_MAX = AUTH_SETTINGS["PASSWORD_LENGTH_MAX"]
-OTP_TIMEOUT = AUTH_SETTINGS["OTP_TIMEOUT"]
+OTP_TIMEOUT = int(AUTH_SETTINGS["OTP_TIMEOUT"])
 EMAIL_DOMAIN_NAME = AUTH_SETTINGS["EMAIL_DOMAIN_NAME"]
 
 QUEST_SETTINGS = settings.QUEST
@@ -46,7 +49,7 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
 
     try:
         question_id = int(action_details.get("QUESTIONID"))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         logger.error(
             "Could not parse 'QUESTIONID' for action '%s'. Check your settings.", action
         )
@@ -59,35 +62,136 @@ def get_survey_details(action: str) -> dict[str, Any] | None:
     }
 
 
+# Dedicated network timeout for the siteverify HTTP call. Kept short and
+# separate from OTP_TIMEOUT: the OTP window is a business rule, not a
+# network deadline.
+TURNSTILE_VERIFY_TIMEOUT = 15
+TURNSTILE_VERIFY_RETRIES = 3
+
+
 async def verify_turnstile_token(
     turnstile_token, client_ip
 ) -> tuple[bool, Response | None]:
     """Helper function to verify Turnstile token with Cloudflare's API"""
 
-    try:
-        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
-            response = await client.post(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                data={
-                    "secret": settings.TURNSTILE_SECRET_KEY,
-                    "response": turnstile_token,
-                    "remoteip": client_ip,
-                },
+    last_error: Exception | None = None
+    for attempt in range(TURNSTILE_VERIFY_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=TURNSTILE_VERIFY_TIMEOUT) as client:
+                response = await client.post(
+                    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                    data={
+                        "secret": settings.TURNSTILE_SECRET_KEY,
+                        "response": turnstile_token,
+                        "remoteip": client_ip,
+                    },
+                )
+            try:
+                data = response.json()
+            except ValueError:
+                logger.error(
+                    "Turnstile siteverify returned non-JSON: status=%s body=%s",
+                    response.status_code,
+                    response.text[:200],
+                )
+                return False, Response(
+                    {"error": "Turnstile verification error"}, status=502
+                )
+            if not data.get("success"):
+                logger.warning("Turnstile verification failed: %s", data)
+                return False, Response(
+                    {"error": "Turnstile verification failed"}, status=403
+                )
+            return True, None
+        except httpx.TimeoutException as e:
+            last_error = e
+            logger.warning(
+                "Turnstile verification timed out (attempt %d/%d)",
+                attempt + 1,
+                TURNSTILE_VERIFY_RETRIES,
             )
-        if not response.json().get("success"):
-            logger.warning("Turnstile verification failed: %s", response.json())
+        except httpx.HTTPError as e:
+            # ConnectError / ReadError etc.: transient network failures.
+            last_error = e
+            logger.warning(
+                "Turnstile verification network error (attempt %d/%d): %s",
+                attempt + 1,
+                TURNSTILE_VERIFY_RETRIES,
+                e,
+            )
+        except Exception:
+            logger.exception("Turnstile verification error")
             return False, Response(
-                {"error": "Turnstile verification failed"}, status=403
+                {"error": "Turnstile verification error"}, status=500
             )
-        return True, None
-    except httpx.TimeoutException:
-        logger.error("Turnstile verification timed out")
-        return False, Response(
-            {"error": "Turnstile verification timed out"}, status=504
+
+    logger.error(
+        "Turnstile verification failed after %d attempts: %s",
+        TURNSTILE_VERIFY_RETRIES,
+        last_error,
+    )
+    return False, Response({"error": "Turnstile verification timed out"}, status=504)
+
+
+WJ_CLOCK_OFFSET_KEY = "wj:clock:offset"
+WJ_CLOCK_OFFSET_TTL = 48 * 3600
+WJ_CLOCK_EWMA_ALPHA = 0.3
+
+
+def estimate_wj_clock_offset(response: httpx.Response) -> float | None:
+    """Estimate WJ server clock offset (wj_time - local_time) in seconds.
+
+    Negative means the WJ clock runs slow (currently ~-230s and drifting
+    ~7s/day). Derived from the response `Date` header with request-RTT
+    midpoint correction. The `Date` header and the `submitted_at` field
+    come from the same WJ server clock domain (verified 2026-09-08: header
+    offset matches the measured submitted_at drift history), so this offset
+    corrects `submitted_at` before validity-window checks.
+    """
+    date_str = response.headers.get("date")
+    if not date_str:
+        return None
+    try:
+        wj_time = parsedate_to_datetime(date_str)
+    except (TypeError, ValueError):  # fmt: skip
+        return None
+    if wj_time is None:  # fmt: skip
+        return None
+    try:
+        elapsed = response.elapsed.total_seconds()
+    except (RuntimeError, AttributeError):  # fmt: skip
+        elapsed = 0.0
+    receive_time = time.time()
+    send_time = receive_time - elapsed
+    local_midpoint = (send_time + receive_time) / 2.0
+    return wj_time.timestamp() - local_midpoint
+
+
+def record_wj_clock_offset(offset: float) -> None:
+    """Fold a fresh offset sample into the rolling EWMA estimate in Redis."""
+    try:
+        r = get_redis_connection("default")
+        existing = r.hget(WJ_CLOCK_OFFSET_KEY, "offset")
+        if existing is not None:
+            offset = WJ_CLOCK_EWMA_ALPHA * offset + (1 - WJ_CLOCK_EWMA_ALPHA) * float(
+                existing
+            )
+        r.hset(
+            WJ_CLOCK_OFFSET_KEY, mapping={"offset": offset, "updated_at": time.time()}
         )
+        r.expire(WJ_CLOCK_OFFSET_KEY, WJ_CLOCK_OFFSET_TTL)
     except Exception:
-        logger.error("Turnstile verification error")
-        return False, Response({"error": "Turnstile verification error"}, status=500)
+        logger.warning("Failed to record WJ clock offset", exc_info=True)
+
+
+def get_cached_wj_clock_offset() -> float | None:
+    """Rolling EWMA offset estimate from Redis, or None if unavailable/stale."""
+    try:
+        r = get_redis_connection("default")
+        cached = r.hget(WJ_CLOCK_OFFSET_KEY, "offset")
+        return float(cached) if cached is not None else None
+    except Exception:
+        return None
 
 
 async def get_latest_answer(
@@ -133,13 +237,16 @@ async def get_latest_answer(
     full_url_path = f"{QUEST_BASE_URL}/{quest_api}/json"
 
     try:
-        async with httpx.AsyncClient(timeout=OTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TURNSTILE_VERIFY_TIMEOUT) as client:
             response = await client.get(
                 full_url_path,
                 params=final_query_params,
             )
             response.raise_for_status()  # Raise an exception for bad status codes
             full_data = response.json()
+            offset_sample = estimate_wj_clock_offset(response)
+            if offset_sample is not None:
+                record_wj_clock_offset(offset_sample)
     except httpx.TimeoutException:
         logger.error("Questionnaire API query timed out")
         return None, Response(
@@ -153,7 +260,10 @@ async def get_latest_answer(
             status=500,
         )
     except Exception:
-        logger.error("An unexpected error occurred")
+        logger.exception(
+            "Questionnaire API returned unexpected response: %s",
+            response.text[:200] if "response" in locals() else "(no response)",
+        )
         return None, Response({"error": "An unexpected error occurred"}, status=500)
 
     # Filter and return only the required fields from the first row
@@ -182,6 +292,9 @@ async def get_latest_answer(
             if latest_answer.get("user")
             else None,
             "otp": otp,
+            # WJ clock offset measured from this response's Date header
+            # (may be None if header missing/unparseable)
+            "server_clock_offset": offset_sample,
         }
 
         # Check if all required fields are present

@@ -28,6 +28,40 @@ def auth_client(user, base_client):
     return base_client
 
 
+@pytest.fixture
+def staff_user(db):
+    """Returns a saved staff user instance."""
+    return factories.UserFactory(is_staff=True)
+
+
+@pytest.fixture
+def staff_client(staff_user):
+    """Returns its own API client authenticated as a staff user."""
+    client = APIClient()
+    client.force_authenticate(user=staff_user)
+    return client
+
+
+@pytest.fixture
+def eager_media(tmp_path, settings):
+    """Scratch media root + inline (eager) Celery tasks for syllabus tests.
+
+    website/celery.py snapshots Django settings at import time, so
+    settings-only overrides race with module import order. Push the flags
+    straight onto the app config too, then restore them after each test.
+    """
+    from website.celery import app as celery_app
+
+    conf = celery_app.conf
+    previous = (conf.get("task_always_eager"), conf.get("task_eager_propagates"))
+    settings.MEDIA_ROOT = tmp_path / "media"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.CELERY_TASK_EAGER_PROPAGATES = True
+    conf.update(task_always_eager=True, task_eager_propagates=True)
+    yield tmp_path / "media"
+    conf.update(task_always_eager=previous[0], task_eager_propagates=previous[1])
+
+
 # -------------------------------------------------------------------------
 # 2. Data Fixtures (Models)
 # -------------------------------------------------------------------------

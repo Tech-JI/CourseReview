@@ -9,7 +9,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "website.settings")
 app = Celery("website")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
-print(app.conf.broker_url)
 
 
 app.conf.beat_schedule = {
@@ -28,16 +27,16 @@ app.conf.beat_schedule = {
         "task": "apps.spider.tasks.crawl_orc",
         "schedule": crontab(minute=0, hour=1),  # 1AM
     },
-    "crawl_timetable": {
-        "task": "apps.spider.tasks.crawl_timetable",
-        "schedule": crontab(minute=30, hour=1),  # 1:30AM
-    },
-    "crawl_medians": {
-        "task": "apps.spider.tasks.crawl_medians",
-        "schedule": crontab(minute=0, hour=2),  # 2AM
+    "crawl_gc_course_offerings": {
+        "task": "apps.spider.tasks.crawl_gc_course_offerings",
+        "schedule": crontab(minute=15, hour=1),  # 1:15AM
     },
     "request_term_change": {
         "task": "apps.analytics.tasks.possibly_request_term_update",
         "schedule": crontab(minute=0, hour=3),  # 3AM
+    },
+    "purge_recycled_syllabus_files": {
+        "task": "apps.web.tasks.purge_recycled_syllabus_files",
+        "schedule": crontab(minute=0, hour=4),  # 4AM
     },
 }

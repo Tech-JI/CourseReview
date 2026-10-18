@@ -4,7 +4,7 @@
 # Values here will override DEFAULTS in settings.py.
 # Environment variables will override values here.
 
-DEBUG: true
+DEBUG: false
 
 # SECRET_KEY: Use env
 
@@ -21,6 +21,7 @@ CORS_ALLOWED_ORIGINS:
 # SESSION:
 #   COOKIE_AGE: 2592000 # 30 days
 #   SAVE_EVERY_REQUEST: true
+#   COOKIE_SECURE: # unset derives it from DEBUG (secure when DEBUG is false)
 #
 # WEB:
 #   COURSE:
@@ -61,3 +62,23 @@ QUEST:
     URL: "https://wj.sjtu.edu.cn/q/dummy2"
     QUESTIONID: 10000002
 # AUTO_IMPORT_CRAWLED_DATA: true
+
+# SYLLABUS:
+#   MAX_UPLOAD_SIZE: 20971520 # 20 MB
+#   ALLOWED_EXTENSIONS: [".pdf", ".docx"]
+#   MIN_MATCH_SCORE: 60
+#   MAX_ANALYSIS_CHARS: # unset derives it from LLM.NUM_CTX
+#   MAX_EXTRACTED_CHARS: 400000
+#   RECYCLE_RETENTION_DAYS: 30
+#   RECYCLE_MAX_FILES: 500
+#   REQUIRE_COURSE_SIGNAL: true
+#   REQUIRE_EVIDENCE: true
+
+# LLM: # syllabus analysis and OCR model (env: LLM__PROVIDER, LLM__BASE_URL, LLM__API_KEY)
+#   PROVIDER: ollama # ollama or openai (OpenAI-compatible API)
+#   BASE_URL: "http://127.0.0.1:11434"
+#   API_KEY: # bearer token for hosted or proxied endpoints
+#   MODEL: "qwen3.8:latest"
+#   TIMEOUT: 600
+#   NUM_CTX: 32768
+#   MAX_PAGES: 30

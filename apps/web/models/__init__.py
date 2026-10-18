@@ -5,6 +5,8 @@ from .distributive_requirement import DistributiveRequirement
 from .instructor import Instructor
 from .review import Review
 from .student import Student
+from .syllabus import Syllabus
+from .syllabus_file import SyllabusFile
 from .vote import Vote
 from .vote_for_review import ReviewVote
 
@@ -16,6 +18,8 @@ __all__ = [
     "Instructor",
     "Review",
     "Student",
+    "Syllabus",
+    "SyllabusFile",
     "Vote",
     "ReviewVote",
 ]

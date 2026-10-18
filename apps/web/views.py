@@ -1,13 +1,19 @@
+import hashlib
 import logging
+import os
 
 from django.conf import settings
+from django.core.files.base import File
+from django.db import IntegrityError
 from django.db.models import Count, Prefetch, Q
+from django.http import FileResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, mixins, pagination, status
 from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.web.models import (
@@ -16,6 +22,8 @@ from apps.web.models import (
     Instructor,
     Review,
     ReviewVote,
+    Syllabus,
+    SyllabusFile,
     Vote,
 )
 from apps.web.serializers import (
@@ -24,7 +32,12 @@ from apps.web.serializers import (
     CourseVoteSerializer,
     ReviewSerializer,
     ReviewVoteSerializer,
+    SyllabusAdminUpdateSerializer,
+    SyllabusCreateSerializer,
+    SyllabusSerializer,
 )
+from apps.web.syllabus_files import restore_recycled_file
+from apps.web.tasks import process_syllabus
 from lib.departments import get_department_name
 from lib.grades import numeric_value_for_grade
 from lib.terms import numeric_value_of_term
@@ -36,6 +49,7 @@ class CoursesPagination(pagination.PageNumberPagination):
     page_size = settings.WEB["COURSE"]["PAGE_SIZE"]
 
 
+@ensure_csrf_cookie
 @api_view(["GET"])
 def user_status(request):
     """
@@ -43,12 +57,19 @@ def user_status(request):
     Input:
         - None
     Output:
-        - Authenticated user: {"isAuthenticated": true, "username": "string"}
+        - Authenticated user: {"isAuthenticated": true, "username": "string",
+          "is_staff": bool}
         - Anonymous user: {"isAuthenticated": false}
     """
     if request.user.is_authenticated:
         logger.info("User is authenticated")
-        return Response({"isAuthenticated": True, "username": request.user.username})
+        return Response(
+            {
+                "isAuthenticated": True,
+                "username": request.user.username,
+                "is_staff": request.user.is_staff,
+            }
+        )
     else:
         logger.info("User is not authenticated")
         return Response({"isAuthenticated": False})
@@ -282,7 +303,7 @@ class CoursesReviewsAPI(
             )
 
         # Validate and save review using ReviewSerializer
-        serializer = ReviewSerializer(data=request.data)
+        serializer = ReviewSerializer(data=request.data, context={"course": course})
         if not serializer.is_valid():
             logger.warning("Review serializer errors: %s", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -474,17 +495,21 @@ def course_professors(request, course_id):
 @permission_classes([AllowAny])
 def course_instructors(request, course_id):
     """
-    Unused API.
+    List instructors for a course (term-agnostic), as {id, name} objects.
     """
     try:
         course = Course.objects.get(pk=course_id)
-        instructors = course.get_instructors()
-        return Response(
-            {"instructors": [instructor.name for instructor in instructors]}, status=200
-        )
     except Course.DoesNotExist:
         logger.warning("Course with id %d not found for instructors API", course_id)
         return Response({"error": "Course not found"}, status=404)
+    instructors = (
+        Instructor.objects.filter(courseoffering__course=course)
+        .distinct()
+        .order_by("name")
+    )
+    return Response(
+        {"instructors": [{"id": i.id, "name": i.name} for i in instructors]}, status=200
+    )
 
 
 @api_view(["POST"])
@@ -584,3 +609,237 @@ def review_vote_api(request, review_id):
             "user_vote": user_vote,
         }
     )
+
+
+DOWNLOAD_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
+}
+
+
+def _syllabus_visibility(queryset, user):
+    """Restrict syllabus rows to the ones this user is allowed to see.
+
+    Only ANALYZED syllabi are public: rejected and failed uploads stay visible
+    to their uploader and to staff, so a refused document (and the account that
+    submitted it) never becomes a public listing.
+    """
+    if getattr(user, "is_staff", False):
+        return queryset
+    if getattr(user, "is_authenticated", False):
+        return queryset.filter(Q(status=Syllabus.Status.ANALYZED) | Q(uploaded_by=user))
+    return queryset.filter(status=Syllabus.Status.ANALYZED)
+
+
+def _download_content_type(file_obj):
+    """Content type derived from the stored filename, never from the client."""
+    name = (file_obj.file.name or "").lower()
+    for ext, content_type in DOWNLOAD_CONTENT_TYPES.items():
+        if name.endswith(ext):
+            return content_type
+    return "application/octet-stream"
+
+
+def _safe_filename(name):
+    """Attachment filename safe to put in a Content-Disposition header."""
+    base = os.path.basename(str(name or "").replace("\\", "/"))
+    cleaned = "".join(ch for ch in base if ch.isprintable() and ch != '"').strip()
+    return cleaned or "syllabus"
+
+
+class CourseSyllabiAPI(
+    generics.GenericAPIView, mixins.ListModelMixin, mixins.CreateModelMixin
+):
+    """
+    List or upload syllabi for a course.
+
+    GET: public, lists SyllabusSerializer rows (newest first).
+    POST: authenticated, multipart {file, instructor}; dedupes by sha256.
+    """
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
+    def get_queryset(self):
+        return Syllabus.objects.filter(course_id=self.kwargs["course_id"])
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return SyllabusCreateSerializer
+        return SyllabusSerializer
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
+
+    def list(self, request, *args, **kwargs):
+        course_id = self.kwargs.get("course_id")
+        if not Course.objects.filter(pk=course_id).exists():
+            return Response(
+                {"detail": "Course not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        queryset = _syllabus_visibility(
+            self.get_queryset(), request.user
+        ).select_related("instructor", "file", "uploaded_by")
+        serializer = SyllabusSerializer(
+            queryset, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        course_id = self.kwargs.get("course_id")
+        try:
+            course = Course.objects.get(pk=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {"detail": "Course not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = SyllabusCreateSerializer(
+            data=request.data, context={"course": course}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        upload = serializer.validated_data["file"]
+        instructor_id = serializer.validated_data["instructor"]
+        max_size = settings.SYLLABUS["MAX_UPLOAD_SIZE"]
+        hasher = hashlib.sha256()
+        size = 0
+        for chunk in upload.chunks():
+            size += len(chunk)
+            if size > max_size:
+                return Response(
+                    {"file": "File exceeds the upload limit"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            hasher.update(chunk)
+        digest = hasher.hexdigest()
+
+        # Reuse an existing SyllabusFile (same bytes already on disk).
+        file_obj = SyllabusFile.objects.filter(sha256=digest).first()
+        if file_obj is None:
+            name = upload.name.lower()
+            ext = ".pdf" if name.endswith(".pdf") else ".docx"
+            file_obj = SyllabusFile(
+                sha256=digest,
+                content_type=upload.content_type or "",
+                original_filename=upload.name,
+                size=size,
+            )
+            try:
+                upload.seek(0)
+                file_obj.file.save(f"{digest}{ext}", File(upload), save=True)
+            except IntegrityError:
+                # Lost a concurrent identical upload race; reuse the winner.
+                file_obj = SyllabusFile.objects.get(sha256=digest)
+
+        # Idempotent re-upload of the same file for the same course+instructor.
+        existing = Syllabus.objects.filter(
+            course=course, instructor_id=instructor_id, file=file_obj
+        ).first()
+        if existing:
+            return Response(
+                SyllabusSerializer(existing, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        restore_recycled_file(file_obj)
+
+        syllabus = Syllabus.objects.create(
+            course=course,
+            instructor_id=instructor_id,
+            file=file_obj,
+            uploaded_by=request.user,
+            status=Syllabus.Status.PENDING,
+        )
+        try:
+            process_syllabus.delay(syllabus.id)
+        except Exception:  # noqa: BLE001 - broker down; task stays pending
+            logger.exception("Failed to enqueue syllabus analysis %d", syllabus.id)
+        # Eager execution (tests) may already have analyzed this row.
+        syllabus.refresh_from_db()
+        return Response(
+            SyllabusSerializer(syllabus, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SyllabusDetailAPI(
+    generics.GenericAPIView,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+):
+    """
+    Syllabus detail. GET public; PATCH/DELETE staff-only (summary/verdict/
+    primary; deletion also recycles the file when unreferenced).
+    """
+
+    serializer_class = SyllabusSerializer
+    queryset = Syllabus.objects.select_related("instructor", "file", "uploaded_by")
+    lookup_field = "pk"
+    lookup_url_kwarg = "syllabus_id"
+
+    def get_queryset(self):
+        return _syllabus_visibility(self.queryset, self.request.user)
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return SyllabusAdminUpdateSerializer
+        return SyllabusSerializer
+
+    def get_permissions(self):
+        if self.request.method in ("PUT", "PATCH", "DELETE"):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
+    def patch(self, request, *args, **kwargs):
+        syllabus = self.get_object()
+        serializer = SyllabusAdminUpdateSerializer(
+            syllabus, data=request.data, partial=True
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        syllabus = serializer.save()
+        if serializer.validated_data.get("is_primary"):
+            Syllabus.objects.filter(
+                course=syllabus.course,
+                instructor=syllabus.instructor,
+            ).exclude(pk=syllabus.pk).update(is_primary=False)
+        return Response(SyllabusSerializer(syllabus, context={"request": request}).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def syllabus_download(request, syllabus_id):
+    """Stream the original uploaded file; staff (is_staff) users only."""
+    try:
+        syllabus = Syllabus.objects.select_related("file").get(pk=syllabus_id)
+    except Syllabus.DoesNotExist:
+        # The URL pattern already restricts syllabus_id to digits, but strip
+        # CR/LF anyway so the value can never forge log lines.
+        safe_id = str(syllabus_id).replace("\r", "").replace("\n", "")
+        logger.warning("Syllabus %s not found for download", safe_id)
+        return Response({"detail": "Syllabus not found"}, status=404)
+    file_obj = syllabus.file
+    response = FileResponse(
+        file_obj.file.open("rb"),
+        as_attachment=True,
+        filename=_safe_filename(file_obj.original_filename),
+        content_type=_download_content_type(file_obj),
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

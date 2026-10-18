@@ -10,13 +10,16 @@ load_dotenv(BASE_DIR / ".env")
 
 # --- Default Configuration ---
 DEFAULTS = {
-    "DEBUG": True,
+    "DEBUG": False,
     "SECRET_KEY": None,
     "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
     "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
+    "CSRF_TRUSTED_ORIGINS": [],
     "SESSION": {
         "COOKIE_AGE": 2592000,  # 30 days
         "SAVE_EVERY_REQUEST": True,
+        # None derives the value from DEBUG; set explicitly to override.
+        "COOKIE_SECURE": None,
     },
     "WEB": {
         "COURSE": {"PAGE_SIZE": 10},
@@ -31,6 +34,11 @@ DEFAULTS = {
         "PASSWORD_LENGTH_MAX": 32,
         "EMAIL_DOMAIN_NAME": "sjtu.edu.cn",
         "ACTION_LIST": ["signup", "login", "reset_password"],
+        # Residual jitter tolerance (seconds) applied to the WJ submission
+        # timestamp AFTER dynamic clock-offset correction (see
+        # apps/auth/utils.estimate_wj_clock_offset). Covers Date-header
+        # 1s resolution, RTT asymmetry, and platform processing delay.
+        "TIMESTAMP_JITTER_TOLERANCE": 60,
     },
     "DATABASE": {"URL": "sqlite:///db.sqlite3"},
     "REDIS": {"URL": "redis://localhost:6379/0", "MAX_CONNECTIONS": 100},
@@ -54,9 +62,43 @@ DEFAULTS = {
         },
     },
     "AUTO_IMPORT_CRAWLED_DATA": True,
+    "SYLLABUS": {
+        "MAX_UPLOAD_SIZE": 20971520,  # 20 MB
+        "ALLOWED_EXTENSIONS": [".pdf", ".docx"],
+        # AI analysis rejects uploads whose match score is below this.
+        "MIN_MATCH_SCORE": 60,
+        # Prompt budget in characters; None derives it from LLM.NUM_CTX.
+        "MAX_ANALYSIS_CHARS": None,
+        # Cap on cached extracted text per uploaded file.
+        "MAX_EXTRACTED_CHARS": 400_000,
+        # Recycled (orphaned) syllabus files are purged after this many days.
+        "RECYCLE_RETENTION_DAYS": 30,
+        "RECYCLE_MAX_FILES": 500,
+        # Refuse analysis verdicts for text with no sign of the course.
+        "REQUIRE_COURSE_SIGNAL": True,
+        "REQUIRE_EVIDENCE": True,
+    },
+    "LLM": {
+        "PROVIDER": "ollama",
+        "BASE_URL": "http://127.0.0.1:11434",
+        "API_KEY": None,
+        "MODEL": "qwen3.8:latest",
+        "TIMEOUT": 600,
+        "NUM_CTX": 32768,
+        "MAX_PAGES": 30,
+    },
 }
 
 config = Config(config_path=BASE_DIR / "config.yaml", defaults=DEFAULTS)
+
+
+def _bool_or_default(value, default: bool) -> bool:
+    """Resolve a tri-state boolean: None keeps the default, strings parse like env."""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.lower() in ("true", "1", "yes")
+    return bool(value)
 
 
 # ==============================================================================
@@ -68,6 +110,11 @@ SECRET_KEY = config.get("SECRET_KEY")
 DEBUG = config.get("DEBUG", cast=bool)
 ALLOWED_HOSTS = config.get("ALLOWED_HOSTS", cast=list)
 CORS_ALLOWED_ORIGINS = config.get("CORS_ALLOWED_ORIGINS", cast=list)
+CSRF_TRUSTED_ORIGINS = config.get("CSRF_TRUSTED_ORIGINS", cast=list)
+
+# Requests arrive via Cloudflare Tunnel over HTTPS; make Django trust the
+# forwarded proto so Secure cookies and is_secure() work correctly.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # --- Infrastructure ---
 DATABASES = {"default": dj_database_url.parse(config.get("DATABASE.URL"))}
@@ -88,7 +135,7 @@ CACHES = {
 # --- Session Management ---
 SESSION_COOKIE_AGE = config.get("SESSION.COOKIE_AGE", cast=int)
 SESSION_SAVE_EVERY_REQUEST = config.get("SESSION.SAVE_EVERY_REQUEST", cast=bool)
-SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = _bool_or_default(config.get("SESSION.COOKIE_SECURE"), not DEBUG)
 
 # --- Application-Specific Settings ---
 AUTH = config.get("AUTH")
@@ -97,6 +144,12 @@ TURNSTILE_SECRET_KEY = config.get("TURNSTILE_SECRET_KEY")
 AUTO_IMPORT_CRAWLED_DATA = config.get("AUTO_IMPORT_CRAWLED_DATA", cast=bool)
 
 QUEST = config.get("QUEST")
+SYLLABUS = config.get("SYLLABUS")
+LLM = config.get("LLM")
+CELERY_BROKER_URL = config.get("REDIS.URL")
+
+# Django admin error emails (empty by default; no mail backend configured)
+ADMINS = []
 
 
 # ==============================================================================
@@ -125,6 +178,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -152,7 +206,10 @@ TEMPLATES = [
     }
 ]
 
-STATIC_URL = "/dummy/"  # Required by Django staticfiles but not used in this setup
+STATIC_URL = "/static/"
+STATIC_ROOT = "/app/staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"  # not served directly; downloads go through the API
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-us"
