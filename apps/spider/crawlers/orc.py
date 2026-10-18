@@ -1,16 +1,20 @@
 import re
 from urllib.parse import urljoin
 
+from django.db import models
+
+from lib.name_normalization import JUNK_INSTRUCTOR_NAMES, clean_instructor_name
+from apps.spider.crawlers.gc_offerings import expand_instructor_names
 from apps.spider.utils import retrieve_soup  # parse_number_and_subnumber,
 from apps.web.models import Course, CourseOffering, Instructor
 from lib.constants import CURRENT_TERM
 
-BASE_URL = "https://www.ji.sjtu.edu.cn/"
+BASE_URL = "https://gc.sjtu.edu.cn/"
 ORC_BASE_URL = urljoin(BASE_URL, "/academics/courses/courses-by-number/")
 # ORC_UNDERGRAD_SUFFIX = "Departments-Programs-Undergraduate"
 # ORC_GRADUATE_SUFFIX = "Departments-Programs-Graduate"
 COURSE_DETAIL_URL_PREFIX = (
-    "https://www.ji.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
+    "https://gc.sjtu.edu.cn/academics/courses/courses-by-number/course-info/?id="
 )
 UNDERGRAD_URL = ORC_BASE_URL
 INSTRUCTOR_TERM_REGEX = re.compile(r"^(?P<name>\w*)\s?(\((?P<term>\w*)\))?")
@@ -119,9 +123,10 @@ def _crawl_course_data(course_url):
     course_topics = list(section_lines.get("Course Topics:", []))
     instructors = []
     for name_line in section_lines.get("Instructors:", []):
-        instructors.extend(
-            name.strip() for name in name_line.split(";") if name.strip()
-        )
+        for raw in name_line.split(";"):
+            cleaned = clean_instructor_name(raw)
+            if cleaned and cleaned.lower() not in JUNK_INSTRUCTOR_NAMES:
+                instructors.append(cleaned)
 
     return {
         "course_code": course_code,
@@ -143,6 +148,9 @@ def _crawl_course_data(course_url):
 
 
 def import_department(department_data):
+    existing = list(
+        Instructor.objects.annotate(_offering_count=models.Count("courseoffering"))
+    )
     for course_data in department_data:
         # Skip pages whose structure was not recognized: importing them would
         # overwrite stored course fields with empty values.
@@ -169,17 +177,17 @@ def import_department(department_data):
             },
         )
 
-        # Handle instructors
+        # Handle instructors: resolve against existing rows so spelling drift
+        # on the catalog page never forks one teacher into several rows.
         if "instructors" in course_data and course_data["instructors"]:
-            for instructor_name in course_data["instructors"]:
-                instructor, _ = Instructor.objects.get_or_create(name=instructor_name)
-                # Create a course offering for the current term if it doesn't exist
-                offering, _ = CourseOffering.objects.get_or_create(
-                    course=course,
-                    term=CURRENT_TERM,
-                    defaults={"section": 1, "period": ""},
-                )
-                offering.instructors.add(instructor)
+            instructors = expand_instructor_names(course_data["instructors"], existing)
+            # Create a course offering for the current term if it doesn't exist
+            offering, _ = CourseOffering.objects.get_or_create(
+                course=course,
+                term=CURRENT_TERM,
+                defaults={"section": 1, "period": ""},
+            )
+            offering.instructors.add(*instructors)
 
 
 def extract_prerequisites(pre_requisites):

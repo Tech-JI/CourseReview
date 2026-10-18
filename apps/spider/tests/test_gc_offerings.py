@@ -3,10 +3,11 @@ from django.conf import settings
 
 from apps.spider.crawlers.gc_offerings import (
     GCOfferingsParseError,
+    clean_instructor_name,
     import_gc_courses,
     parse_gc_offerings,
 )
-from apps.web.models import Course, CourseOffering
+from apps.web.models import Course, CourseOffering, Instructor
 
 
 SAMPLE_HTML = """
@@ -114,12 +115,12 @@ def test_parse_gc_offerings_reads_all_semester_tables():
     reason="project migrations use PostgreSQL-only ArrayField columns",
 )
 @pytest.mark.django_db
-def test_import_gc_courses_updates_courses_without_changing_offerings():
+def test_import_gc_courses_updates_courses_and_creates_offerings():
     rows = parse_gc_offerings(SAMPLE_HTML)
     stale_course = Course.objects.create(
         course_code="OLD1000J", course_title="Old", department="OLD", number=1000
     )
-    CourseOffering.objects.create(
+    stale_offering = CourseOffering.objects.create(
         course=stale_course, term="26SU", section=1, period=""
     )
 
@@ -128,7 +129,169 @@ def test_import_gc_courses_updates_courses_without_changing_offerings():
     physics = Course.objects.get(course_code="PHYS1500J")
     assert physics.course_title == "Physics I"
     assert physics.course_credits == 4
-    assert not physics.courseoffering_set.exists()
-    assert CourseOffering.objects.filter(
-        course=stale_course, term="26SU"
-    ).exists()
+    # Unrelated offerings are untouched.
+    assert CourseOffering.objects.get(pk=stale_offering.pk).course == stale_course
+
+    offerings = list(physics.courseoffering_set.order_by("section"))
+    assert [(o.term, o.section) for o in offerings] == [("26SU", 1), ("26SU", 2)]
+    assert [o.instructors_string() for o in offerings] == [
+        "Richard Grumitt",
+        "Mesli Abdelmadjid",
+    ]
+
+    # Crosslisted code imports under its primary code only.
+    assert Course.objects.filter(course_code="VK335").count() == 0
+
+    # A row with no instructor ("–") still gets an offering, without instructors.
+    materials = Course.objects.get(course_code="MSE3350J")
+    assert materials.courseoffering_set.get().instructors.count() == 0
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_gc_courses_is_idempotent():
+    rows = parse_gc_offerings(SAMPLE_HTML)
+
+    assert import_gc_courses(rows) == 5
+    assert import_gc_courses(rows) == 5
+
+    assert CourseOffering.objects.count() == 6
+    assert Instructor.objects.count() == 6  # 6 unique names across 6 rows
+    physics = Course.objects.get(course_code="PHYS1500J")
+    assert physics.courseoffering_set.count() == 2
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_gc_courses_syncs_changed_instructors():
+    rows = parse_gc_offerings(SAMPLE_HTML)
+    assert import_gc_courses(rows) == 5
+
+    physics_rows = [row for row in rows if row["course_code"] == "PHYS1500J"]
+    physics_rows[0]["instructors"] = ["New Professor"]
+    assert import_gc_courses(rows) == 5
+
+    physics = Course.objects.get(course_code="PHYS1500J")
+    section_one = physics.courseoffering_set.get(term="26SU", section=1)
+    assert [i.name for i in section_one.instructors.all()] == ["New Professor"]
+    section_two = physics.courseoffering_set.get(term="26SU", section=2)
+    assert [i.name for i in section_two.instructors.all()] == ["Mesli Abdelmadjid"]
+    # Instructor rows are never deleted, only unbound.
+    assert Instructor.objects.filter(name="Richard Grumitt").exists()
+
+
+def test_clean_instructor_name_strips_page_annotations():
+    assert clean_instructor_name("Sung-Liang Chen (Fall)") == "Sung-Liang Chen"
+    assert clean_instructor_name("Rui Yang (Summer).") == "Rui Yang"
+    assert clean_instructor_name("YAN Xu 闫旭") == "YAN Xu"
+    assert clean_instructor_name("Qiong Yu (余琼)") == "Qiong Yu"
+    assert clean_instructor_name("Jaehyung “Joshua” Ju") == "Jaehyung Joshua Ju"
+    assert clean_instructor_name("Dr. Lin Yun") == "Lin Yun"
+    assert clean_instructor_name("Albert Shih (UM)") == "Albert Shih"
+    # Junk / empty cells collapse to "" and are dropped upstream.
+    assert clean_instructor_name("教师") == ""
+    assert clean_instructor_name(",") == ""
+    assert clean_instructor_name("   ") == ""
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_reuses_instructor_across_spelling_variants():
+    """A name drift on the GC page must rebind to the existing row, never fork."""
+    rows = parse_gc_offerings(SAMPLE_HTML)
+    assert import_gc_courses(rows) == 5
+    assert Instructor.objects.count() == 6
+
+    physics = Course.objects.get(course_code="PHYS1500J")
+    section_one = physics.courseoffering_set.get(term="26SU", section=1)
+    section_two = physics.courseoffering_set.get(term="26SU", section=2)
+    original_instructor = section_one.instructors.get()
+    mesli_instructor = section_two.instructors.get()
+
+    # GC rotates to a word-reversed spelling for the same person.
+    rows[0]["instructors"] = ["Grumitt Richard"]
+    assert import_gc_courses(rows) == 5
+
+    section_one.refresh_from_db()
+    # No new Instructor row; the offering stays bound to the original one.
+    assert Instructor.objects.count() == 6
+    assert section_one.instructors.get().pk == original_instructor.pk
+    # Case/punctuation drift is absorbed the same way.
+    rows[1]["instructors"] = ["mesli-abdelmadjid"]
+    assert import_gc_courses(rows) == 5
+    assert Instructor.objects.count() == 6
+    section_two.refresh_from_db()
+    assert section_two.instructors.get().pk == mesli_instructor.pk
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_filters_junk_and_expands_merged_cells():
+    """Junk cells (教师, punctuation) vanish; merged cells split into people."""
+    html = """
+    <h1>Courses Offered in Summer 2026</h1>
+    <table>
+      <tr><td>Course Code</td><td>Course Title -CHN</td>
+          <td>Course Title -ENG</td><td>Crs</td><td>Instructor(s)</td></tr>
+      <tr><td>TEST1000J</td><td>测试</td><td>Test Course</td><td>4</td>
+          <td>Dr. Lin Yun, 教师, YAN Xu 闫旭</td></tr>
+    </table>
+    """
+    rows = parse_gc_offerings(html)
+    assert rows[0]["instructors"] == ["Lin Yun", "YAN Xu"]
+
+    assert import_gc_courses(rows) == 1
+    offering = CourseOffering.objects.get()
+    assert {i.name for i in offering.instructors.all()} == {"Lin Yun", "YAN Xu"}
+
+    # Merged multi-person cell (no separator) splits into both people.
+    html2 = html.replace("Dr. Lin Yun, 教师, YAN Xu 闫旭", "Zhaoguang Wang Ting Sun")
+    rows2 = parse_gc_offerings(html2)
+    assert rows2[0]["instructors"] == ["Zhaoguang Wang", "Ting Sun"]
+
+
+@pytest.mark.skipif(
+    "postgresql" not in settings.DATABASES["default"]["ENGINE"],
+    reason="project migrations use PostgreSQL-only ArrayField columns",
+)
+@pytest.mark.django_db
+def test_import_splits_merged_cells_from_stale_payloads():
+    """Payloads stored before canonicalization carry unsplit merged cells;
+    the importer must still split them instead of collapsing to one person."""
+    rows = parse_gc_offerings(SAMPLE_HTML)
+    rows.append(
+        {
+            "course_code": "ME3950J",
+            "crosslisted_codes": [],
+            "course_title": "Laboratory I",
+            "course_title_chn": "",
+            "department": "ME",
+            "number": 3950,
+            "course_credits": 4,
+            "url": "https://gc.sjtu.edu.cn/",
+            "term": "25FA",
+            "section": 1,
+            "instructors": ["Zhaoguang Wang Ting Sun"],
+        }
+    )
+    assert import_gc_courses(rows) == 6
+
+    offering = CourseOffering.objects.get(
+        course__course_code="ME3950J", term="25FA", section=1
+    )
+    assert {i.name for i in offering.instructors.all()} == {
+        "Zhaoguang Wang",
+        "Ting Sun",
+    }

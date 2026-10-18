@@ -3,13 +3,12 @@ from decimal import Decimal, InvalidOperation
 
 import requests
 from bs4 import BeautifulSoup
-from django.db import transaction
+from django.db import models, transaction
+from django.db.models import Q
 
-from apps.web.models import Course
+from apps.web.models import Course, CourseOffering, Instructor
 
-OFFERINGS_URL = (
-    "https://gc.sjtu.edu.cn/academics/courses/present-course-offerings/"
-)
+OFFERINGS_URL = "https://gc.sjtu.edu.cn/academics/courses/present-course-offerings/"
 HEADING_RE = re.compile(
     r"Courses\s+Offered\s+in\s+(Spring|Summer|Fall)\s+(20\d{2})",
     re.IGNORECASE,
@@ -20,6 +19,123 @@ COURSE_CODE_RE = re.compile(
 INSTRUCTOR_SEPARATOR_RE = re.compile(r"\s*[,，;；]\s*")
 TERM_CODES = {"spring": "SP", "summer": "SU", "fall": "FA"}
 MIN_EXPECTED_OFFERINGS = 20
+
+# ---------------------------------------------------------------------------
+# Instructor name canonicalization
+#
+# The GC page itself is inconsistent: the same person appears under different
+# spellings across terms (case, hyphens, middle names, term annotations like
+# "(Fall)", CJK annotations like "闫旭", or even full-name/short-name
+# alternation). Importing each cell verbatim with get_or_create(name) silently
+# forks one teacher into several Instructor rows every time the page rotates.
+# The pure-string cleaning/matching helpers live in lib.name_normalization
+# (shared with the review API); the functions here resolve against the live
+# Instructor table.
+# ---------------------------------------------------------------------------
+
+from lib.name_normalization import (  # noqa: E402
+    INSTRUCTOR_SPLITS,
+    JUNK_INSTRUCTOR_NAMES,
+    TOKEN_ALIASES,
+    best_name_match,
+    clean_instructor_name,
+    name_tokens,
+)
+
+
+CANDIDATE_LIMIT = 200
+
+
+def _candidate_rows(clean_name, limit=CANDIDATE_LIMIT):
+    """Instructor rows that could plausibly match a cleaned name.
+
+    Instead of loading the whole Instructor table, prefilter on the name
+    tokens (plus curated aliases and a short prefix of the longer tokens) so
+    the pure-string matcher only ever sees a bounded candidate set.
+    """
+    query = Q()
+    for token in name_tokens(clean_name):
+        query |= Q(name__icontains=token)
+        alias = TOKEN_ALIASES.get(token)
+        if alias:
+            query |= Q(name__icontains=alias)
+        if len(token) >= 6:
+            query |= Q(name__icontains=token[:4])
+            query |= Q(name__icontains=token[-4:])
+    if not query:
+        return []
+    return list(
+        Instructor.objects.filter(query)
+        .annotate(_offering_count=models.Count("courseoffering"))
+        .order_by("-_offering_count", "id")[:limit]
+    )
+
+
+def _best_instructor_match(clean_name, existing):
+    """Find the Instructor row a cleaned name should map to.
+
+    Candidates are ordered by usage (most offerings first) so ties resolve to
+    the most-used spelling as canonical. Returns None when nothing plausibly
+    matches.
+    """
+    ranked = sorted(
+        existing,
+        key=lambda r: (-_offering_count(r), r.id),
+    )
+    matched = best_name_match(clean_name, [r.name for r in ranked])
+    if matched is None:
+        return None
+    return next((r for r in ranked if r.name == matched), None)
+
+
+def _offering_count(row):
+    """Offering count for tie-breaking, honoring a prefetched annotation."""
+    count = getattr(row, "_offering_count", None)
+    if count is not None:
+        return count
+    return row.courseoffering_set.count()
+
+
+def resolve_instructor(clean_name, existing=None):
+    """Return the Instructor row for a cleaned name, reusing existing rows
+    across spelling variants. Creates a new row only when no existing
+    instructor plausibly matches.
+
+    Callers that already hold a candidate set pass it in; callers that do not
+    get a bounded prefiltered query instead of a full table load.
+    """
+    if existing is not None:
+        candidates = list(existing)
+    else:
+        candidates = _candidate_rows(clean_name)
+    match = _best_instructor_match(clean_name, candidates)
+    if match is not None:
+        return match
+    instructor, _ = Instructor.objects.get_or_create(name=clean_name)
+    return instructor
+
+
+def expand_instructor_names(raw_names, existing=None):
+    """Resolve raw GC cell text to Instructor rows, self-defensively.
+
+    Applies cleaning, junk filtering, and curated multi-person splits so the
+    importer behaves correctly even when handed payloads stored before the
+    canonicalization logic existed. Returns a deduped list of Instructor rows.
+    Pass a list to reuse and extend a shared candidate set; pass None to let
+    each name resolve through its own bounded query.
+    """
+    resolved = []
+    for raw in raw_names:
+        cleaned = clean_instructor_name(raw)
+        if not cleaned or cleaned.lower() in JUNK_INSTRUCTOR_NAMES:
+            continue
+        for name in INSTRUCTOR_SPLITS.get(cleaned, [cleaned]):
+            inst = resolve_instructor(name, existing)
+            if existing is not None and all(row.id != inst.id for row in existing):
+                existing.append(inst)
+            if not any(row.id == inst.id for row in resolved):
+                resolved.append(inst)
+    return resolved
 
 
 class GCOfferingsParseError(ValueError):
@@ -84,9 +200,7 @@ def _coalesce_course_metadata(offerings):
 
     for (_, course_code), items in by_code.items():
         for field in fields:
-            populated = {
-                item[field] for item in items if item[field] not in (None, "")
-            }
+            populated = {item[field] for item in items if item[field] not in (None, "")}
             if len(populated) > 1:
                 raise GCOfferingsParseError(
                     f"conflicting {field} values for {course_code}: "
@@ -97,11 +211,7 @@ def _coalesce_course_metadata(offerings):
                 item[field] = value
 
         crosslisted_codes = sorted(
-            {
-                code
-                for item in items
-                for code in item.get("crosslisted_codes", [])
-            }
+            {code for item in items for code in item.get("crosslisted_codes", [])}
         )
         for item in items:
             item["crosslisted_codes"] = crosslisted_codes
@@ -197,31 +307,47 @@ def _parse_course_cells(values, source_url):
 
 
 def _parse_instructors(value):
-    value = value.strip()
-    if not value or value in {"-", "–", "—"}:
-        return []
-    return [name for name in INSTRUCTOR_SEPARATOR_RE.split(value) if name]
+    names = []
+    for raw in INSTRUCTOR_SEPARATOR_RE.split(value or ""):
+        cleaned = clean_instructor_name(raw)
+        if not cleaned or cleaned.lower() in JUNK_INSTRUCTOR_NAMES:
+            continue
+        # Expand cells that cram several instructors together (curated).
+        names.extend(INSTRUCTOR_SPLITS.get(cleaned, [cleaned]))
+    return names
 
 
 @transaction.atomic
 def import_gc_courses(offerings):
     if not offerings:
         raise ValueError("refusing to import an empty course list")
-    imported_codes = set()
+    courses_by_code = {}
+    existing = None
 
     for item in offerings:
-        if item["course_code"] in imported_codes:
-            continue
-        Course.objects.update_or_create(
-            course_code=item["course_code"],
-            defaults={
-                "course_title": item["course_title"],
-                "department": item["department"],
-                "number": item["number"],
-                "course_credits": item["course_credits"],
-                "url": item["url"],
-            },
-        )
-        imported_codes.add(item["course_code"])
+        course = courses_by_code.get(item["course_code"])
+        if course is None:
+            course, _ = Course.objects.update_or_create(
+                course_code=item["course_code"],
+                defaults={
+                    "course_title": item["course_title"],
+                    "department": item["department"],
+                    "number": item["number"],
+                    "course_credits": item["course_credits"],
+                    "url": item["url"],
+                },
+            )
+            courses_by_code[item["course_code"]] = course
 
-    return len(imported_codes)
+        instructors = expand_instructor_names(item["instructors"], existing)
+        # Sections are numbered by row order within the GC page table, not by
+        # the registrar's section numbers (the page has no such column).
+        offering, _ = CourseOffering.objects.get_or_create(
+            course=course,
+            term=item["term"],
+            section=item["section"],
+            defaults={"period": ""},
+        )
+        offering.instructors.set(instructors)
+
+    return len(courses_by_code)
