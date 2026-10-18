@@ -16,7 +16,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -63,6 +62,8 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 staticfiles
+media/
+data/backups/
 
 # Flask stuff:
 instance/
@@ -159,6 +160,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+tunnel.env
 
 # Spyder project settings
 .spyderproject

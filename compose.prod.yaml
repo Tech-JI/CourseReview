@@ -3,18 +3,41 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - /etc/coursereview/secrets.env
-    environment:
-      DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
-      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+      - path: ${CR_SECRETS_ENV:?set CR_SECRETS_ENV}
+        required: true
     volumes:
-      - /etc/coursereview/config.yaml:/app/config.yaml:ro
+      - ${CR_CONFIG_FILE:?set CR_CONFIG_FILE}:/app/config.yaml:ro
+      - ${CR_MEDIA_DIR:?set CR_MEDIA_DIR}:/app/media
 
   migrate:
     env_file:
-      - /etc/coursereview/secrets.env
-    environment:
-      DATABASE__URL: ${DATABASE__URL:-postgres://admin:test@db:5432/coursereview}
-      REDIS__URL: ${REDIS__URL:-redis://cache:6379/0}
+      - path: ${CR_SECRETS_ENV:?set CR_SECRETS_ENV}
+        required: true
     volumes:
-      - /etc/coursereview/config.yaml:/app/config.yaml:ro
+      - ${CR_CONFIG_FILE:?set CR_CONFIG_FILE}:/app/config.yaml:ro
+
+  worker:
+    env_file:
+      - path: ${CR_SECRETS_ENV:?set CR_SECRETS_ENV}
+        required: true
+    volumes:
+      - ${CR_CONFIG_FILE:?set CR_CONFIG_FILE}:/app/config.yaml:ro
+      - ${CR_MEDIA_DIR:?set CR_MEDIA_DIR}:/app/media
+
+  beat:
+    env_file:
+      - path: ${CR_SECRETS_ENV:?set CR_SECRETS_ENV}
+        required: true
+    volumes:
+      - ${CR_CONFIG_FILE:?set CR_CONFIG_FILE}:/app/config.yaml:ro
+
+  tunnel:
+    image: ${CR_TUNNEL_IMAGE:-cloudflare/cloudflared:latest}
+    command: ["tunnel", "run", "--protocol", "http2"]
+    env_file:
+      - path: ${CR_TUNNEL_ENV:?set CR_TUNNEL_ENV}
+        required: true
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy

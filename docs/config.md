@@ -57,6 +57,9 @@ These are typically non-secret and environment-specific:
 - `QUEST.RESET_PASSWORD.URL`
 - `QUEST.RESET_PASSWORD.QUESTIONID`
 
+Optional feature tuning also lives here: `SYLLABUS.*` (upload limits and the
+analysis gate) and `LLM.*` (the model used for syllabus analysis and OCR).
+
 ## Environment variables
 
 Environment variables use `__` to represent nesting.
@@ -170,6 +173,7 @@ CORS_ALLOWED_ORIGINS:
 # SESSION:
 #   COOKIE_AGE: 2592000 # 30 days
 #   SAVE_EVERY_REQUEST: true
+#   COOKIE_SECURE: # unset derives it from DEBUG (secure when DEBUG is false)
 #
 # WEB:
 #   COURSE:
@@ -216,6 +220,26 @@ QUEST:
     QUESTIONID: 10000002
 
 # AUTO_IMPORT_CRAWLED_DATA: true
+
+# SYLLABUS:
+#   MAX_UPLOAD_SIZE: 20971520 # 20 MB
+#   ALLOWED_EXTENSIONS: [".pdf", ".docx"]
+#   MIN_MATCH_SCORE: 60
+#   MAX_ANALYSIS_CHARS: # unset derives it from LLM.NUM_CTX
+#   MAX_EXTRACTED_CHARS: 400000
+#   RECYCLE_RETENTION_DAYS: 30
+#   RECYCLE_MAX_FILES: 500
+#   REQUIRE_COURSE_SIGNAL: true
+#   REQUIRE_EVIDENCE: true
+
+# LLM: # model used for syllabus analysis/OCR (env: LLM__PROVIDER, LLM__BASE_URL, LLM__API_KEY)
+#   PROVIDER: ollama # ollama or openai (OpenAI-compatible API)
+#   BASE_URL: "http://127.0.0.1:11434"
+#   API_KEY: # bearer token for hosted or proxied endpoints
+#   MODEL: "qwen3.8:latest"
+#   TIMEOUT: 600
+#   NUM_CTX: 32768
+#   MAX_PAGES: 30
 ```
 
 ## Built-in defaults
@@ -228,9 +252,12 @@ DEFAULTS = {
     "SECRET_KEY": None,
     "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
     "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],
+    "CSRF_TRUSTED_ORIGINS": [],
     "SESSION": {
         "COOKIE_AGE": 2592000,  # 30 days
         "SAVE_EVERY_REQUEST": True,
+        # None derives the value from DEBUG; set explicitly to override.
+        "COOKIE_SECURE": None,
     },
     "WEB": {
         "COURSE": {"PAGE_SIZE": 10},
@@ -268,6 +295,26 @@ DEFAULTS = {
         },
     },
     "AUTO_IMPORT_CRAWLED_DATA": True,
+    "SYLLABUS": {
+        "MAX_UPLOAD_SIZE": 20971520,  # 20 MB
+        "ALLOWED_EXTENSIONS": [".pdf", ".docx"],
+        "MIN_MATCH_SCORE": 60,
+        "MAX_ANALYSIS_CHARS": None,  # derived from LLM.NUM_CTX
+        "MAX_EXTRACTED_CHARS": 400_000,
+        "RECYCLE_RETENTION_DAYS": 30,
+        "RECYCLE_MAX_FILES": 500,
+        "REQUIRE_COURSE_SIGNAL": True,
+        "REQUIRE_EVIDENCE": True,
+    },
+    "LLM": {
+        "PROVIDER": "ollama",
+        "BASE_URL": "http://127.0.0.1:11434",
+        "API_KEY": None,
+        "MODEL": "qwen3.8:latest",
+        "TIMEOUT": 600,
+        "NUM_CTX": 32768,
+        "MAX_PAGES": 30,
+    },
 }
 ```
 
@@ -282,7 +329,12 @@ For production, usually:
 - use real Postgres and Valkey URLs
 - keep secrets in environment variables, not in `config.yaml`
 
+`SESSION.COOKIE_SECURE` defaults to `None`, which means it follows `DEBUG`:
+session cookies are `Secure` whenever `DEBUG` is false. Set it explicitly only
+when a deployment needs something different (for example, an internal HTTP-only
+staging host).
+
 Typical production split:
 
-- `/etc/coursereview/secrets.env` for secrets
-- `/etc/coursereview/config.yaml` for non-secret config
+- `CR_SECRETS_ENV` for secrets
+- `CR_CONFIG_FILE` for non-secret config
