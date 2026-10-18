@@ -10,7 +10,7 @@ load_dotenv(BASE_DIR / ".env")
 
 # --- Default Configuration ---
 DEFAULTS = {
-    "DEBUG": False,
+    "DEBUG": True,
     "SECRET_KEY": None,
     "ALLOWED_HOSTS": ["127.0.0.1", "localhost"],
     "CORS_ALLOWED_ORIGINS": ["http://localhost:5173", "http://127.0.0.1:5173"],

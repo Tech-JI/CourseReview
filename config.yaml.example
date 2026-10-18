@@ -4,7 +4,7 @@
 # Values here will override DEFAULTS in settings.py.
 # Environment variables will override values here.
 
-DEBUG: false
+DEBUG: true
 
 # SECRET_KEY: Use env
 
