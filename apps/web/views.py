@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from apps.web.models import (
     Course,
     CourseMedian,
+    CourseOffering,
     Instructor,
     Review,
     ReviewVote,
@@ -100,6 +101,9 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         - Query parameters:
             - department (string): Filter by department code (case-insensitive)
             - code (string): Filter by course code (partial match)
+            - term (string): Filter courses offered in the given term (e.g. "25FA")
+            - professor (string): Match part of an instructor's name, ignoring case.
+              Searches all terms by default, or the selected term when supplied.
             - min_quality (integer): Filter by minimum quality score (authenticated only)
             - min_difficulty (integer): Filter by minimum difficulty score (authenticated only)
             - sort_by (string): Sort field ("course_code", "review_count"),("quality_score", "difficulty_score")(authenticated only)
@@ -113,6 +117,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
             "previous": "string|null",
             "results": [CourseSearchSerializer objects]
         }
+        Each course's instructors field lists its current-term instructors.
     """
 
     serializer_class = CourseSearchSerializer
@@ -133,10 +138,24 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         """Helper function to apply all filters to courses queryset."""
         department = self.request.query_params.get("department")
         code = self.request.query_params.get("code")
+        term = self.request.query_params.get("term", "").strip()
+        professor = self.request.query_params.get("professor", "").strip()
         if department:
             queryset = queryset.filter(department__iexact=department)
         if code:
             queryset = queryset.filter(course_code__icontains=code)
+        if term and professor:
+            queryset = queryset.filter(
+                courseoffering__term__iexact=term,
+                courseoffering__instructors__name__icontains=professor,
+            )
+        elif term:
+            queryset = queryset.filter(courseoffering__term__iexact=term)
+        elif professor:
+            queryset = queryset.filter(
+                courseoffering__instructors__name__icontains=professor,
+            )
+
         return queryset
 
     def _filter_by_score(self, queryset):
