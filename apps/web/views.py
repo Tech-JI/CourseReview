@@ -5,7 +5,7 @@ import os
 from django.conf import settings
 from django.core.files.base import File
 from django.db import IntegrityError
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.http import FileResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, mixins, pagination, status
@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from apps.web.models import (
     Course,
     CourseMedian,
+    CourseOffering,
     Instructor,
     Review,
     ReviewVote,
@@ -100,6 +101,9 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
         - Query parameters:
             - department (string): Filter by department code (case-insensitive)
             - code (string): Filter by course code (partial match)
+            - term (string): Filter courses offered in the given term (e.g. "25FA")
+            - professor (string): Match part of an instructor's name, ignoring case.
+              Searches all terms by default, or the selected term when supplied.
             - min_quality (integer): Filter by minimum quality score (authenticated only)
             - min_difficulty (integer): Filter by minimum difficulty score (authenticated only)
             - sort_by (string): Sort field ("course_code", "review_count"),("quality_score", "difficulty_score")(authenticated only)
@@ -113,6 +117,7 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
             "previous": "string|null",
             "results": [CourseSearchSerializer objects]
         }
+        Each course's instructors field lists its current-term instructors.
     """
 
     serializer_class = CourseSearchSerializer
@@ -137,6 +142,21 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
             queryset = queryset.filter(department__iexact=department)
         if code:
             queryset = queryset.filter(course_code__icontains=code)
+
+        offering_filters = {}
+        term = self.request.query_params.get("term", "").strip()
+        if term:
+            offering_filters["term__iexact"] = term
+
+        professor = self.request.query_params.get("professor", "").strip()
+        if professor:
+            offering_filters["instructors__name__icontains"] = professor
+
+        if offering_filters:
+            matching_offerings = CourseOffering.objects.filter(
+                course_id=OuterRef("pk"), **offering_filters
+            )
+            queryset = queryset.filter(Exists(matching_offerings))
         return queryset
 
     def _filter_by_score(self, queryset):

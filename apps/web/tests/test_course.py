@@ -2,6 +2,12 @@ import pytest
 from django.urls import reverse
 
 from apps.web.models import Review, Vote
+from apps.web.tests.factories import (
+    CourseOfferingFactory,
+    InstructorFactory,
+    ReviewFactory,
+)
+from lib.constants import CURRENT_TERM
 
 
 @pytest.mark.django_db
@@ -49,6 +55,101 @@ class TestCourseAPIUnauthenticated:
 
         response = base_client.get(url, {"code": "101"})
         assert response.data["count"] == 2
+
+    def test_filter_professor_and_term_match_same_offering(
+        self, base_client, course_factory
+    ):
+        chen = InstructorFactory(name="Mei Chen")
+        math_course = course_factory(department="MATH")
+        for offering in CourseOfferingFactory.create_batch(
+            2, course=math_course, term=CURRENT_TERM
+        ):
+            offering.instructors.add(chen)
+        ReviewFactory(course=math_course)
+
+        physics_course = course_factory(department="PHYS")
+        physics_offering = CourseOfferingFactory(
+            course=physics_course, term=CURRENT_TERM
+        )
+        physics_offering.instructors.add(chen)
+
+        former_course = course_factory(department="MATH")
+        CourseOfferingFactory(course=former_course, term="20FA").instructors.add(chen)
+        current_offering = CourseOfferingFactory(
+            course=former_course, term=CURRENT_TERM
+        )
+        current_offering.instructors.add(InstructorFactory(name="Alex Wu"))
+        ReviewFactory(course=former_course, professor=chen.name)
+
+        response = base_client.get(
+            reverse("courses_api"),
+            {"professor": "  cHe  ", "term": CURRENT_TERM, "department": "MATH"},
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        (result,) = response.data["results"]
+        assert result["id"] == math_course.pk
+        assert result["review_count"] == 1
+        assert result["instructors"] == [chen.name]
+
+    @pytest.mark.parametrize("term_params", [{}, {"term": "   "}])
+    def test_professor_search_across_terms(
+        self, base_client, course_factory, term_params
+    ):
+        chen = InstructorFactory(name="Mei Chen")
+        course = course_factory()
+        for term in ("20FA", "21SP"):
+            CourseOfferingFactory(course=course, term=term).instructors.add(chen)
+        ReviewFactory(course=course_factory(), professor=chen.name)
+
+        response = base_client.get(
+            reverse("courses_api"), {"professor": "chen", **term_params}
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert [row["id"] for row in response.data["results"]] == [course.pk]
+
+    @pytest.mark.parametrize(
+        ("other_filters", "expected_codes"),
+        [
+            ({}, ["MATH101J", "PHYS202J"]),
+            ({"department": "MATH"}, ["MATH101J"]),
+            ({"code": "202"}, ["PHYS202J"]),
+        ],
+    )
+    def test_filter_by_term_without_professor(
+        self, base_client, other_filters, expected_codes
+    ):
+        CourseOfferingFactory(
+            term="24FA", course__department="MATH", course__course_code="MATH101J"
+        )
+        CourseOfferingFactory(
+            term="24FA", course__department="PHYS", course__course_code="PHYS202J"
+        )
+        CourseOfferingFactory(
+            term="24SP", course__department="MATH", course__course_code="MATH202J"
+        )
+
+        response = base_client.get(
+            reverse("courses_api"), {"term": " 24fa ", **other_filters}
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == len(expected_codes)
+        assert [
+            row["course_code"] for row in response.data["results"]
+        ] == expected_codes
+
+    @pytest.mark.parametrize(("professor", "expected_count"), [("   ", 1), ("Wu", 0)])
+    def test_professor_filter_blank_or_unmatched(
+        self, base_client, course, professor, expected_count
+    ):
+        response = base_client.get(reverse("courses_api"), {"professor": professor})
+
+        assert response.status_code == 200
+        assert response.data["count"] == expected_count
 
     def test_sort_courses_by_review_count_anonymous(
         self, base_client, user, course_factory
