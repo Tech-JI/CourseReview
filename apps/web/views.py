@@ -19,7 +19,6 @@ from rest_framework.response import Response
 from apps.web.models import (
     Course,
     CourseMedian,
-    CourseOffering,
     Instructor,
     Review,
     ReviewVote,
@@ -117,7 +116,8 @@ class CoursesListAPI(generics.GenericAPIView, mixins.ListModelMixin):
             "previous": "string|null",
             "results": [CourseSearchSerializer objects]
         }
-        Each course's instructors field lists its current-term instructors.
+        Each course's instructors field always lists its current-term
+        instructors, even when matched by a past-term professor or term filter.
     """
 
     serializer_class = CourseSearchSerializer
